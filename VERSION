@@ -1,0 +1,3 @@
+# simple versioning system <breaking-change.non-breaking-change>
+# do not change unless necessary
+VERSION=0.0
