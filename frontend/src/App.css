@@ -1,3 +1,6 @@
+/* Boxy S-mobiili look: white header with green title, grey uppercase section
+   headings, full-width white rows with hairline dividers, square corners. */
+
 .muted {
   color: var(--muted);
 }
@@ -6,12 +9,77 @@
 }
 
 .demo-banner {
-  margin: 0 16px 12px;
-  padding: 10px 14px;
-  border-radius: 16px;
+  padding: 10px 16px;
   background: var(--warn-soft);
+  border-bottom: 1px solid var(--border);
   color: var(--body);
   font-size: 13px;
+}
+
+/* ---------- App bar ---------- */
+
+.app-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 8px 52px;
+  text-align: center;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+
+  h1 {
+    font-family: var(--condensed);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    color: var(--brand-green);
+    line-height: 1.2;
+  }
+  small {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+  }
+}
+
+.back {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--brand-green);
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ---------- Section headings & list rows ---------- */
+
+.section-title {
+  margin: 0;
+  padding: 18px 16px 8px;
+  font-family: var(--condensed);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.intro {
+  padding: 14px 16px;
+  color: var(--muted);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 /* ---------- Customer picker ---------- */
@@ -19,46 +87,17 @@
 .picker {
   height: 100%;
   overflow-y: auto;
-  padding-bottom: 24px;
-}
-
-.picker-head {
-  padding: 40px 16px 28px;
-  margin-bottom: 16px;
-  text-align: center;
-  color: var(--on-brand);
-  background: var(--brand);
-  border-radius: 0 0 24px 24px;
-
-  h1 {
-    font-size: 26px;
-    margin: 14px 0 4px;
-    color: var(--on-brand);
-  }
-  p {
-    opacity: 0.85;
-  }
-}
-
-.logo {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--brand);
-  background: var(--brand-mint);
 }
 
 .customer-list {
   list-style: none;
   margin: 0;
-  padding: 0 16px;
-  display: grid;
-  gap: 8px;
+  padding: 0;
+  background: var(--surface);
+
+  li + li button {
+    border-top: 1px solid var(--border);
+  }
 
   button {
     width: 100%;
@@ -66,14 +105,13 @@
     align-items: center;
     gap: 12px;
     padding: 14px 16px;
-    border: 1px solid transparent;
-    border-radius: 22px;
-    background: var(--surface);
+    border: none;
+    background: transparent;
     text-align: left;
     cursor: pointer;
 
     &:hover {
-      border-color: var(--brand-green);
+      background: var(--accent-soft);
     }
   }
 
@@ -81,27 +119,32 @@
   small {
     display: block;
   }
+  strong {
+    font-weight: 500;
+  }
   small {
     color: var(--muted);
+    font-size: 13px;
   }
 }
 
 .avatar {
   flex: none;
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: grid;
   place-items: center;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--brand);
-  background: var(--brand-mint);
+  color: #fff;
+  background: #9a9a9a;
 }
 
 .chevron {
   margin-left: auto;
   font-size: 24px;
-  color: var(--text);
+  color: #a8a8a8;
 }
 
 /* ---------- Chat ---------- */
@@ -112,82 +155,45 @@
   flex-direction: column;
 }
 
-.chat-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  margin-bottom: 12px;
-  color: var(--on-brand);
-  background: var(--brand);
-
-  strong,
-  small {
-    display: block;
-    line-height: 1.25;
-    color: var(--on-brand);
-  }
-  strong {
-    font-size: 17px;
-  }
-  small {
-    opacity: 0.8;
-    font-size: 13px;
-  }
-}
-
-.back {
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--on-brand);
-  font-size: 28px;
-  line-height: 1;
-  cursor: pointer;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.12);
-  }
-}
-
 .messages {
   flex: 1;
   overflow-y: auto;
-  padding: 0 16px 12px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
 .welcome {
-  padding: 8px 4px 4px;
+  margin: -12px -16px 0;
+  background: var(--surface);
 
   h2 {
-    font-size: 24px;
-    margin-bottom: 4px;
+    padding: 16px 16px 2px;
+    font-size: 20px;
   }
   p {
+    padding: 0 16px 14px;
     color: var(--muted);
   }
 }
 
 .baskets {
   list-style: none;
-  margin: 14px 0 0;
+  margin: 0;
   padding: 0;
-  display: grid;
-  gap: 8px;
 
   li {
     display: grid;
-    grid-template-columns: 14px 1fr;
-    column-gap: 12px;
+    grid-template-columns: 12px 1fr;
+    column-gap: 14px;
     align-items: center;
     padding: 12px 16px;
-    border-radius: 22px;
     background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  strong {
+    font-weight: 500;
   }
   small {
     grid-column: 2;
@@ -214,8 +220,8 @@
 
 .bubble {
   max-width: 85%;
-  padding: 12px 16px;
-  border-radius: 22px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
   overflow-wrap: anywhere;
 
   p + p,
@@ -227,27 +233,23 @@
     margin: 0;
     padding-left: 20px;
   }
+  strong {
+    color: inherit;
+  }
 
   &.user {
     align-self: flex-end;
     color: var(--on-brand);
-    background: var(--brand);
-    border-bottom-right-radius: 6px;
+    background: var(--brand-green);
   }
   &.coach {
     background: var(--surface);
-    border-bottom-left-radius: 6px;
+    border: 1px solid var(--border);
   }
   &.error {
     color: var(--error);
     background: var(--error-soft);
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .bubble.user {
-    color: var(--brand);
-    background: var(--brand-mint);
+    border-color: transparent;
   }
 }
 
@@ -262,14 +264,17 @@
 .concept {
   width: 100%;
   margin: 0;
-  padding: 14px 16px;
-  border-radius: 22px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
   background: var(--surface);
+  border: 1px solid var(--border);
 }
 
 .chart-card figcaption {
+  font-family: var(--condensed);
   font-weight: 700;
   font-size: 14px;
+  text-transform: uppercase;
   color: var(--text);
   margin-bottom: 8px;
 }
@@ -280,6 +285,8 @@
 
 .concept {
   background: var(--accent-soft);
+  border-color: transparent;
+  border-left: 3px solid var(--brand-green);
   font-size: 14px;
 
   p {
@@ -327,16 +334,17 @@
 
   form {
     display: flex;
-    gap: 8px;
+    align-items: center;
+    gap: 10px;
   }
 
   input {
     flex: 1;
     min-width: 0;
-    padding: 12px 18px;
-    border-radius: 40px;
-    border: 1px solid transparent;
-    background: var(--surface-alt);
+    padding: 11px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
     color: var(--body);
     outline: none;
 
@@ -345,6 +353,7 @@
     }
   }
 
+  /* Round green action button, like the app's Maksu button. */
   button[type='submit'] {
     flex: none;
     width: 46px;
@@ -353,12 +362,12 @@
     border-radius: 50%;
     font-size: 20px;
     font-weight: 700;
-    color: var(--brand);
-    background: var(--brand-mint);
+    color: #fff;
+    background: var(--brand-green);
     cursor: pointer;
 
     &:disabled {
-      opacity: 0.45;
+      opacity: 0.4;
       cursor: default;
     }
   }
@@ -373,19 +382,18 @@
 
   button {
     flex: none;
-    padding: 8px 14px;
-    border-radius: 40px;
-    border: 1.5px solid var(--text);
-    background: transparent;
-    color: var(--text);
+    padding: 7px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--brand-green);
+    background: var(--surface);
+    color: var(--brand-green);
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
 
     &:hover {
-      background: var(--brand-mint);
-      border-color: var(--brand-mint);
-      color: var(--brand);
+      color: #fff;
+      background: var(--brand-green);
     }
   }
 }

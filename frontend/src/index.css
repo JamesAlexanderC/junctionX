@@ -1,51 +1,39 @@
 /* Palette sampled from s-pankki.fi so the web view blends into S-mobiili. */
 :root {
-  --brand: #004628; /* S-Pankki dark green: headers, text, primary */
-  --brand-mint: #91fa9b; /* mint highlight: primary buttons, accents */
-  --brand-green: #00aa46; /* bright green: charts, positive values */
-  --bg: #f5f8f7;
+  /* Palette from s-pankki.fi and the S-mobiili app: white list rows on a
+     light grey background, bright S-green for accents. */
+  --brand: #004628; /* S-Pankki dark green */
+  --brand-green: #00aa46; /* S-mobiili green: titles, active, primary */
+  --brand-mint: #91fa9b;
+  --bg: #f2f2f2;
   --surface: #ffffff;
-  --surface-alt: #eff0f1;
-  --text: #004628;
+  --surface-alt: #ececec;
+  --text: #1f1f1f;
   --body: #212529;
-  --muted: #5f6b66;
-  --border: #e6e9e9;
+  --muted: #6b6b6b;
+  --border: #dcdcdc;
   --accent: var(--brand-green);
-  --accent-soft: #e6f8ea;
+  --accent-soft: #e6f6ec;
   --on-brand: #ffffff;
   --error: #b3261e;
-  --error-soft: #ffc9d7;
+  --error-soft: #fde7ec;
   --warn-soft: #fff1d8;
   --b1: #004628;
   --b2: #ffa200;
   --b3: #e8506e;
+  --radius: 4px;
+  --condensed: 'Roboto Condensed', 'Arial Narrow', 'S Bonus UX', sans-serif;
 
   font: 16px/1.5 'S Bonus UX', 'Open Sans', system-ui, -apple-system, 'Segoe UI',
     Roboto, Arial, sans-serif;
   color: var(--body);
   background: var(--bg);
-  color-scheme: light dark;
+  /* Always light: S-mobiili's look is light, even on dark-mode phones. */
+  color-scheme: light;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d1a14;
-    --surface: #15261d;
-    --surface-alt: #1c3126;
-    --text: #e9f5ee;
-    --body: #d9e4de;
-    --muted: #9aaba2;
-    --border: #24392d;
-    --accent: #3fd47a;
-    --accent-soft: #1b3a28;
-    --error: #ffb4c4;
-    --error-soft: #3d1f27;
-    --warn-soft: #3a2f1a;
-    --b1: #91fa9b;
-  }
-}
 
 * {
   box-sizing: border-box;

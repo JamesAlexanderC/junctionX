@@ -8,7 +8,7 @@ export const MOCK_CUSTOMERS = [
 
 const ANSWERS = [
   {
-    match: /basket|spend.*month|where.*money/i,
+    match: /basket|where.*money/i,
     text:
       'You spent **€1,840** last month. **€1,120** went on must-pay bills ' +
       '(basket 1), **€210** on one-off essentials like the dentist (basket 2), ' +

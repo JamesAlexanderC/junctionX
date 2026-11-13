@@ -195,12 +195,14 @@ function Message({ msg }) {
 function CustomerPicker({ customers, demo, loading, onPick }) {
   return (
     <main className="picker">
-      <div className="picker-head">
-        <div className="logo">€</div>
+      <header className="app-bar">
         <h1>Money Coach</h1>
-        <p>Chat with your own banking data. Pick a customer to start.</p>
-      </div>
+      </header>
+      <p className="intro">
+        Chat with your own banking data. Pick a customer to start.
+      </p>
       {demo && <DemoBanner />}
+      <h2 className="section-title">Customers</h2>
       {loading ? (
         <p className="muted center">Loading customers…</p>
       ) : (
@@ -305,12 +307,12 @@ function Chat({ customer, demo, onBack }) {
 
   return (
     <main className="chat">
-      <header className="chat-head">
+      <header className="app-bar">
         <button type="button" className="back" onClick={onBack} aria-label="Back">
           ‹
         </button>
         <div>
-          <strong>Money Coach</strong>
+          <h1>Money Coach</h1>
           <small>Customer {customer.customer_id}</small>
         </div>
       </header>
@@ -324,6 +326,7 @@ function Chat({ customer, demo, onBack }) {
               Ask me anything about your money. I sort every expense into three
               baskets:
             </p>
+            <h3 className="section-title">Your three baskets</h3>
             <ol className="baskets">
               <li>
                 <b className="dot b1" /> <strong>Must-pay bills</strong>
