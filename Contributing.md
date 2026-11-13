@@ -7,13 +7,13 @@ main will be current release, I will create release branches in form release-VER
 
 all merges to development should be approved through me (17clarkeja@gmail.com)
 
-every PR request should solve merge conflicts with main
+every PR request should solve merge conflicts with develop
 
 every PR request should result in a runnable development branch
 
 ## Style guide
 
-to ensure consistency no line of code should be over 88 lines long
+to ensure consistency no line of code should be over 88 characters long
 
 black should be run at the end of each feature branch before PR
 
