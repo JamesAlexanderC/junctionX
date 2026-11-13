@@ -27,7 +27,14 @@ const SUGGESTIONS = [
 ]
 
 // Basket colours first, so pie charts of the three baskets match the legend.
-const COLORS = ['#2f6fdf', '#e09a1a', '#e0475b', '#1f9e74', '#8b5cf6', '#64748b']
+const COLORS = [
+  'var(--b1)',
+  'var(--b2)',
+  'var(--b3)',
+  '#00aa46',
+  '#91fa9b',
+  '#5f6b66',
+]
 
 const formatValue = (value, unit) =>
   unit === '€'
@@ -103,7 +110,11 @@ function ChartCard({ chart }) {
           ))}
         </Pie>
         {tooltip}
-        <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+        <Legend
+          iconType="circle"
+          wrapperStyle={{ fontSize: 12 }}
+          formatter={(v) => <span style={{ color: 'var(--body)' }}>{v}</span>}
+        />
       </PieChart>
     )
   } else if (kind === 'line') {
