@@ -179,6 +179,9 @@ BAND_Z = 1.28  # 80% band
 DANGER_BALANCE_EUR = 50.0  # #20
 UPCOMING_BILLS_DAYS = 30  # #21
 NO_PAYDAY_HORIZON_DAYS = 30  # horizon when no payday was found
+# #19 (FC-1): with fewer days than this left in the month, "end of month"
+# means next month's last day, so the forecast always looks ahead.
+MONTH_END_ROLLOVER_DAYS = 3
 SEASONAL_WARN_RATIO = 1.25  # #23
 DEFAULT_CYCLE_DAYS = 30
 

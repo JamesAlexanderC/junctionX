@@ -245,7 +245,8 @@ def end_of_month(p):
     low, high = eom.get("low"), eom.get("high")
     if _num(low) and _num(high) and low == high:
         return []  # no days left this month: nothing to forecast
-    text = f"Expected balance at month end: {_eur(eom['expected'])}"
+    when = f"on {_nice_date(eom['date'])}" if eom.get("date") else "at month end"
+    text = f"Expected balance {when}: {_eur(eom['expected'])}"
     if _num(low) and _num(high):
         text += f" (likely between {_eur(low)} and {_eur(high)})"
     return [
