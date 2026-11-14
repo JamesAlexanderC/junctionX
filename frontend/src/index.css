@@ -1,0 +1,73 @@
+/* Palette sampled from s-pankki.fi so the web view blends into S-mobiili. */
+:root {
+  /* Palette from s-pankki.fi and the S-mobiili app: white list rows on a
+     light grey background, bright S-green for accents. */
+  --brand: #004628; /* S-Pankki dark green */
+  --brand-green: #00aa46; /* S-mobiili green: titles, active, primary */
+  --brand-mint: #91fa9b;
+  --bg: #f2f2f2;
+  --surface: #ffffff;
+  --surface-alt: #ececec;
+  --text: #1f1f1f;
+  --body: #212529;
+  --muted: #6b6b6b;
+  --border: #dcdcdc;
+  --accent: var(--brand-green);
+  --accent-soft: #e6f6ec;
+  --on-brand: #ffffff;
+  --error: #b3261e;
+  --error-soft: #fde7ec;
+  --warn-soft: #fff1d8;
+  --b1: #004628;
+  --b2: #ffa200;
+  --b3: #e8506e;
+  --radius: 4px;
+  --condensed: 'Roboto Condensed', 'Arial Narrow', 'S Bonus UX', sans-serif;
+
+  font: 16px/1.5 'S Bonus UX', 'Open Sans', system-ui, -apple-system, 'Segoe UI',
+    Roboto, Arial, sans-serif;
+  color: var(--body);
+  background: var(--bg);
+  /* Always light: S-mobiili's look is light, even on dark-mode phones. */
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+}
+
+#root {
+  /* Mobile web view width; centred when opened on a desktop browser. */
+  max-width: 480px;
+  height: 100dvh;
+  margin: 0 auto;
+  background: var(--bg);
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+strong {
+  color: var(--text);
+}

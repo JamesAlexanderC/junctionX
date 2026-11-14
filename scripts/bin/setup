@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# Set up the project: .env file, Python backend and React (Vite) frontend.
+# Portable across macOS (bash 3.2, BSD tools) and Ubuntu (GNU tools).
+#
+# Usage: scripts/bin/setup [--clean] [--backend-only | --frontend-only]
+#   --clean           remove the virtualenv / node_modules before installing
+#   --backend-only    skip the frontend install
+#   --frontend-only   skip the backend install
+
+set -euo pipefail
+
+# Resolve repo root without GNU-only `readlink -f` so this works on macOS.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+FRONTEND_DIR="${REPO_ROOT}/frontend"
+
+# Django 6.x requires Python 3.12 or newer.
+MIN_PY_MAJOR=3
+MIN_PY_MINOR=12
+
+# Placeholder in .env.example that gets replaced with a random secret.
+ENV_PLACEHOLDER='**CHANGE_ME**'
+
+CLEAN=0
+DO_BACKEND=1
+DO_FRONTEND=1
+for arg in "$@"; do
+    case "${arg}" in
+        --clean) CLEAN=1 ;;
+        --backend-only) DO_FRONTEND=0 ;;
+        --frontend-only) DO_BACKEND=0 ;;
+        -h|--help)
+            sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: ${arg}" >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [ "${DO_BACKEND}" -eq 0 ] && [ "${DO_FRONTEND}" -eq 0 ]; then
+    echo "Error: --backend-only and --frontend-only are mutually exclusive." >&2
+    exit 1
+fi
+
+section() {
+    echo
+    echo "==> $1"
+}
+
+random_secret() {
+    # 24 alphanumeric chars; LC_ALL=C stops BSD tr choking on binary input.
+    # `|| true`: tr gets SIGPIPE when head exits, which pipefail would flag.
+    LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom 2>/dev/null | head -c 24 || true
+}
+
+setup_env() {
+    section "Environment (.env)"
+    local example="${REPO_ROOT}/.env.example"
+    local target="${REPO_ROOT}/.env"
+
+    if [ -f "${target}" ]; then
+        echo ".env already exists, leaving it untouched."
+        return
+    fi
+    if [ ! -f "${example}" ]; then
+        echo "Warning: no .env.example found, skipping .env creation." >&2
+        return
+    fi
+
+    # Copy line by line, swapping each placeholder for its own random secret.
+    # Avoids `sed -i`, whose syntax differs between GNU and BSD.
+    local line
+    : >"${target}"
+    while IFS= read -r line || [ -n "${line}" ]; do
+        case "${line}" in
+            *"${ENV_PLACEHOLDER}"*)
+                line="${line%%"${ENV_PLACEHOLDER}"*}$(random_secret)"
+                ;;
+        esac
+        printf '%s\n' "${line}" >>"${target}"
+    done <"${example}"
+
+    echo "Created .env from .env.example (placeholders set to random values)."
+}
+
+setup_backend() {
+    section "Backend (Python)"
+
+    if [ ! -f "${REPO_ROOT}/requirements.txt" ]; then
+        echo "Error: no requirements.txt found in ${REPO_ROOT}" >&2
+        exit 1
+    fi
+
+    # Reuse an existing venv/ if that's what's there, otherwise default to
+    # .venv/ (matches the lookup order in scripts/bin/venv).
+    local venv_dir="${REPO_ROOT}/.venv"
+    if [ ! -d "${venv_dir}" ] && [ -d "${REPO_ROOT}/venv" ]; then
+        venv_dir="${REPO_ROOT}/venv"
+    fi
+
+    if [ "${CLEAN}" -eq 1 ] && [ -d "${venv_dir}" ]; then
+        echo "Removing existing virtualenv at ${venv_dir}..."
+        rm -rf "${venv_dir}"
+    fi
+
+    if [ ! -x "${venv_dir}/bin/python" ]; then
+        local python="${PYTHON:-python3}"
+        if ! command -v "${python}" >/dev/null 2>&1; then
+            echo "Error: ${python} not found on PATH. Install Python first." >&2
+            exit 1
+        fi
+
+        if ! "${python}" -c "import sys; sys.exit(sys.version_info < \
+(${MIN_PY_MAJOR}, ${MIN_PY_MINOR}))"; then
+            echo "Error: Python ${MIN_PY_MAJOR}.${MIN_PY_MINOR}+ required," \
+                "found $("${python}" --version 2>&1)." >&2
+            echo "Set PYTHON=/path/to/python3.x to choose another one." >&2
+            exit 1
+        fi
+
+        echo "Creating virtualenv at ${venv_dir}..."
+        "${python}" -m venv "${venv_dir}"
+    fi
+
+    local venv_py="${venv_dir}/bin/python"
+    echo "Using $("${venv_py}" --version 2>&1) from ${venv_dir}"
+
+    echo "Upgrading pip..."
+    "${venv_py}" -m pip install --quiet --upgrade pip
+
+    echo "Installing backend dependencies (requirements.txt)..."
+    "${venv_py}" -m pip install -r "${REPO_ROOT}/requirements.txt"
+
+    if [ -f "${REPO_ROOT}/requirements-dev.txt" ]; then
+        echo "Installing dev dependencies (requirements-dev.txt)..."
+        "${venv_py}" -m pip install -r "${REPO_ROOT}/requirements-dev.txt"
+    fi
+}
+
+setup_frontend() {
+    section "Frontend (Node)"
+
+    if ! command -v npm >/dev/null 2>&1; then
+        echo "Error: npm not found on PATH. Install Node.js first." >&2
+        exit 1
+    fi
+
+    if [ ! -f "${FRONTEND_DIR}/package.json" ]; then
+        echo "Error: no package.json found in ${FRONTEND_DIR}" >&2
+        exit 1
+    fi
+
+    echo "Using node $(node --version) / npm $(npm --version)"
+
+    if [ "${CLEAN}" -eq 1 ]; then
+        echo "Removing existing node_modules..."
+        rm -rf "${FRONTEND_DIR}/node_modules"
+    fi
+
+    # Prefer a reproducible install from the lockfile when one exists.
+    if [ -f "${FRONTEND_DIR}/package-lock.json" ]; then
+        echo "Installing frontend dependencies (npm ci)..."
+        (cd "${FRONTEND_DIR}" && npm ci)
+    else
+        echo "No package-lock.json found, running npm install..."
+        (cd "${FRONTEND_DIR}" && npm install)
+    fi
+}
+
+setup_env
+[ "${DO_BACKEND}" -eq 1 ] && setup_backend
+[ "${DO_FRONTEND}" -eq 1 ] && setup_frontend
+
+section "Done"
+echo "Next steps:"
+echo "  docker compose up -d           # start Postgres"
+if [ "${DO_BACKEND}" -eq 1 ]; then
+    echo "  source venv                    # activate the Python virtualenv"
+fi
+if [ "${DO_FRONTEND}" -eq 1 ]; then
+    echo "  cd frontend && npm run dev     # start the frontend dev server"
+fi

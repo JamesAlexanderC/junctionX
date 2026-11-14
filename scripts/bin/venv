@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Activate the project's Python virtual environment, if one exists.
+# Works in bash and zsh on macOS and Ubuntu.
+#
+# This must be *sourced* so the activation affects your current shell:
+#   source scripts/bin/venv      (or `source venv` if scripts/bin is on PATH)
+#
+# No `set -e`: this runs inside your interactive shell. The shebang only
+# exists so that executing it directly prints the "must be sourced" hint.
+
+# Work out whether we were sourced, and where this file lives.
+if [ -n "${ZSH_VERSION:-}" ]; then
+    case "${ZSH_EVAL_CONTEXT:-}" in
+        *:file*) _venv_sourced=1 ;;
+        *) _venv_sourced=0 ;;
+    esac
+    _venv_self="${(%):-%x}"
+elif [ -n "${BASH_VERSION:-}" ]; then
+    if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+        _venv_sourced=1
+    else
+        _venv_sourced=0
+    fi
+    _venv_self="${BASH_SOURCE[0]}"
+else
+    _venv_sourced=1
+    _venv_self=""
+fi
+
+if [ "${_venv_sourced}" -eq 0 ]; then
+    echo "This script must be sourced, not executed:" >&2
+    echo "  source ${0}" >&2
+    exit 1
+fi
+
+# Resolve the repo root from this file's location, falling back to git.
+if [ -n "${_venv_self}" ]; then
+    _venv_root="$(cd "$(dirname "${_venv_self}")/../.." && pwd)"
+else
+    _venv_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+fi
+
+_venv_found=""
+for _venv_name in .venv venv; do
+    if [ -f "${_venv_root}/${_venv_name}/bin/activate" ]; then
+        _venv_found="${_venv_root}/${_venv_name}"
+        break
+    fi
+done
+
+if [ -n "${_venv_found}" ]; then
+    # shellcheck disable=SC1091
+    . "${_venv_found}/bin/activate"
+    echo "Activated virtualenv: ${_venv_found} ($(python --version 2>&1))"
+else
+    echo "No virtualenv found in ${_venv_root} (looked for .venv/ and venv/)." >&2
+    echo "Create one with: python3 -m venv ${_venv_root}/.venv" >&2
+fi
+
+unset _venv_sourced _venv_self _venv_root _venv_found _venv_name

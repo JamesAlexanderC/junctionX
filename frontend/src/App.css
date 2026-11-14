@@ -1,0 +1,399 @@
+/* Boxy S-mobiili look: white header with green title, grey uppercase section
+   headings, full-width white rows with hairline dividers, square corners. */
+
+.muted {
+  color: var(--muted);
+}
+.center {
+  text-align: center;
+}
+
+.demo-banner {
+  padding: 10px 16px;
+  background: var(--warn-soft);
+  border-bottom: 1px solid var(--border);
+  color: var(--body);
+  font-size: 13px;
+}
+
+/* ---------- App bar ---------- */
+
+.app-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 8px 52px;
+  text-align: center;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+
+  h1 {
+    font-family: var(--condensed);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    color: var(--brand-green);
+    line-height: 1.2;
+  }
+  small {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+  }
+}
+
+.back {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--brand-green);
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ---------- Section headings & list rows ---------- */
+
+.section-title {
+  margin: 0;
+  padding: 18px 16px 8px;
+  font-family: var(--condensed);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.intro {
+  padding: 14px 16px;
+  color: var(--muted);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- Customer picker ---------- */
+
+.picker {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.customer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+
+  li + li button {
+    border-top: 1px solid var(--border);
+  }
+
+  button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--accent-soft);
+    }
+  }
+
+  strong,
+  small {
+    display: block;
+  }
+  strong {
+    font-weight: 500;
+  }
+  small {
+    color: var(--muted);
+    font-size: 13px;
+  }
+}
+
+.avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: #9a9a9a;
+}
+
+.chevron {
+  margin-left: auto;
+  font-size: 24px;
+  color: #a8a8a8;
+}
+
+/* ---------- Chat ---------- */
+
+.chat {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.welcome {
+  margin: -12px -16px 0;
+  background: var(--surface);
+
+  h2 {
+    padding: 16px 16px 2px;
+    font-size: 20px;
+  }
+  p {
+    padding: 0 16px 14px;
+    color: var(--muted);
+  }
+}
+
+.baskets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li {
+    display: grid;
+    grid-template-columns: 12px 1fr;
+    column-gap: 14px;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  strong {
+    font-weight: 500;
+  }
+  small {
+    grid-column: 2;
+    color: var(--muted);
+    font-size: 13px;
+  }
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+
+  &.b1 {
+    background: var(--b1);
+  }
+  &.b2 {
+    background: var(--b2);
+  }
+  &.b3 {
+    background: var(--b3);
+  }
+}
+
+.bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+
+  p + p,
+  p + ul,
+  ul + p {
+    margin-top: 8px;
+  }
+  ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  strong {
+    color: inherit;
+  }
+
+  &.user {
+    align-self: flex-end;
+    color: var(--on-brand);
+    background: var(--brand-green);
+  }
+  &.coach {
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  &.error {
+    color: var(--error);
+    background: var(--error-soft);
+    border-color: transparent;
+  }
+}
+
+.assistant {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.chart-card,
+.concept {
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.chart-card figcaption {
+  font-family: var(--condensed);
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.chart-body {
+  height: 220px;
+}
+
+.concept {
+  background: var(--accent-soft);
+  border-color: transparent;
+  border-left: 3px solid var(--brand-green);
+  font-size: 14px;
+
+  p {
+    margin-top: 4px;
+  }
+}
+
+.typing {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px 0;
+
+  i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--brand-green);
+    animation: blink 1.2s infinite ease-in-out;
+  }
+  i:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  i:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+}
+
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* ---------- Composer ---------- */
+
+.composer {
+  padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+
+  form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 11px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--body);
+    outline: none;
+
+    &:focus {
+      border-color: var(--brand-green);
+    }
+  }
+
+  /* Round green action button, like the app's Maksu button. */
+  button[type='submit'] {
+    flex: none;
+    width: 46px;
+    height: 46px;
+    border: none;
+    border-radius: 50%;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--brand-green);
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  scrollbar-width: none;
+
+  button {
+    flex: none;
+    padding: 7px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--brand-green);
+    background: var(--surface);
+    color: var(--brand-green);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+
+    &:hover {
+      color: #fff;
+      background: var(--brand-green);
+    }
+  }
+}
