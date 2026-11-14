@@ -31,6 +31,30 @@ function groupBySection(items) {
   return [...groups]
 }
 
+// Grey placeholder rows shown while the insights request is in flight.
+export function InsightsSkeleton({ rows = 4 }) {
+  return (
+    <div className="insights skeleton" role="status" aria-label="Loading insights">
+      <div className="section">
+        <span className="skel section-title" style={{ width: 80 }} />
+        <ul className="panel rows">
+          {Array.from({ length: rows }, (_, i) => (
+            <li key={i}>
+              <div className="row">
+                <span className="row-main">
+                  <span className="skel title" />
+                  <span className="skel line" />
+                </span>
+                <span className="skel value" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
 export default function Insights({ items, onAsk }) {
   if (!items?.length) return null
   return (

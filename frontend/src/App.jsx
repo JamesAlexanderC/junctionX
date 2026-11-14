@@ -8,7 +8,7 @@ import './App.css'
 import { getInsights, sendChat } from './api.js'
 import Chat from './components/Chat.jsx'
 import CustomerPicker from './components/CustomerPicker.jsx'
-import Insights from './components/Insights.jsx'
+import Insights, { InsightsSkeleton } from './components/Insights.jsx'
 
 // Chat history in the API's shape: [{role, content}].
 const toHistory = (messages) =>
@@ -29,6 +29,7 @@ export default function App() {
   const [customerId, setCustomerId] = useState(null)
   const [insights, setInsights] = useState([])
   const [insightsError, setInsightsError] = useState(null)
+  const [insightsLoading, setInsightsLoading] = useState(false)
   const [messages, setMessages] = useState([])
   const [busy, setBusy] = useState(false)
   const [tab, setTab] = useState('overview')
@@ -36,6 +37,7 @@ export default function App() {
   useEffect(() => {
     if (!customerId) return undefined
     const ctrl = new AbortController()
+    setInsightsLoading(true)
     getInsights(customerId, { signal: ctrl.signal })
       .then((items) => {
         setInsights(items)
@@ -45,6 +47,9 @@ export default function App() {
         if (e?.name === 'AbortError') return
         setInsights([])
         setInsightsError(e.message)
+      })
+      .finally(() => {
+        if (!ctrl.signal.aborted) setInsightsLoading(false)
       })
     return () => ctrl.abort()
   }, [customerId])
@@ -105,7 +110,8 @@ export default function App() {
               {insightsError}
             </p>
           )}
-          {customerId && <Insights items={insights} onAsk={ask} />}
+          {customerId && insightsLoading && <InsightsSkeleton />}
+          {customerId && !insightsLoading && <Insights items={insights} onAsk={ask} />}
           {!customerId && (
             <p className="empty">Pick a customer to see what their money is doing.</p>
           )}
