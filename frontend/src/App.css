@@ -1278,10 +1278,17 @@ button {
 /* Waiting indicator: progress text (F2). */
 .msg.progress {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   padding: 14px 16px;
+  color: var(--muted);
+}
+
+/* Heading of Gemini's thought summary, under the step it is on. */
+.progress-thought {
+  font-size: 0.8rem;
+  font-style: italic;
   color: var(--muted);
 }
 

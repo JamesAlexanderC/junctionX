@@ -6,6 +6,8 @@
 //   GET  /api/goals/?customer_id=<id> -> {active, completed, clash}
 //   GET  /api/spending/?customer_id=<id> -> {month, total, categories, savings}
 //   POST /api/chat/ {customer_id, message, history, depth?} -> send_reply
+//   POST /api/chat/?stream=1 (same body) -> NDJSON progress events, then
+//                                          {type: "reply", reply}
 //   POST /api/auth/login/ {username, password} -> {token, user}
 //   POST /api/auth/logout/                      -> 204
 //
@@ -48,10 +50,9 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, { method = 'GET', body, signal } = {}) {
-  let res
+async function send(path, { method = 'GET', body, signal } = {}) {
   try {
-    res = await fetch(`${API}${path}`, {
+    return await fetch(`${API}${path}`, {
       method,
       headers: {
         ...(body ? { 'Content-Type': 'application/json' } : {}),
@@ -64,6 +65,9 @@ async function request(path, { method = 'GET', body, signal } = {}) {
     if (e?.name === 'AbortError') throw e
     throw new ApiError('Backend not reachable', 0)
   }
+}
+
+async function readJson(res) {
   let data = null
   try {
     data = await res.json()
@@ -82,6 +86,31 @@ async function request(path, { method = 'GET', body, signal } = {}) {
     throw new ApiError(msg, res.status)
   }
   return data
+}
+
+async function request(path, options) {
+  return readJson(await send(path, options))
+}
+
+// Lines of an NDJSON body as they arrive, parsed. Falls back to reading the
+// whole body where the response has no stream (older browsers, test fakes).
+async function* ndjsonLines(res) {
+  const parse = (line) => (line.trim() ? [JSON.parse(line)] : [])
+  if (!res.body?.getReader) {
+    for (const line of (await res.text()).split('\n')) yield* parse(line)
+    return
+  }
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    buffer += decoder.decode(value, { stream: !done })
+    const lines = buffer.split('\n')
+    buffer = done ? '' : lines.pop()
+    for (const line of lines) yield* parse(line)
+    if (done) return
+  }
 }
 
 // {built, demos: [...], customers: [...]} for the landing page.
@@ -134,17 +163,39 @@ export async function getSpending(customerId, { signal } = {}) {
   }
 }
 
-// Only the last 6 turns are sent (context.md "Controls").
-export function sendChat({ customerId, message, history = [], depth }) {
-  return request('/api/chat/', {
-    method: 'POST',
-    body: {
-      customer_id: customerId,
-      message,
-      history: history.slice(-6),
-      ...(depth ? { depth } : {}),
-    },
-  })
+// Only the last 6 turns are sent (context.md "Controls"). With onProgress
+// the reply streams (?stream=1): onProgress gets each {type: "step" |
+// "thought", text} event while the coach works, and the reply comes last.
+export async function sendChat({
+  customerId,
+  message,
+  history = [],
+  depth,
+  onProgress,
+}) {
+  const body = {
+    customer_id: customerId,
+    message,
+    history: history.slice(-6),
+    ...(depth ? { depth } : {}),
+  }
+  if (!onProgress) return request('/api/chat/', { method: 'POST', body })
+  const res = await send('/api/chat/?stream=1', { method: 'POST', body })
+  // Errors (401, 404, 503) and an older backend answer plain JSON.
+  if (!res.ok || !res.headers.get('Content-Type')?.includes('ndjson')) {
+    return readJson(res)
+  }
+  try {
+    for await (const event of ndjsonLines(res)) {
+      if (event.type === 'reply') return event.reply
+      if (event.type === 'error') throw new ApiError(event.error, 500)
+      if (event.text) onProgress(event)
+    }
+  } catch (e) {
+    if (e instanceof ApiError) throw e
+    throw new ApiError('The connection to the coach dropped', 0)
+  }
+  throw new ApiError('The coach stopped without answering', 0)
 }
 
 export async function login(username, password) {

@@ -1,5 +1,10 @@
 """Saldo REST API (CLAUDE.md "API", P2.1, P2.5, P2.8)."""
 
+import json
+import logging
+from itertools import chain
+
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -17,6 +22,9 @@ from .serializers import (
     RateSerializer,
     SnoozeSerializer,
 )
+
+log = logging.getLogger("coach.api")
+NDJSON = "application/x-ndjson"
 
 
 def _not_found(customer_id):
@@ -71,21 +79,56 @@ def home(request, customer_id):
 
 @api_view(["POST"])
 def chat(request):
+    """POST {customer_id, message, history, depth?} -> send_reply JSON.
+
+    With ?stream=1 the answer is NDJSON instead, one event a line, so the
+    chat can show what the coach is doing (coach/gemini/progress.py):
+    {"type": "step"|"thought", "text"} while it works, then {"type": "reply",
+    "reply": <send_reply>}, or {"type": "error", "error"} if it broke midway.
+    404 and 503 are still plain JSON statuses, sent before any event.
+    """
     req = ChatRequest(data=request.data)
     req.is_valid(raise_exception=True)
     data = req.validated_data
+    events = loop.chat_stream(
+        data["customer_id"],
+        data["message"],
+        history=data.get("history"),
+        depth=data.get("depth"),
+    )
     try:
-        reply, _meta = loop.chat(
-            data["customer_id"],
-            data["message"],
-            history=data.get("history"),
-            depth=data.get("depth"),
-        )
+        first = next(events)
     except LookupError:
         return _not_found(data["customer_id"])
     except loop.GeminiNotConfigured as exc:
         return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-    return Response(reply)
+    events = chain([first], events)
+    if request.query_params.get("stream") != "1":
+        done = [e for e in events if e["type"] == "done"]
+        return Response(done[-1]["reply"])
+    response = StreamingHttpResponse(_ndjson(events), content_type=NDJSON)
+    # Proxies must pass each line on at once, not buffer the whole answer.
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
+
+
+def _ndjson(events):
+    """One JSON line per event; the final "done" (reply and meta) goes out as
+    {"type": "reply", "reply"} without the meta."""
+
+    def line(event):
+        return json.dumps(event, default=str) + "\n"
+
+    try:
+        for e in events:
+            if e["type"] == "done":
+                yield line({"type": "reply", "reply": e["reply"]})
+            else:
+                yield line(e)
+    except Exception:  # noqa: BLE001 - the status line is already sent
+        log.exception("chat stream failed")
+        yield line({"type": "error", "error": "The coach stopped unexpectedly."})
 
 
 def _panel(request, summary):

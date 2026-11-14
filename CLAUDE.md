@@ -51,6 +51,10 @@ Own-account transfers: `transaction_type` in `OWN_TRANSFER_TYPES`
   the data supports, alerts first.
 - `POST /api/chat/` `{customer_id, message, history, depth?}` -> send_reply JSON;
   503 `{"error": ...}` without `GEMINI_API_KEY`.
+  `?stream=1` answers NDJSON instead: `{type: "step"|"thought", text}` lines
+  while it works (`coach/gemini/progress.py`), then `{type: "reply", reply}`
+  or `{type: "error", error}`; 404 / 503 stay plain JSON. Thought headings
+  only appear when Gemini thinks (`GEMINI_THINKING_LEVEL=high`).
 - `GET /api/goals/?customer_id=` -> `{customer_id, as_of, active: [{id, name,
   emoji, type, priority, paused, target, saved, progress_pct, expected_pct,
   on_track, target_date, projected_date, months_needed, difficulty,

@@ -6,7 +6,11 @@
 	# Django API on the internal compose network (never published). Caddy
 	# has no proxy read timeout by default, so long Gemini turns are fine.
 	handle /api/* {
-		reverse_proxy backend:8000
+		# flush_interval -1: pass the chat's progress lines (NDJSON, which
+		# encode leaves alone) on as they come instead of buffering them.
+		reverse_proxy backend:8000 {
+			flush_interval -1
+		}
 	}
 
 	handle {

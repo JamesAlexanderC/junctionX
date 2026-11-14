@@ -42,6 +42,8 @@ export default function CustomerView({
   const [overviewLoading, setOverviewLoading] = useState(true)
   const [messages, setMessages] = useState([])
   const [busy, setBusy] = useState(false)
+  // What the coach is doing right now: {step, thought} from the stream.
+  const [progress, setProgress] = useState({})
   const [tab, setTab] = useState('overview')
   const overviewCtrl = useRef(null)
 
@@ -80,8 +82,16 @@ export default function CustomerView({
       const history = toHistory(messages)
       setMessages((m) => [...m, { role: 'user', content: text }])
       setBusy(true)
+      setProgress({})
+      const onProgress = (e) => setProgress((p) => ({ ...p, [e.type]: e.text }))
       try {
-        const reply = await sendChat({ customerId, message: text, history, depth })
+        const reply = await sendChat({
+          customerId,
+          message: text,
+          history,
+          depth,
+          onProgress,
+        })
         setMessages((m) => [...m, { role: 'assistant', reply }])
         loadOverview()
       } catch (e) {
@@ -163,7 +173,7 @@ export default function CustomerView({
           </section>
 
           <section className="pane coach" aria-label="Coach">
-            <Chat messages={messages} busy={busy} onSend={send} />
+            <Chat messages={messages} busy={busy} progress={progress} onSend={send} />
           </section>
         </main>
 
