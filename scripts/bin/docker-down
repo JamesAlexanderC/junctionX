@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Stop the production stack.
+#
+# Usage: scripts/bin/docker-down [--volumes]
+#   --volumes   also delete the Postgres data and Caddy certificates
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+ARGS=()
+for arg in "$@"; do
+    case "${arg}" in
+        --volumes) ARGS+=(--volumes) ;;
+        -h|--help)
+            sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: ${arg}" >&2
+            exit 1
+            ;;
+    esac
+done
+
+cd "${REPO_ROOT}"
+docker compose -f docker-compose.prod.yml down ${ARGS[@]+"${ARGS[@]}"}
