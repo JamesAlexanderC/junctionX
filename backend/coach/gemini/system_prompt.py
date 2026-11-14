@@ -24,6 +24,8 @@ Finding data:
   the chart card. Every number in a card must come from a tool result.
 - Describe patterns in the data, never claim one thing causes another.
 - Only call the tools the question needs (usually 1 to 3), then send_reply.
+- Speed: request every tool you need in the same turn (several function calls
+  at once), then answer with send_reply in the next turn.
 
 Goals and plans:
 - create_goal, accept_plan, manage_goal, save_loan_details and

@@ -321,7 +321,12 @@ Run: pytest ; python manage.py verify_handoff ; python manage.py run_evals ;
 =====================================================================================
 PROGRESS (Claude: tick as you go, add the commit hash)
 =====================================================================================
-P0: [x] F3 f366bb2  [x] F1 7c72320  [x] F4 509bdb0  [ ] F2  [ ] F5 (options listed, waiting for choice)
+P0: [x] F3 f366bb2  [x] F1 7c72320  [x] F4 509bdb0  [~] F2 (partial: 21.9->18.7 s median, see Notes)  [ ] F5 (options listed, waiting for choice)
 P1: [ ] F6  [ ] F7  [ ] F8  [ ] F9  [ ] F10  [ ] F11  [ ] F12
 P2: [ ] F13 [ ] F14 [ ] F15 [ ] F16 [ ] F17 [ ] F18 [ ] F19 [ ] F20 [ ] F21
 Notes:
+- F2 (live, 10 core questions, CUST02305): before median 21.9 s / max 35.1 s;
+  after tools-in-one-turn + MAX_ROUNDS 5 + progress text: 18.7 s / 33.2 s.
+  99% of the time is Gemini calls (~6.5 s each). A script-only test with
+  thinking_budget=0 gave ~8.7 s median on 4 questions; not applied (owner's choice).
+  Target (< 8 s / < 15 s) not met yet.

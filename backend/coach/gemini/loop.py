@@ -21,8 +21,8 @@ from .validate import ReplyError, validate_reply
 
 log = logging.getLogger("coach.gemini")
 
-# Deeper questions chain tools (list_inferences -> get_inference -> ...).
-MAX_ROUNDS = 8
+# The spec's 5 rounds (F2: speed); call tools together to fit deeper answers.
+MAX_ROUNDS = 5
 HISTORY_TURNS = 6
 # Total size of tool results per turn, so the context stays small (~15k tokens).
 MAX_TURN_RESULT_CHARS = 60_000

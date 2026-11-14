@@ -6,6 +6,29 @@ import { ReplyCard } from './Cards.jsx'
 
 const nextDepth = (d) => Math.min(4, (d ?? 1) + 1)
 
+// F2: replies can take a while; say what is happening as the wait grows.
+const PROGRESS_STEPS = [
+  { after: 0, text: 'Checking your numbers…' },
+  { after: 4000, text: 'Looking deeper into your data…' },
+  { after: 10000, text: 'Putting your answer together…' },
+]
+const PROGRESS_TICK_MS = 1000
+
+function Progress() {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const started = Date.now()
+    const id = setInterval(() => setElapsed(Date.now() - started), PROGRESS_TICK_MS)
+    return () => clearInterval(id)
+  }, [])
+  const step = PROGRESS_STEPS.filter((s) => elapsed >= s.after).at(-1)
+  return (
+    <div className="msg coach muted" role="status" aria-live="polite">
+      {step.text}
+    </div>
+  )
+}
+
 function CoachMessage({ reply, onSend, isLast }) {
   return (
     <div className="msg coach">
@@ -75,7 +98,7 @@ export default function Chat({ messages, busy, onSend, disabled }) {
             />
           ),
         )}
-        {busy && <div className="msg coach muted">Thinking…</div>}
+        {busy && <Progress />}
         <div ref={endRef} />
       </div>
       <form

@@ -41,8 +41,13 @@ def _chat(client, message="Tell me more", depth=2):
     )
 
 
-def test_round_limit_allows_deeper_tool_chains():
-    assert loop.MAX_ROUNDS == 8
+def test_round_limit_is_five():
+    # F2 (handoff/Gemini_fix.md): back to the spec's 5 rounds for speed.
+    assert loop.MAX_ROUNDS == 5
+
+
+def test_system_prompt_asks_for_tools_in_one_round():
+    assert "in the same turn" in SYSTEM_PROMPT
 
 
 def test_tool_results_over_the_turn_budget_are_replaced(
