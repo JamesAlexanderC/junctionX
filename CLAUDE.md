@@ -61,11 +61,15 @@ Own-account transfers: `transaction_type` in `OWN_TRANSFER_TYPES`
   unknown). Active goals are shown here, not in `/api/insights/`.
 - `POST /api/goals/`, `PATCH /api/goals/<id>/`, `POST /api/goals/<id>/rate/`.
 - `GET /api/spending/?customer_id=` -> `{customer_id, as_of, month, is_current,
-  total, categories: [{category, total, share, count}]}`
+  total, categories: [{category, total, share, count, usual, vs_usual}],
+  savings: [{category, total, count}], savings_total}`
   (`insights.spending_summary` of `profile["spending"]`, built by
   `inferences/spending.py`): spending per data `category`, names spelt as in
   the data, this month else last month (`is_current`). Spending = outflows
-  minus own-account and Saver transfers (`common.spend`). 400 without
+  minus own-account and Saver transfers (`common.spend`). `usual` = the #24
+  mean monthly spend over the last 3 full months (`whatif.category_means`),
+  null without history; `vs_usual = total - usual`. Saver deposits (#75, e.g.
+  "Invest Deposit") are listed under `savings`, not in `total`. 400 without
   `customer_id`, 404 if unknown.
 - `POST /api/loans/` `{customer_id, balance, interest_rate, years_left}`.
 - `GET /api/customers/?q=&limit=50` -> `[{customer_id, customer_age,

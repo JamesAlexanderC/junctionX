@@ -428,25 +428,50 @@ def goal_summary(p):
     }
 
 
+SPENDING_FIELDS = (
+    "category",
+    "total",
+    "share",
+    "count",
+    "usual",  # #24 mean monthly spend, last 3 full months
+    "vs_usual",
+)
+
+
 def spending_summary(p):
     """Spending per data category for the Overview panel (GET /api/spending/).
 
     Fields are picked from ``profile["spending"]`` as inferences/spending.py
-    computed them; nothing is calculated here.
+    computed them; nothing is calculated here. Savings (#75) are listed apart
+    and are not part of ``total``.
     """
     sp = (p or {}).get("spending") or {}
-    cats = [
-        {k: c.get(k) for k in ("category", "total", "share", "count")}
-        for c in sp.get("categories") or []
-        if _num(c.get("total")) and c["total"] > 0
-    ]
-    if not cats:
-        return {"month": None, "is_current": None, "total": 0, "categories": []}
+
+    def rows(key, fields):
+        return [
+            {k: c.get(k) for k in fields}
+            for c in sp.get(key) or []
+            if _num(c.get("total")) and c["total"] > 0
+        ]
+
+    cats = rows("categories", SPENDING_FIELDS)
+    savings = rows("savings", ("category", "total", "count"))  # #75, not spending
+    if not cats and not savings:
+        return {
+            "month": None,
+            "is_current": None,
+            "total": 0,
+            "categories": [],
+            "savings": [],
+            "savings_total": 0,
+        }
     return {
         "month": sp.get("month"),
         "is_current": bool(sp.get("is_current")),
-        "total": sp.get("total"),
+        "total": sp.get("total") or 0,
         "categories": cats,
+        "savings": savings,
+        "savings_total": sp.get("savings_total") or 0,
     }
 
 

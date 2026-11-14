@@ -121,8 +121,15 @@ def test_spending_summary_picks_computed_fields():
         "total": 650.0,
         "share": 53.6,
         "count": 1,
+        "usual": 650.0,
+        "vs_usual": 0.0,
     }
+    assert out["categories"][3]["vs_usual"] == 12.99
     assert "Travel" not in {c["category"] for c in out["categories"]}
+    assert out["savings"] == [
+        {"category": "Invest Deposit", "total": 150.0, "count": 1}
+    ]
+    assert out["savings_total"] == 150.0
 
 
 def test_spending_summary_empty_profile():
@@ -131,6 +138,8 @@ def test_spending_summary_empty_profile():
         "is_current": None,
         "total": 0,
         "categories": [],
+        "savings": [],
+        "savings_total": 0,
     }
 
 

@@ -36,10 +36,33 @@ def test_categories_keep_the_data_spelling_and_sum_to_total():
 
 
 def test_inflows_and_savings_transfers_are_not_spending():
-    names = {
-        c["category"] for c in compute_spending(make_df(_rows()), DAY)["categories"]
-    }
+    out = compute_spending(make_df(_rows()), DAY)
+    names = {c["category"] for c in out["categories"]}
     assert not names & {"Salary", "Invest Deposit"}
+    # #75: savings are their own row, outside the spending total.
+    saved = {"category": "Invest Deposit", "total": 200.0, "count": 1}
+    assert out["savings"] == [saved]
+    assert out["savings_total"] == 200.0
+    assert out["total"] == 765.0
+
+
+def test_usual_is_the_3_month_mean_from_24():
+    rows = _rows()
+    for m, amount in ((7, 80), (8, 90), (9, 100)):
+        ts = f"2026-{m:02d}-01 12:00"
+        rows.append(dict(ts=ts, amount=-amount, category="Groceries"))
+    out = compute_spending(make_df(rows), DAY)
+    groceries = next(c for c in out["categories"] if c["category"] == "Groceries")
+    assert groceries["usual"] == 90.0
+    assert groceries["vs_usual"] == 10.0  # 100 so far this month
+    housing = next(c for c in out["categories"] if c["category"] == "Housing")
+    assert housing["usual"] is None and housing["vs_usual"] is None
+
+
+def test_means_passed_in_are_used():
+    out = compute_spending(make_df(_rows()), DAY, means={"housing": 600.0})
+    assert out["categories"][0]["usual"] == 600.0
+    assert out["categories"][0]["vs_usual"] == 50.0
 
 
 def test_empty_month_falls_back_to_last_month():
