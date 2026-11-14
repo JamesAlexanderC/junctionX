@@ -93,3 +93,17 @@ def test_end_of_month_hidden_on_the_last_day():
     p = sample()
     p["forecast"]["end_of_month"] = {"expected": 500.0, "low": 500.0, "high": 500.0}
     assert "end_of_month" not in {i["key"] for i in insights.insights(p)}
+
+
+def test_seasonal_insight_names_the_month():
+    # Live: "Last year 2026-10 cost 1.4x a usual month".
+    p = copy.deepcopy(sample())
+    p["forecast"]["seasonal"] = {
+        "warn": True,
+        "next_month": "2026-11",
+        "ratio": 1.4,
+        "pot": 120.0,
+    }
+    item = next(i for i in insights.insights(p) if i["key"] == "seasonal")
+    assert item["text"].startswith("Last November cost 1.4x a usual month.")
+    assert "2026-11" not in item["text"]

@@ -33,6 +33,23 @@ COLUMNS = [
 # --- Small value helpers ---------------------------------------------------------
 
 
+# Fixed English names: user-facing text must not depend on the server locale.
+MONTH_NAMES = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+
+
 def r2(x):
     """Round to 2 dp as a plain float; None, NaN and inf become None."""
     if x is None:
@@ -67,6 +84,11 @@ def to_date(d) -> date:
 
 def month_key(d) -> str:
     return pd.Timestamp(d).strftime("%Y-%m")
+
+
+def month_name(month: str) -> str:
+    """English name of a 'YYYY-MM' key: '2026-10' -> 'October'."""
+    return MONTH_NAMES[int(month[5:7]) - 1]
 
 
 def add_months(month: str, n: int) -> str:

@@ -10,6 +10,8 @@ engine is respected when present; every builder also checks its own numbers.
 
 from datetime import date
 
+from inferences.common import month_name
+
 BASKET_NAMES = {
     "essential": "Essentials",
     "surprise": "Surprises",
@@ -308,7 +310,7 @@ def seasonal(p):
     if not s.get("warn") or not _available(p, "forecast.seasonal"):
         return []
     text = (
-        f"Last year {s.get('next_month')} cost {s.get('ratio')}x a usual month. "
+        f"Last {month_name(s['next_month'])} cost {s.get('ratio')}x a usual month. "
         f"A pot of {_eur(s.get('pot') or 0)} would cover the extra."
     )
     return [

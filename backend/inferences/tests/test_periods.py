@@ -8,7 +8,7 @@ from datetime import date
 
 import pytest
 
-from inferences.common import last_complete_month
+from inferences.common import last_complete_month, month_name
 
 
 @pytest.mark.parametrize(
@@ -23,3 +23,11 @@ from inferences.common import last_complete_month
 )
 def test_last_complete_month(today, expected):
     assert last_complete_month(today) == expected
+
+
+@pytest.mark.parametrize(
+    "month, expected",
+    [("2026-10", "October"), ("2027-01", "January"), ("2026-12", "December")],
+)
+def test_month_name(month, expected):
+    assert month_name(month) == expected

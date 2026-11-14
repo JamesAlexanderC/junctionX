@@ -76,7 +76,12 @@ import pandas as pd
 from inferences import alert_thresholds as thresholds
 from inferences.thresholds import NO_PAYDAY_HORIZON_DAYS
 from inferences import models
-from inferences.common import buffer_amount, fill_pseudo_merchants, merchant_name
+from inferences.common import (
+    buffer_amount,
+    fill_pseudo_merchants,
+    merchant_name,
+    month_name,
+)
 
 T = thresholds
 
@@ -384,7 +389,7 @@ def rule_23_seasonal(df, profile, today, **ctx):
         23,
         "amber",
         "Pricier month coming",
-        f"Last year {month[5:]}/{month[:4][2:]} cost more than usual. A pot of "
+        f"Last {month_name(month)} cost more than usual. A pot of "
         f"{_eur(seasonal.get('pot', 0))} would cover it.",
         today,
         impact,

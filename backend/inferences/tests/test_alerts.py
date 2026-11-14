@@ -384,3 +384,13 @@ def test_spending_pace_partial_view_says_what_stays_in_the_account():
 def test_spending_pace_full_view_keeps_the_plain_wording():
     text = _pace(partial_view=False)["text"]
     assert "more than your EUR 386.03 income" in text
+
+
+def test_seasonal_alert_names_the_month():
+    # Live (CUST00007, 00021, 00028): "Last year 11/26" named the coming
+    # month, not last year's. The text names the month instead.
+    seasonal = {"warn": True, "next_month": "2026-11", "ratio": 1.4, "pot": 120.0}
+    p = profile(forecast__seasonal=seasonal)
+    a = alerts.rule_23_seasonal(make_df([]), p, TODAY)
+    assert a["text"].startswith("Last November cost more than usual.")
+    assert "11/26" not in a["text"]
