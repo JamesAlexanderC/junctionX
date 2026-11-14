@@ -1,22 +1,18 @@
-"""send_reply validation (P2.4): schema, number matching, card whitelist."""
+"""send_reply validation (P2.4): schema, number matching, card whitelist.
+
+Numbers in the text and in every card (cards.data_fields) must come from a
+tool result of this turn or the user's message. Each known card must match
+its payload (cards.py); unknown card types are dropped.
+"""
 
 import re
 from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-CARD_TYPES = {
-    "number",
-    "chart",
-    "basket_bar",
-    "slider",
-    "goal",
-    "level_progress",
-    "question",
-    "alert",
-    "plan",
-    "before_after",
-}
+from .cards import CARD_MODELS, clean_card, data_fields
+
+CARD_TYPES = set(CARD_MODELS)
 MAX_CHIPS = 3
 # Small counts ("2 easy steps", "3 months") are allowed without a tool source.
 FREE_INTEGERS = set(range(0, 11))
@@ -82,14 +78,43 @@ def _matches(n, values):
     return False
 
 
+def _unmatched(numbers, allowed):
+    return [n for n in numbers if n not in FREE_INTEGERS and not _matches(n, allowed)]
+
+
 def unmatched_numbers(text, tool_results, message=""):
     allowed = collect_numbers(tool_results) | collect_numbers(message)
-    bad = []
-    for n in numbers_in_text(text):
-        if n in FREE_INTEGERS or _matches(n, allowed):
+    return _unmatched(numbers_in_text(text), allowed)
+
+
+def _clean_cards(cards):
+    """Known cards in their documented shape; unknown types are dropped."""
+    out = []
+    for i, card in enumerate(cards):
+        if card["type"] not in CARD_TYPES:
             continue
-        bad.append(n)
-    return bad
+        try:
+            out.append(clean_card(card))
+        except ValidationError as exc:
+            problems = [
+                f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}"
+                for e in exc.errors()
+            ]
+            raise ReplyError(
+                f"card {i} ({card['type']}) does not match its payload: "
+                f"{problems}. Fix the card and resend."
+            ) from exc
+    return out
+
+
+def _check_card_numbers(cards, allowed):
+    for i, card in enumerate(cards):
+        bad = _unmatched(sorted(collect_numbers(data_fields(card))), allowed)
+        if bad:
+            raise ReplyError(
+                f"These numbers in card {i} ({card['type']}) are not in any tool "
+                f"result from this turn: {bad}. Only use numbers returned by tools."
+            )
 
 
 def validate_reply(args, tool_results, message=""):
@@ -104,7 +129,9 @@ def validate_reply(args, tool_results, message=""):
             "These numbers are not in any tool result from this turn: "
             f"{bad}. Only use numbers returned by tools."
         )
-    cards = [c for c in reply.cards if c["type"] in CARD_TYPES]
+    cards = _clean_cards(reply.cards)
+    allowed = collect_numbers(tool_results) | collect_numbers(message)
+    _check_card_numbers(cards, allowed)
     return {
         "text": reply.text,
         "depth": reply.depth,

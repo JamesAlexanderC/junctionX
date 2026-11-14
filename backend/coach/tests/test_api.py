@@ -165,7 +165,10 @@ def test_unknown_card_type_removed(client, aino, fake_gemini):
                 {
                     "text": "Here you go.",
                     "depth": 1,
-                    "cards": [{"type": "hologram"}, {"type": "number", "value": 1}],
+                    "cards": [
+                        {"type": "hologram"},
+                        {"type": "number", "label": "Count", "value": 1},
+                    ],
                     "chips": ["a", "b", "c", "d"],
                 },
             )
