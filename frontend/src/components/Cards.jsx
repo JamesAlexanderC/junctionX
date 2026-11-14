@@ -52,8 +52,15 @@ function BasketBarCard({ card }) {
 }
 
 // What-if slider: #24 and #26 recalculated locally, no API call.
+// The slider works in whole percent on 5 % steps. A fraction (0.2) is read as
+// 20 %, in case a card still carries simulate_cut's 0-1 value.
+const sliderStart = (pct) => {
+  const p = pct > 0 && pct <= 1 ? pct * 100 : (pct ?? 20)
+  return Math.round(p / 5) * 5
+}
+
 export function SliderCard({ card }) {
-  const [p, setP] = useState(card.pct ?? 20)
+  const [p, setP] = useState(() => sliderStart(card.pct))
   const saving = cutSaving(card.monthly_spend, p / 100)
   const goal =
     card.goal &&
@@ -68,8 +75,10 @@ export function SliderCard({ card }) {
     )
   return (
     <div className="card">
-      <label>
-        Cut {card.category} by {p}%
+      <label className="slider">
+        <span>
+          Cut {card.category} by <strong>{p}%</strong>
+        </span>
         <input
           type="range"
           min={card.min_pct ?? 0}

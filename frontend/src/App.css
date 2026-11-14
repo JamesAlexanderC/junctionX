@@ -394,9 +394,35 @@
   align-items: center;
   gap: 12px;
   margin: auto;
-  max-width: 280px;
+  max-width: 340px;
   text-align: center;
   color: var(--muted);
+}
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.suggestions button {
+  width: 100%;
+  padding: 10px 14px;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.suggestions button:hover,
+.suggestions button:focus-visible {
+  border-color: var(--brand-green);
+  background: var(--accent-soft);
 }
 
 .msg {
@@ -491,9 +517,68 @@ table.card thead th {
   padding-left: 20px;
 }
 
+.slider {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* What-if slider: an S-green filled thumb on a visible track, big enough
+   to grab with a thumb on a phone. */
 .card input[type='range'] {
   width: 100%;
-  accent-color: var(--brand-green);
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  touch-action: pan-y;
+}
+
+.card input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.card input[type='range']::-moz-range-track {
+  height: 6px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.card input[type='range']::-moz-range-progress {
+  height: 6px;
+  background: var(--brand-green);
+  border-radius: 999px;
+}
+
+.card input[type='range']::-webkit-slider-thumb {
+  width: 24px;
+  height: 24px;
+  margin-top: -10px;
+  background: var(--brand-green);
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+  -webkit-appearance: none;
+}
+
+.card input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--brand-green);
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+}
+
+.card input[type='range']:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 4px;
 }
 
 .big {
@@ -587,6 +672,11 @@ table.card thead th {
   font-size: 11px;
   fill: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.chart-svg .name {
+  font-size: 12px;
+  fill: var(--text);
 }
 
 .chart-svg .col {

@@ -5,6 +5,7 @@ import { ReplyCard } from '../components/Cards.jsx'
 import Chat from '../components/Chat.jsx'
 import Insights from '../components/Insights.jsx'
 import { niceTicks, shortLabel } from '../lib/chart.js'
+import { SUGGESTIONS } from '../lib/suggestions.js'
 
 // Every App test starts logged in unless it clears the token itself.
 beforeEach(() => localStorage.setItem('saldo.token', 'test-token'))
@@ -30,6 +31,21 @@ describe('cards', () => {
     )
     expect((screen.getByTestId('monthly-saving')).textContent).toContain('€18')
     expect((screen.getByTestId('yearly-saving')).textContent).toContain('€216')
+  })
+
+  it('slider reads a 0-1 fraction as percent and can be dragged', () => {
+    render(
+      <ReplyCard
+        card={{ type: 'slider', category: 'restaurants', monthly_spend: 370.95, pct: 0.2 }}
+        onSend={() => {}}
+      />,
+    )
+    const slider = screen.getByRole('slider')
+    expect(slider.value).toBe('20')
+    expect(screen.getByTestId('monthly-saving').textContent).toContain('€74.19')
+    fireEvent.change(slider, { target: { value: '30' } })
+    expect(screen.getByText('30%')).toBeTruthy()
+    expect(screen.getByTestId('monthly-saving').textContent).toContain('€111.29')
   })
 
   it('plan card shows clears N alerts', () => {
@@ -199,6 +215,41 @@ describe('chart card', () => {
     expect(screen.getByTestId('chart-readout').textContent).toContain('19 October 2026')
   })
 
+  it('named categories draw horizontal bars with full names; months draw columns', () => {
+    const named = {
+      ...bars,
+      data: ['leaky', 'other', 'saver', 'surprise', 'essential'].map((label) => ({
+        label,
+        value: 100,
+      })),
+    }
+    const { container, unmount } = render(<ReplyCard card={named} onSend={() => {}} />)
+    const names = [...container.querySelectorAll('text.name')].map((t) => t.textContent)
+    expect(names).toEqual(['Leaky', 'Other', 'Saver', 'Surprise', 'Essential'])
+    unmount()
+    const months = {
+      ...bars,
+      data: ['2026-08', '2026-09'].map((label) => ({ label, value: 100 })),
+    }
+    const view = render(<ReplyCard card={months} onSend={() => {}} />)
+    expect(view.container.querySelectorAll('text.name')).toHaveLength(0)
+    expect(view.container.querySelectorAll('path.col')).toHaveLength(2)
+  })
+
+  it('category bars hide zero rows but keep them in the table', () => {
+    const card = {
+      ...bars,
+      data: [
+        { label: 'surprise', value: 0 },
+        { label: 'essential', value: 2039.87 },
+      ],
+    }
+    const { container } = render(<ReplyCard card={card} onSend={() => {}} />)
+    const names = [...container.querySelectorAll('text.name')].map((t) => t.textContent)
+    expect(names).toEqual(['Essential'])
+    expect(screen.getAllByRole('row')).toHaveLength(2)
+  })
+
   it('every value is in the screen-reader table', () => {
     render(<ReplyCard card={bars} onSend={() => {}} />)
     expect(screen.getAllByRole('row')).toHaveLength(3)
@@ -292,5 +343,28 @@ describe('auth', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
     expect(await screen.findByLabelText('Username')).toBeTruthy()
     expect(localStorage.getItem('saldo.token')).toBeNull()
+  })
+})
+
+describe('chat suggestions', () => {
+  it('an empty chat offers one starter per feature and sends it with its depth', () => {
+    const onSend = vi.fn()
+    render(<Chat messages={[]} busy={false} onSend={onSend} />)
+    const list = screen.getByRole('list', { name: 'Suggested questions' })
+    expect(list.querySelectorAll('button')).toHaveLength(SUGGESTIONS.length)
+    fireEvent.click(screen.getByRole('button', { name: /chart of where my money went/ }))
+    expect(onSend).toHaveBeenCalledWith(
+      'Show me a chart of where my money went this month',
+      2,
+    )
+  })
+
+  it('no suggestions once the chat has messages, or with no customer', () => {
+    const { rerender } = render(
+      <Chat messages={[{ role: 'user', content: 'Hi' }]} busy={false} onSend={() => {}} />,
+    )
+    expect(screen.queryByRole('list', { name: 'Suggested questions' })).toBeNull()
+    rerender(<Chat messages={[]} busy={false} onSend={() => {}} disabled />)
+    expect(screen.queryByRole('list', { name: 'Suggested questions' })).toBeNull()
   })
 })

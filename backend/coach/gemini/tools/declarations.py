@@ -71,7 +71,10 @@ CARD_SCHEMA = {
         "saver": NUM,
         "category": STR,
         "monthly_spend": NUM,
-        "pct": NUM,
+        "pct": {
+            "type": "number",
+            "description": "slider: start position in percent (20 = 20 %), 0-50",
+        },
         "min_pct": NUM,
         "max_pct": NUM,
         "goal": {"type": "object", "properties": {}},

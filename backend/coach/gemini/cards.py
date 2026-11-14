@@ -8,7 +8,7 @@ money; every other number in a card must come from a tool result.
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class _Card(BaseModel):
@@ -71,6 +71,12 @@ class SliderCard(_Card):
     max_pct: float = 50
     pct: float
     goal: _SliderGoal | None = None
+
+    @field_validator("pct")
+    @classmethod
+    def pct_is_a_percent(cls, v):
+        # simulate_cut takes a fraction (0.2 = 20 %); the slider wants percent.
+        return round(v * 100, 2) if 0 < v <= 1 else v
 
 
 class GoalCard(_Card):

@@ -153,3 +153,17 @@ def test_chips_repeating_question_options_are_dropped():
     }
     reply = validate_reply(args, [], "")
     assert reply["chips"] == ["Different goal"]
+
+
+@pytest.mark.parametrize("given,shown", [(0.2, 20), (20, 20), (0, 0)])
+def test_slider_pct_is_shown_in_percent(given, shown):
+    card = {
+        "type": "slider",
+        "category": "restaurants",
+        "monthly_spend": 370.95,
+        "pct": given,
+    }
+    reply = validate_reply(
+        {"text": "Try it.", "depth": 3, "cards": [card]}, [{"spend": 370.95}], ""
+    )
+    assert reply["cards"][0]["pct"] == shown
