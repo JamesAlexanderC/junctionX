@@ -19,6 +19,7 @@ from .models import (
     AlertSnooze,
     ComputedArtifact,
     Customer,
+    DismissedSuggestion,
     Goal,
     GoalRating,
     LoanDetails,
@@ -238,6 +239,15 @@ def ratings(customer_id):
     ]
 
 
+def dismissed_ids(customer_id):
+    """Detected-goal suggestion ids the user dismissed (#56 to #62)."""
+    return sorted(
+        DismissedSuggestion.objects.filter(customer_id=customer_id).values_list(
+            "suggestion_id", flat=True
+        )
+    )
+
+
 def latest_loan(customer_id):
     loan = LoanDetails.objects.filter(customer_id=customer_id).last()
     return loan.as_dict() if loan else None
@@ -294,6 +304,7 @@ def build(customer_id):
         goals=goal_dicts(customer_id),
         loans=latest_loan(customer_id),
         ratings=ratings(customer_id),
+        dismissed=dismissed_ids(customer_id),
         peer_table=peer_table(),
         mortgage_model=mortgage_model(),
         # Snoozes are applied when reading (active_alerts), not baked into the

@@ -14,12 +14,20 @@ from ..models import ChatTurn, DemoCache
 from . import router
 from .system_prompt import FALLBACK_REPLY, SYSTEM_PROMPT
 from .tools import ToolContext, call_tool, tool_declarations
+from .tools.inference import list_inferences
 from .validate import ReplyError, validate_reply
 
 log = logging.getLogger("coach.gemini")
 
-MAX_ROUNDS = 5
+# Deeper questions chain tools (list_inferences -> get_inference -> ...).
+MAX_ROUNDS = 8
 HISTORY_TURNS = 6
+# Total size of tool results per turn, so the context stays small (~15k tokens).
+MAX_TURN_RESULT_CHARS = 60_000
+BUDGET_ERROR = (
+    "The tool result budget for this turn is used up. Answer with the results "
+    "you already have and call send_reply."
+)
 
 
 def get_client():
@@ -61,12 +69,33 @@ def profile_summary(profile):
             .get("label"),
             "goals": [{"id": g["id"], "name": g["name"]} for g in goals],
             "alert_count": len(profile.get("alerts", [])),
+            "inferences_available": _available_count(profile),
             "leaky_categories": [
                 c["category"]
                 for c in profile.get("baskets", {}).get("leaky_categories", [])
             ],
         }
     )
+
+
+def _available_count(profile):
+    """How many catalogue items this profile supports (see list_inferences)."""
+    ctx = ToolContext(profile.get("customer_id", ""))
+    ctx._profile = profile
+    return sum(row["available"] for row in list_inferences(ctx)["items"])
+
+
+def _call_within_budget(ctx, name, args, used):
+    """Run a tool; past the turn's budget its result is replaced by an error,
+    also in ctx.results so its numbers cannot be quoted. Returns (result,
+    chars used so far)."""
+    result = call_tool(ctx, name, args)
+    size = len(json.dumps(result, default=str))
+    if used + size > MAX_TURN_RESULT_CHARS:
+        result = {"error": BUDGET_ERROR}
+        ctx.results[-1] = result
+        return result, used
+    return result, used + size
 
 
 def _history_contents(customer_id, history):
@@ -170,6 +199,7 @@ def _run(client, contents, ctx):
     """The tool loop: at most MAX_ROUNDS rounds, one retry on a bad reply."""
     config = build_config()
     retried = False
+    used = 0
     for round_no in range(1, MAX_ROUNDS + 1):
         resp = client.models.generate_content(
             model=settings.GEMINI_MODEL, contents=contents, config=config
@@ -189,7 +219,7 @@ def _run(client, contents, ctx):
                     retried = True
                     result = {"error": str(exc), "instruction": "Fix and resend."}
             else:
-                result = call_tool(ctx, call.name, args)
+                result, used = _call_within_budget(ctx, call.name, args, used)
             parts.append(
                 types.Part.from_function_response(
                     name=call.name, response={"result": result}

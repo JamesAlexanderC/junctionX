@@ -173,6 +173,17 @@ class LoanDetails(models.Model):
         }
 
 
+class DismissedSuggestion(models.Model):
+    """A detected-goal suggestion (#56 to #62) the user hid; never shown again."""
+
+    customer_id = models.CharField(max_length=64, db_index=True)
+    suggestion_id = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("customer_id", "suggestion_id")]
+
+
 class Profile(models.Model):
     """Cached build_profile output; rebuilt when the inference code changes."""
 

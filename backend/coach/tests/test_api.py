@@ -7,7 +7,7 @@ the real inference engine, so expected numbers are read from the tools.
 import pytest
 
 from coach import services
-from coach.gemini import router
+from coach.gemini import loop, router
 from coach.gemini.system_prompt import FALLBACK_REPLY
 from coach.gemini.tools import ToolContext, call_tool
 from coach.models import Goal, Profile
@@ -125,11 +125,11 @@ def test_unsupported_category_is_unavailable(aino):
     assert out["available"] is False and out["reason"]
 
 
-def test_no_send_reply_stops_after_5_rounds(client, aino, fake_gemini):
+def test_no_send_reply_stops_after_max_rounds(client, aino, fake_gemini):
     fake = fake_gemini(response(("get_baskets", {})))
     res = chat(client, "How much?", depth=1)
     assert res.json() == FALLBACK_REPLY
-    assert len(fake.models.calls) == 5
+    assert len(fake.models.calls) == loop.MAX_ROUNDS
 
 
 def test_invented_number_retried_once_then_fallback(client, aino, fake_gemini):
@@ -165,7 +165,10 @@ def test_unknown_card_type_removed(client, aino, fake_gemini):
                 {
                     "text": "Here you go.",
                     "depth": 1,
-                    "cards": [{"type": "hologram"}, {"type": "number", "value": 1}],
+                    "cards": [
+                        {"type": "hologram"},
+                        {"type": "number", "label": "Count", "value": 1},
+                    ],
                     "chips": ["a", "b", "c", "d"],
                 },
             )

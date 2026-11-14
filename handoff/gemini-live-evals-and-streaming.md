@@ -19,7 +19,7 @@ model output, which can't be done offline.
 1. Put `GEMINI_API_KEY` in `.env` and list the models your key can use:
    `python -c "from google import genai; [print(m.name) for m in genai.Client().models.list()]"`.
    Set `GEMINI_MODEL` / `GEMINI_ROUTER_MODEL` in `.env` (defaults
-   `gemini-2.5-flash` / `gemini-2.5-flash-lite`).
+   `gemini-3.8-flash` / `gemini-3.5-flash-lite`).
 2. Build a demo profile (`load_data` + `build_profiles`) or use `demo-aino`.
 3. `cd backend && python manage.py run_evals --customer <id>`; target 90 %.
 4. Common things to tune if evals fail:

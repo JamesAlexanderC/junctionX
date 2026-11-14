@@ -1,0 +1,141 @@
+"""send_reply card payloads (CLAUDE.md "Card payloads") as pydantic models.
+
+``clean_card`` validates one card against its type and drops unknown fields,
+so the frontend only ever gets the documented shape. ``NOT_DATA`` lists the
+fields whose numbers are UI settings or ids, not claims about the user's
+money; every other number in a card must come from a tool result.
+"""
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class _Card(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+
+class _Row(_Card):
+    label: str
+    value: float
+
+
+class _SliderGoal(_Card):
+    target: float
+    saved: float
+    monthly_rate: float
+
+
+class _PlanStep(_Card):
+    text: str
+    monthly_impact: float
+    clears: list[str] = []
+
+
+class _Snapshot(_Card):
+    safe_to_spend: float | None = None
+    buffer_months: float | None = None
+    goal_date: str | None = None
+
+
+class NumberCard(_Card):
+    label: str
+    value: float
+    unit: str | None = None
+
+
+class ChartCard(_Card):
+    kind: Literal["bar", "line"]
+    title: str
+    unit: str | None = None
+    data: list[_Row] = Field(min_length=1)
+
+
+class BasketBarCard(_Card):
+    essential: float
+    surprise: float
+    leaky: float
+    saver: float
+
+
+class SliderCard(_Card):
+    category: str
+    monthly_spend: float
+    min_pct: float = 0
+    max_pct: float = 50
+    pct: float
+    goal: _SliderGoal | None = None
+
+
+class GoalCard(_Card):
+    name: str
+    target: float
+    saved: float
+    target_date: str | None = None
+    difficulty: str | None = None
+    monthly_needed: float | None = None
+
+
+class LevelProgressCard(_Card):
+    level: int
+    name: str
+    progress: float
+    euros_to_go: float | None = None
+    next_step: str | None = None
+
+
+class QuestionCard(_Card):
+    question: str
+    options: list[str] = Field(min_length=2, max_length=4)
+    quick_answer: str | None = None
+
+
+class AlertCard(_Card):
+    id: str
+    severity: Literal["red", "amber", "blue"]
+    title: str
+    text: str
+
+
+class PlanCard(_Card):
+    steps: list[_PlanStep] = Field(min_length=1)
+
+
+class BeforeAfterCard(_Card):
+    before: _Snapshot
+    after: _Snapshot
+
+
+CARD_MODELS = {
+    "number": NumberCard,
+    "chart": ChartCard,
+    "basket_bar": BasketBarCard,
+    "slider": SliderCard,
+    "goal": GoalCard,
+    "level_progress": LevelProgressCard,
+    "question": QuestionCard,
+    "alert": AlertCard,
+    "plan": PlanCard,
+    "before_after": BeforeAfterCard,
+}
+
+# Fields that are not claims about money: ids, display settings, and the
+# question card, whose options are choices Gemini offers, not facts.
+ALWAYS_NOT_DATA = {"type", "id", "clears", "unit", "kind"}
+NOT_DATA = {
+    "slider": {"min_pct", "max_pct", "pct"},
+    "question": {"question", "options", "quick_answer"},
+}
+
+
+def clean_card(card: dict) -> dict:
+    """The card in its documented shape; raises pydantic.ValidationError."""
+    model = CARD_MODELS[card["type"]]
+    fields = model.model_validate(card).model_dump(exclude_none=True)
+    return {"type": card["type"], **fields}
+
+
+def data_fields(card: dict) -> dict:
+    """The parts of a cleaned card whose numbers must come from tools."""
+    skip = ALWAYS_NOT_DATA | NOT_DATA.get(card["type"], set())
+    return {k: v for k, v in card.items() if k not in skip}
