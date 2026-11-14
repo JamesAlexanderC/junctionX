@@ -139,6 +139,33 @@ def test_unknown_card_types_are_still_dropped_quietly():
     assert out["cards"] == []
 
 
+def test_card_declaration_lists_every_nested_field():
+    """F4: Gemini can only fill nested card fields it is told about."""
+    from coach.gemini import cards
+    from coach.gemini.tools.declarations import CARD_SCHEMA
+
+    props = CARD_SCHEMA["properties"]
+    nested = {
+        "steps": cards._PlanStep,
+        "before": cards._Snapshot,
+        "after": cards._Snapshot,
+        "goal": cards._SliderGoal,
+        "data": cards._Row,
+    }
+    for field, model in nested.items():
+        schema = props[field]
+        listed = schema.get("items", schema).get("properties", {})
+        assert set(model.model_fields) <= set(listed), field
+
+
+def test_plan_card_built_from_suggest_fixes_passes():
+    step = {"text": "Cut takeaway by 20%", "monthly_impact": 24.6, "clears": ["a-1"]}
+    tool = [{"steps": [{**step, "effort": 2, "score": 0.25, "action": {}}]}]
+    card = {"type": "plan", "steps": [step]}
+    out = validate_reply(_reply(card, text="Two easy steps."), tool)
+    assert out["cards"][0]["steps"][0]["monthly_impact"] == 24.6
+
+
 def test_chips_repeating_question_options_are_dropped():
     card = {
         "type": "question",

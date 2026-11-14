@@ -68,16 +68,19 @@ def create_goal(ctx, name, amount, date, emoji="", priority="medium"):
             ctx,
             "create_goal",
             proposal,
-            "Ask the user to confirm this goal. Nothing was saved.",
+            "Ask the user to confirm this goal. Nothing was saved. When they "
+            "say yes, call create_goal again.",
         )
+    # F1: the yes confirms what the user saw, so save the stored proposal.
+    proposal = {**proposal, **ctx.previous_pending["create_goal"]}
     goal = Goal.objects.create(
         customer_id=ctx.customer_id,
-        name=name,
-        emoji=emoji,
-        target=amount,
+        name=proposal["name"],
+        emoji=proposal["emoji"],
+        target=proposal["amount"],
         start_date=services.today(),
-        target_date=target_date,
-        priority=priority,
+        target_date=date_cls.fromisoformat(proposal["date"]),
+        priority=proposal["priority"],
     )
     services.refresh_profile(ctx.customer_id)
     ctx.reload()

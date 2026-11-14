@@ -34,6 +34,12 @@ def _previous_weekday(d: date) -> date:
     return d
 
 
+# Why no payday was found (detect_payday "reason").
+PAYDAY_NO_INCOME = "no_income"
+PAYDAY_NOT_RECURRING = "not_recurring"
+PAYDAY_AMOUNT_VARIES = "amount_varies"
+
+
 def _payday_in_month(month: str, day: int) -> date:
     p = pd.Period(month, freq="M")
     return _previous_weekday(date(p.year, p.month, min(day, days_in_month(month))))
@@ -51,19 +57,28 @@ def detect_payday(df: pd.DataFrame, today) -> dict:
     inflows = income_inflows(df)
     current = month_key(today)
     window = {add_months(current, -k) for k in range(th.RECURRENCE_WINDOW_MONTHS)}
-    best = None
+    best, recurring = None, False
     for merchant, g in inflows.groupby("merchant_id"):
         months_seen = set(g["month"]) & window
         if len(months_seen) < th.RECURRENCE_MIN_MONTHS:
             continue
+        recurring = True
         if models.cv(g["tx_amount_eur"]) >= th.SALARY_CV_MAX:
             continue
         monthly = g.groupby("month")["tx_amount_eur"].sum().median()
         if best is None or monthly > best[1]:
             best = (merchant, monthly, g)
     if best is None:
+        # Which check failed, so the app can say why (availability.py).
+        if not len(inflows):
+            reason = PAYDAY_NO_INCOME
+        elif recurring:
+            reason = PAYDAY_AMOUNT_VARIES
+        else:
+            reason = PAYDAY_NOT_RECURRING
         return {
             "found": False,
+            "reason": reason,
             "day_of_month": None,
             "next_payday": None,
             "days_to_payday": None,
@@ -79,6 +94,7 @@ def detect_payday(df: pd.DataFrame, today) -> dict:
         candidate = _payday_in_month(add_months(current, 1), day)
     return {
         "found": True,
+        "reason": None,
         "day_of_month": day,
         "next_payday": iso(candidate),
         "days_to_payday": (candidate - today).days,

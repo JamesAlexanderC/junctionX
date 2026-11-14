@@ -120,6 +120,6 @@ message "Undo" (`manage_goal` with `action: "undo"`) reverses it.
 - Each card must match its payload in `cards.py`; unknown fields are dropped
   and unknown card types are removed.
 - A failed check gets one retry, then the fallback reply.
-- A turn has at most 8 rounds of tool calls and about 60,000 characters of
+- A turn has at most 5 rounds of tool calls and about 60,000 characters of
   tool results. A result past that budget is replaced by an error, and its
   numbers can't be quoted.

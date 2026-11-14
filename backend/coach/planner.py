@@ -13,6 +13,12 @@ from . import services
 MAX_STEPS = 3
 CUT_EFFORT = {0.1: 1, 0.2: 2, 0.3: 3}
 DANGER_EUR = 50.0
+TIGHT_DAYS = 20  # alert inference number: balance may drop low (#20)
+NOTHING_TO_CHANGE = (
+    "There is nothing the coach can change for this: no everyday spending to "
+    "cut, no subscription to drop, no goal to pause and no savings to move."
+)
+GENERAL_OPTIONS = ["Snooze it if it looks fine", "Talk to an S-Bank advisor"]
 
 
 def default_alert_runner(df, profile, today):
@@ -286,7 +292,59 @@ def suggest_fixes(
         )
         remaining -= cleared
         current = sim
-    return {"steps": steps, "still_open": sorted(remaining)}
+    by_id = {a["id"]: a for a in open_alerts}
+    unclearable = [
+        explain_unclearable(profile, by_id[i], candidates) for i in sorted(remaining)
+    ]
+    return {
+        "steps": steps,
+        "still_open": sorted(remaining),
+        "unclearable": unclearable,
+    }
+
+
+# --- F4: why an alert cannot be cleared ------------------------------------------
+
+
+def _bills_until(profile, impact_date):
+    """Upcoming bills due on or before the alert's impact date."""
+    if not impact_date:
+        return []
+    cutoff = str(impact_date)[:10]
+    bills = profile.get("forecast", {}).get("upcoming_bills") or []
+    return [b for b in bills if str(b.get("date", ""))[:10] <= cutoff]
+
+
+def explain_unclearable(profile, alert, candidates):
+    """Why none of the candidate actions clears ``alert``, from the data,
+    with what the user can do instead (never the fallback; F4)."""
+    if candidates:
+        biggest = max(c["monthly_impact"] for c in candidates)
+        why = (
+            f"None of the {len(candidates)} changes the coach can suggest clears "
+            f"it; the biggest saves EUR {biggest:,.2f} a month."
+        )
+    else:
+        why = NOTHING_TO_CHANGE
+    options = list(GENERAL_OPTIONS)
+    bills = _bills_until(profile, alert.get("impact_date"))
+    if alert.get("inference") == TIGHT_DAYS and bills:
+        bill = max(bills, key=lambda b: b["amount"])
+        lead = f"{bill['name']} of EUR {bill['amount']:,.2f} is due on {bill['date']}"
+        if profile.get("balance") is not None:
+            lead += f", against a balance of EUR {profile['balance']:,.2f}"
+        why = f"{lead}. {why}"
+        options = [
+            f"Keep money aside for the {bill['name']} bill",
+            "Ask whether the due date can move",
+            "Talk to an S-Bank advisor",
+        ]
+    return {
+        "id": alert["id"],
+        "title": alert.get("title"),
+        "why": why,
+        "options": options,
+    }
 
 
 def _goal_date(profile, on):
