@@ -5,6 +5,7 @@ import re
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+from coach import services
 from coach.gemini import loop
 from coach.models import ChatTurn, DismissedSuggestion, Goal, LoanDetails
 
@@ -140,4 +141,7 @@ class Command(BaseCommand):
         if created.count() != 1:
             why.append(f"{created.count()} goals saved, expected 1")
         created.delete()
+        # A queryset delete skips the profile cache: rebuild it, or the next
+        # questions see the deleted goal (and a higher level).
+        services.invalidate(cid)
         return not why, why
