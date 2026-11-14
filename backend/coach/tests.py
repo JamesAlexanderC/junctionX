@@ -13,6 +13,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from google.genai import types
 
+from finance import analytics as a
 from finance.models import Customer, Transaction
 from finance.tests import synthetic_txns
 
@@ -117,6 +118,8 @@ class RouterTests(SimpleTestCase):
             "Should I buy bitcoin?": "invest_advice",
             "What if I cut taxis by 50%?": "what_if",
             "restaurant trend": "spending",
+            "How has my spending changed over the last year?": "cashflow",
+            "Where should I keep my spare cash?": "cash_buffer",
         }
         for question, intent in cases.items():
             with self.subTest(question=question):
@@ -219,6 +222,22 @@ class OfflineAnswerTests(SimpleTestCase):
         self.assertIn("**€240 a year**", ans.text)
         self.assertEqual(ans.charts[0]["kind"], "line")
         self.assertEqual(ans.concept["title"], "Compound interest")
+
+    def test_dashboard_insight_questions_are_understood(self):
+        insights = a.insights(self.ctx.txns, self.ctx.today)
+        for item in insights:
+            with self.subTest(question=item["question"]):
+                ans = build_answer(self.ctx, user(item["question"]))
+                self.assertNotEqual(ans.intent, "fallback")
+                self.assertTrue(ans.tools)
+
+    def test_cashflow_answer(self):
+        ans = build_answer(
+            self.ctx, user("How has my spending changed over the last year?")
+        )
+        self.assertEqual(ans.tools[0][0], "monthly_cashflow")
+        self.assertIn("Busiest month", ans.text)
+        self.assertEqual(len(ans.charts[0]["data"]), 12)
 
     def test_stream_events(self):
         events = collect(OfflineProvider().stream(self.ctx, user("hello")))

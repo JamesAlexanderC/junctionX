@@ -7,6 +7,11 @@ export default function SafeToSpendCard({ data: s, onAsk }) {
   const billsTotal = bills.reduce((sum, b) => sum + Number(b.amount || 0), 0)
   const days = s.days_until_payday
   const tight = Number(s.per_day) < 5
+  // Big idle balances make a per-day figure meaningless ("€3,888 a day"), so
+  // lead with the total and compare it with the customer's normal pace.
+  const short = billsTotal - Number(s.balance ?? billsTotal)
+  const covered = Boolean(s.well_covered) && !tight
+  const weekly = Number(s.typical_spend_per_day || 0) * 7
   return (
     <Card
       className="safe-card"
@@ -15,21 +20,41 @@ export default function SafeToSpendCard({ data: s, onAsk }) {
       question="What is safe to spend this week?"
       onAsk={onAsk}
     >
-      <div className="safe-hero">
-        <p className="safe-per-day">
-          <span className={`safe-amount${tight ? ' is-tight' : ''}`}>
-            {eur(s.per_day)}
+      {covered ? (
+        <div className="safe-hero">
+          <p className="safe-per-day">
+            <span className="safe-amount">{eur(s.amount)}</span>
+          </p>
+          <p className="safe-sub">free until payday, after bills and a reserve</p>
+        </div>
+      ) : (
+        <div className="safe-hero">
+          <p className="safe-per-day">
+            <span className={`safe-amount${tight ? ' is-tight' : ''}`}>
+              {eur(s.per_day)}
+            </span>
+            <span className="safe-unit">/ day</span>
+          </p>
+          <p className="safe-sub">
+            <strong>{eur(s.amount)}</strong> in total until payday
+          </p>
+        </div>
+      )}
+      {covered && (
+        <p className="safe-note" role="note">
+          <Icon name="check" size={16} strokeWidth={2.5} />
+          <span>
+            Well covered. Your everyday spending is usually about{' '}
+            <strong>{eur(weekly)} a week</strong>.
           </span>
-          <span className="safe-unit">/ day</span>
         </p>
-        <p className="safe-sub">
-          <strong>{eur(s.amount)}</strong> in total until payday
-        </p>
-      </div>
+      )}
       {tight && (
         <p className="safe-warn" role="note">
           <Icon name="alert" size={16} />
-          Bills due before payday take up almost all of your balance.
+          {short > 0.5
+            ? `Bills due before payday are ${eur(short)} more than your balance.`
+            : 'Bills due before payday take up almost all of your balance.'}
         </p>
       )}
       <div className="payday">

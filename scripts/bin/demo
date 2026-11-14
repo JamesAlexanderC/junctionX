@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Start the Money Coach demo: Django API on :8000 and the Vite app on :5173.
+# Assumes `setup` has run and Postgres is up with the dataset loaded (see
+# README "Run the demo"). Ctrl+C stops both servers.
+#
+# Usage: scripts/bin/demo
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+case "${1:-}" in
+    -h|--help)
+        sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'
+        exit 0
+        ;;
+esac
+
+PYTHON="${REPO_ROOT}/.venv/bin/python"
+if [ ! -x "${PYTHON}" ] && [ -x "${REPO_ROOT}/venv/bin/python" ]; then
+    PYTHON="${REPO_ROOT}/venv/bin/python"
+fi
+if [ ! -x "${PYTHON}" ]; then
+    echo "Error: no virtualenv found. Run scripts/bin/setup first." >&2
+    exit 1
+fi
+
+if [ ! -x "${REPO_ROOT}/frontend/node_modules/.bin/vite" ]; then
+    echo "Error: frontend dependencies missing. Run scripts/bin/setup first." >&2
+    exit 1
+fi
+
+# Stop both servers on exit, including the child process Django's
+# autoreloader spawns.
+cleanup() {
+    trap - EXIT INT TERM
+    local pid
+    for pid in $(jobs -p); do
+        pkill -TERM -P "${pid}" 2>/dev/null || true
+        kill "${pid}" 2>/dev/null || true
+    done
+}
+trap cleanup EXIT INT TERM
+
+(cd "${REPO_ROOT}/backend" && exec "${PYTHON}" manage.py runserver 8000) &
+(cd "${REPO_ROOT}/frontend" && exec ./node_modules/.bin/vite --port 5173) &
+
+echo
+echo "Money Coach: http://localhost:5173  (API on http://localhost:8000)"
+echo "Press Ctrl+C to stop."
+wait

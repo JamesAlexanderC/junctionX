@@ -255,6 +255,42 @@ class ToolTests(SimpleTestCase):
         for item in items:
             self.assertIn(item["tone"], {"good", "warn", "info"})
             self.assertTrue(item["text"])
+            self.assertTrue(item["question"])
+            self.assertNotRegex(item["text"], r"\d{4}-\d{2}-\d{2}")
+
+    def test_change_phrase_avoids_silly_percentages(self):
+        self.assertEqual(
+            a.change_phrase(391, 81), "up from €81 a month in the 3 months before"
+        )
+        self.assertEqual(a.change_phrase(150, 100), "up 50% on the 3 months before")
+        self.assertEqual(a.change_phrase(60, 100), "down 40% on the 3 months before")
+        self.assertIn("down to nothing", a.change_phrase(0, 100))
+        self.assertIn("up from nothing", a.change_phrase(50, 0))
+
+    def test_idle_cash(self):
+        cash = a.idle_cash(10000, 1000)
+        self.assertEqual(cash["buffer"], 3000.0)
+        self.assertEqual(cash["idle"], 7000.0)
+        self.assertEqual(cash["interest"], 210.0)
+        self.assertTrue(cash["worth_moving"])
+        self.assertFalse(a.idle_cash(2000, 1000)["worth_moving"])
+
+    def test_safe_to_spend_well_covered(self):
+        last = max(self.txns, key=lambda t: (t.date, t.timestamp))
+
+        def with_balance(balance):
+            move = Tx(
+                date(2026, 9, 30),
+                datetime(2026, 9, 30, 23),
+                "Other Income",
+                0.0,
+                balance,
+            )
+            return a.prepare(self.txns + [move])
+
+        self.assertGreater(last.balance, 0)
+        self.assertTrue(a.safe_to_spend(with_balance(60000))["well_covered"])
+        self.assertFalse(a.safe_to_spend(with_balance(1500))["well_covered"])
 
 
 class HomeReadinessTests(SimpleTestCase):
@@ -295,6 +331,30 @@ class HomeReadinessTests(SimpleTestCase):
         self.assertEqual(home["application"]["days_to_decision"], 31)
         self.assertEqual(home["application"]["properties_considered"], 1)
         self.assertIn("deposit", home["verdict"])
+
+    def test_existing_loans_reduce_affordability(self):
+        base = a.affordability(3000, 500, 1000)
+        less = a.affordability(3000, 500, 1000, monthly_debt=300)
+        self.assertEqual(less["max_payment"], base["max_payment"] - 300)
+        self.assertLess(less["max_property_price"], base["max_property_price"])
+
+    def test_rejected_target_stays_below_declined_loan(self):
+        app = {
+            "mortgage_customer_id": "C0002",
+            "final_decision": "rejected",
+            "rejection_reason": "insufficient_income",
+            "final_property_price_eur": 110000,
+            "final_requested_loan_eur": 100000,
+            "final_equity_amount_eur": 10000,
+        }
+        events = [
+            {"timestamp": datetime(2026, 5, 1), "event_type": "application_created"},
+            {"timestamp": datetime(2026, 6, 1), "event_type": "loan_decision"},
+        ]
+        home = a.home_readiness(synthetic_txns(), app, events)
+        self.assertTrue(home["capped_by_application"])
+        self.assertLess(home["max_loan"], 100000)
+        self.assertIn("1 June 2026", home["verdict"])
 
     def test_without_application(self):
         home = a.home_readiness(synthetic_txns())

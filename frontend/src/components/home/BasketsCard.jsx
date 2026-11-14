@@ -1,6 +1,6 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { BASKET_COLORS, SERIES, tooltipStyle } from '../../chartTheme.js'
-import { eur, monthLabel, pct } from '../../format.js'
+import { categoryName, eur, monthLabel, pct } from '../../format.js'
 import Card from './Card.jsx'
 
 export default function BasketsCard({ baskets = [], lastMonth, onAsk }) {
@@ -48,7 +48,7 @@ export default function BasketsCard({ baskets = [], lastMonth, onAsk }) {
           {lastMonth && (
             <>
               {' '}
-              {monthLabel(lastMonth.month, { year: true })}:{' '}
+              Last month ({monthLabel(lastMonth.month, { year: true })}):{' '}
               <strong>{eur(lastMonth.spend)}</strong>.
             </>
           )}
@@ -63,7 +63,7 @@ export default function BasketsCard({ baskets = [], lastMonth, onAsk }) {
               <small>
                 {(b.top_categories ?? [])
                   .slice(0, 3)
-                  .map((c) => `${c.category} ${eur(c.monthly_avg)}`)
+                  .map((c) => `${categoryName(c.category)} ${eur(c.monthly_avg)}`)
                   .join(' · ')}
               </small>
             </span>

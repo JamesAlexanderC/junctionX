@@ -80,13 +80,19 @@ All JSON. Money in EUR, floats rounded to 2 dp.
                               "leakage":f}},
     "monthly_cashflow": [{"month":"2025-10","income","spend","net"}],  // 12
     "safe_to_spend": {"amount","per_day","days_until_payday","next_payday",
-                      "reserve","upcoming_bills":[{"label","amount","due"}]},
+                      "reserve","balance","typical_spend_per_day",
+                      "well_covered":bool,   // big idle balance: show total
+                      "upcoming_bills":[{"label","amount","due"}]},
     "persona": {"key","label","description","traits":[str]},
-    "insights": [{"title","text","tone":"good"|"warn"|"info"}],   // 3-5
+    "insights": [{"title","text","tone":"good"|"warn"|"info",
+                  "question"}],   // 3-5; question = what to ask the coach
     "home_readiness": {"has_application":bool, "decision":str|null,
                        "max_property_price":float, "deposit_needed":float,
                        "deposit_saved_estimate":float, "months_to_deposit":int|null,
-                       "verdict":str}
+                       "verdict":str, "max_loan", "max_payment",
+                       "existing_debt_monthly",        // from the application
+                       "capped_by_application":bool,   // rejected: stay below
+                       "application": timeline|null}
   }
   ```
 - `POST /api/chat/` body `{"customer_id", "messages":[{"role","content"}]}` →
@@ -100,6 +106,11 @@ All JSON. Money in EUR, floats rounded to 2 dp.
   - `{"type":"concept","title","text"}` short explainer of a money concept
   - `{"type":"suggestions","items":[str]}` 2–3 follow-up questions
   - `{"type":"error","message"}`, `{"type":"done"}`
+
+Consistency rules: the dashboard and the coach share one implementation for
+every figure (e.g. `analytics.idle_cash` for the 3-month buffer, the same
+insights). Changes against a tiny or zero base are described with both
+amounts ("up from €81 a month") rather than percentages like "+383%".
 
 ## Frontend (`frontend/`)
 

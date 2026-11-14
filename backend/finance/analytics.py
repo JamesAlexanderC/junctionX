@@ -512,7 +512,10 @@ def safe_to_spend(txns, today=None):
 
     Returns ``{"amount","per_day","days_until_payday","next_payday",
     "reserve","balance","upcoming_bills":[{"label","amount","due"}],
-    "typical_spend_per_day"}``.
+    "typical_spend_per_day","well_covered"}``. ``well_covered`` is true when
+    the free money dwarfs everyday spending (big idle balances), where a
+    "€3,000 a day" figure would be meaningless and callers should talk about
+    the total instead.
     """
     today = today or AS_OF
     balance = current_balance(txns)
@@ -554,9 +557,12 @@ def safe_to_spend(txns, today=None):
     reserve = min(300.0, max(50.0, 0.10 * _monthly_spend_avg(txns, today)))
     bills = sum(b["amount"] for b in upcoming)
     amount = max(0.0, balance - bills - reserve)
+    per_day = amount / days
+    well_covered = amount > 0 and per_day >= max(3 * typical_per_day, 75.0)
     return {
         "amount": r2(amount),
-        "per_day": r2(amount / days),
+        "per_day": r2(per_day),
+        "well_covered": well_covered,
         "days_until_payday": days,
         "next_payday": next_payday.isoformat(),
         "reserve": r2(reserve),
@@ -728,6 +734,67 @@ def _pct(x):
 def _eur(x):
     """Format money for prose: €1,234 or -€56."""
     return f"-€{-x:,.0f}" if x < -0.5 else f"€{abs(x):,.0f}"
+
+
+# How a category reads in a sentence (mirrors ``coach.vocab.DISPLAY``).
+CATEGORY_NAMES = {
+    "Restaurants": "dining out",
+    "Lifestyle": "shopping & lifestyle",
+    "Transportation": "transport",
+}
+
+
+def category_name(category):
+    """'Restaurants' -> 'dining out', 'Health' -> 'health'."""
+    return CATEGORY_NAMES.get(category, category.lower())
+
+
+def _title(text):
+    return text[:1].upper() + text[1:]
+
+
+def nice_date(iso):
+    """'2026-06-18' -> '18 June 2026'."""
+    d = date.fromisoformat(str(iso)[:10])
+    return f"{d.day} {d.strftime('%B %Y')}"
+
+
+def change_phrase(recent, before):
+    """Describe a move from ``before`` to ``recent`` (both monthly amounts).
+
+    Percentages stop being meaningful when the base is tiny, so a jump of
+    more than double is shown as the two levels instead ("up from €81 a
+    month"), and a fall to zero as "down to nothing".
+    """
+    if before <= 0:
+        return f"up from nothing to {_eur(recent)} a month"
+    if recent <= 0:
+        return f"down to nothing, from {_eur(before)} a month"
+    change = (recent - before) / before
+    if change > 1:
+        return f"up from {_eur(before)} a month in the 3 months before"
+    word = "up" if change > 0 else "down"
+    return f"{word} {_pct(abs(change))} on the 3 months before"
+
+
+BUFFER_MONTHS = 3
+IDLE_MIN = 2000  # below this, moving money to savings isn't worth a mention
+
+
+def idle_cash(balance, spend_monthly, rate=SAVINGS_INTEREST):
+    """Money above a 3-month spending buffer and the interest it could earn.
+
+    Returns ``{"buffer","idle","interest","worth_moving"}``. Used by
+    the dashboard insight and the coach so they always quote the same numbers.
+    """
+    buffer = BUFFER_MONTHS * max(0.0, spend_monthly)
+    idle = max(0.0, balance - buffer)
+    return {
+        "buffer": r2(buffer),
+        "idle": r2(idle),
+        "interest": r2(idle * rate),
+        "worth_moving": idle >= IDLE_MIN,
+    }
 
 
 def persona(txns, today=None, feats=None):
@@ -1014,14 +1081,21 @@ def biggest_expenses(txns, period="last_month", n=5, today=None):
 def insights(txns, today=None, feats=None, limit=5):
     """3-5 concrete, number-backed observations, most important first.
 
-    Returns ``[{"title","text","tone":"good"|"warn"|"info"}]``.
+    Returns ``[{"title","text","tone":"good"|"warn"|"info","question"}]``
+    where ``question`` is what the coach should be asked to go deeper.
     """
     today = today or AS_OF
     f = feats or features(txns, today)
     cands = []  # (priority, insight)
+    overall = "How am I doing overall?"
 
-    def add(priority, title, text, tone):
-        cands.append((priority, {"title": title, "text": text, "tone": tone}))
+    def add(priority, title, text, tone, question=overall):
+        cands.append(
+            (
+                priority,
+                {"title": title, "text": text, "tone": tone, "question": question},
+            )
+        )
 
     rate = f["savings_rate"]
     margin = f["income"] - f["spend"]
@@ -1060,12 +1134,16 @@ def insights(txns, today=None, feats=None, limit=5):
     if leak_cats:
         cat, total = max(leak_cats.items(), key=lambda kv: kv[1])
         monthly = total / WINDOW_MONTHS
+        name = category_name(cat)
+        yearly = monthly * 0.2 * 12
         add(
-            7,
-            f"{cat} is your biggest leak",
-            f"You spend about {_eur(monthly)} a month on {cat.lower()}. "
-            f"Cutting it by 20% frees up {_eur(monthly * 0.2 * 12)} a year.",
+            # A leak worth less than ~€100 a year is not worth headlining.
+            7 if yearly >= 100 else 1,
+            f"{_title(name)} is your biggest leak",
+            f"You spend about {_eur(monthly)} a month on {name}. "
+            f"Cutting it by 20% frees up {_eur(yearly)} a year.",
             "info",
+            f"What if I cut {name} by 20%?",
         )
 
     taxi = taxi_stats(txns, "last_3_months", today)
@@ -1076,6 +1154,7 @@ def insights(txns, today=None, feats=None, limit=5):
             f"{taxi['rides']} taxi rides in the last 3 months cost "
             f"{_eur(taxi['total'])}, about {_eur(taxi['avg_per_ride'])} a ride.",
             "warn" if taxi["total"] > 200 else "info",
+            "How much did I spend on taxis in the last 3 months?",
         )
 
     last = monthly_cashflow(txns, today)[-1]
@@ -1089,6 +1168,7 @@ def insights(txns, today=None, feats=None, limit=5):
             f"You spent {_eur(last['spend'])} in {month_name}, {_pct(delta)} "
             f"above your monthly average of {_eur(avg_spend)}.",
             "warn",
+            "Compare my last two months",
         )
     elif delta <= -0.10:
         add(
@@ -1097,6 +1177,7 @@ def insights(txns, today=None, feats=None, limit=5):
             f"{month_name} spend was {_eur(last['spend'])}, {_pct(-delta)} "
             f"below your average of {_eur(avg_spend)}.",
             "good",
+            "Compare my last two months",
         )
 
     if f["overdraft_days"] >= 5:
@@ -1107,6 +1188,7 @@ def insights(txns, today=None, feats=None, limit=5):
             f"last year (lowest {_eur(f['balance_min'])}). A buffer of "
             f"{_eur(0.5 * avg_spend)} would cover half a month.",
             "warn",
+            "What is safe to spend this week?",
         )
 
     if f["invest_monthly"] > 0:
@@ -1116,17 +1198,22 @@ def insights(txns, today=None, feats=None, limit=5):
             f"You put {_eur(f['invest_monthly'])} a month into investments "
             f"({_pct(f['invest_rate'])} of income).",
             "good",
+            "What kind of spender am I?",
         )
-    elif f["cushion_months"] >= 3:
-        idle = f["balance_avg"] - 2 * avg_spend
-        add(
-            6,
-            "Idle cash",
-            f"Your average balance covers {f['cushion_months']:.1f} months of "
-            f"spending. Moving the {_eur(idle)} above a 2-month buffer into "
-            f"savings at 3% would earn about {_eur(idle * 0.03)} a year.",
-            "info",
-        )
+    else:
+        cash = idle_cash(f["balance_now"], avg_spend)
+        if cash["worth_moving"]:
+            add(
+                6,
+                "Idle cash",
+                f"Your balance is {_eur(f['balance_now'])}. Keeping "
+                f"{BUFFER_MONTHS} months of spending ({_eur(cash['buffer'])}) "
+                f"as a buffer and moving the other {_eur(cash['idle'])} to "
+                f"savings at 3% would earn about {_eur(cash['interest'])} a "
+                "year.",
+                "info",
+                "Where should I keep my spare cash?",
+            )
 
     big = biggest_expenses(txns, "last_month", 1, today)["items"]
     if big and big[0]["amount"] >= 0.2 * max(avg_spend, 1):
@@ -1135,8 +1222,10 @@ def insights(txns, today=None, feats=None, limit=5):
             3,
             "Biggest single cost",
             f"Your largest payment last month was {_eur(b['amount'])} on "
-            f"{b['category'].lower()} ({b['date']}).",
+            f"{category_name(b['category'])}, on "
+            f"{nice_date(b['date']).rsplit(' ', 1)[0]}.",
             "info",
+            "What are my biggest expenses?",
         )
 
     trends = []
@@ -1147,25 +1236,29 @@ def insights(txns, today=None, feats=None, limit=5):
         # Ignore noise: need a meaningful level and a >= 30 EUR/month move.
         if tr["change_pct"] is not None and recent >= 60:
             if abs(recent - before) >= 30:
-                trends.append((tr["change_pct"], cat, recent))
+                trends.append((tr["change_pct"], cat, recent, before))
     if trends:
-        change, cat, recent = max(trends)
+        change, cat, recent, before = max(trends)
+        name = category_name(cat)
         if change >= 0.4:
             add(
                 5,
-                f"{cat} is creeping up",
-                f"{cat} averaged {_eur(recent)} a month over the last 3 "
-                f"months, up {_pct(change)} on the 3 months before.",
+                f"{_title(name)} is creeping up",
+                f"You averaged {_eur(recent)} a month on {name} over the last "
+                f"3 months, {change_phrase(recent, before)}.",
                 "warn",
+                f"How much did I spend on {name} in the last 3 months?",
             )
-        change, cat, recent = min(trends)
+        change, cat, recent, before = min(trends)
+        name = category_name(cat)
         if change <= -0.3:
             add(
                 4,
-                f"Less on {cat.lower()}",
-                f"{cat} is down {_pct(-change)} on the previous 3 months "
-                f"(now {_eur(recent)} a month).",
+                f"Less on {name}",
+                f"You averaged {_eur(recent)} a month on {name} over the last "
+                f"3 months, {change_phrase(recent, before)}.",
                 "good",
+                f"How much did I spend on {name} in the last 3 months?",
             )
 
     found_subs = detect_subscriptions(txns, today)
@@ -1177,6 +1270,7 @@ def insights(txns, today=None, feats=None, limit=5):
             f"{len(found_subs)} recurring payments add up to {_eur(total)} a "
             "month. Worth checking you still use them all.",
             "info",
+            "Show my spending by basket",
         )
 
     add(
@@ -1185,6 +1279,7 @@ def insights(txns, today=None, feats=None, limit=5):
         "Sorting spend into bills, surprise essentials and everyday leakage "
         "shows where cuts are easiest.",
         "info",
+        "Show my spending by basket",
     )
     add(
         0,
@@ -1192,6 +1287,7 @@ def insights(txns, today=None, feats=None, limit=5):
         "Check your daily safe-to-spend figure before bigger purchases: it "
         "already sets aside upcoming bills.",
         "info",
+        "What is safe to spend this week?",
     )
     cands.sort(key=lambda c: -c[0])
     return [ins for _, ins in cands[:limit]]
@@ -1217,16 +1313,17 @@ def max_loan_for_payment(payment, rate=MORTGAGE_RATE, years=MORTGAGE_YEARS):
     return payment * (1 - (1 + i) ** -n) / i
 
 
-def affordability(income_monthly, savings_monthly, saved_now):
+def affordability(income_monthly, savings_monthly, saved_now, monthly_debt=0.0):
     """Finnish rule-of-thumb affordability estimate.
 
-    Payment <= 35% of net income, stress-tested at 6% over 25 years; loan is
-    at most 90% of the price, so a 10% deposit is needed.
+    Payment <= 35% of net income (less any existing loan payments),
+    stress-tested at 6% over 25 years; loan is at most 90% of the price, so a
+    10% deposit is needed.
 
     Returns ``{"max_payment","max_loan","max_property_price",
     "deposit_needed","deposit_saved_estimate","months_to_deposit"}``.
     """
-    max_payment = max(0.0, income_monthly * MAX_PAYMENT_SHARE)
+    max_payment = max(0.0, income_monthly * MAX_PAYMENT_SHARE - monthly_debt)
     max_loan = max_loan_for_payment(max_payment)
     price = max_loan / MAX_LTV
     deposit = price - max_loan
@@ -1352,27 +1449,63 @@ def home_readiness(txns, application=None, events=(), today=None, feats=None):
     "max_loan","max_payment","application": timeline-or-None}``.
     """
     f = feats or features(txns, today)
-    est = affordability(
-        f["income"],
-        f["income"] - f["spend"],
-        deposit_saved_estimate(txns, today),
-    )
     timeline = mortgage_timeline(application, list(events)) if application else None
     decision = timeline["decision"] if timeline else None
+    # Loan payments the bank recorded during the application reduce what a
+    # new mortgage payment can be.
+    debt = 0.0
+    if timeline:
+        debt = sum(
+            e["amount"] for e in timeline["expenses"] if e["type"] == "existing_loan"
+        )
+    saved = deposit_saved_estimate(txns, today)
+    est = affordability(f["income"], f["income"] - f["spend"], saved, debt)
+    capped = False
+    fin = timeline["final"] if timeline else {}
+    if decision == "rejected" and fin.get("loan") and est["max_loan"] >= fin["loan"]:
+        # The bank said no to this loan, so never suggest one at least as big.
+        capped = True
+        loan = 0.9 * fin["loan"]
+        price = loan / MAX_LTV
+        gap = (price - loan) - saved
+        margin = f["income"] - f["spend"]
+        est.update(
+            max_loan=r2(loan),
+            max_payment=r2(annuity_payment(loan)),
+            max_property_price=r2(price),
+            deposit_needed=r2(price - loan),
+            months_to_deposit=(
+                0 if gap <= 0 else math.ceil(gap / margin) if margin > 0 else None
+            ),
+        )
+    decided = timeline["decided"] if timeline else None
+    when = f" on {nice_date(decided)}" if decided else ""
     if timeline and decision == "approved":
-        fin = timeline["final"]
         verdict = (
-            f"Your mortgage was approved on {timeline['decided']}: "
+            f"Your mortgage was approved{when}: "
             f"{_eur(fin['loan'])} towards a {_eur(fin['property_price'])} home "
             f"with {_eur(fin['equity'])} of your own money."
         )
     elif timeline:
+        if capped:
+            aim = (
+                f"Aim for a smaller loan, about {_eur(est['max_loan'])}, and a "
+                f"home around {_eur(est['max_property_price'])}."
+            )
+        elif debt:
+            aim = (
+                f"Counting the {_eur(debt)} a month you already pay on loans, "
+                f"a home around {_eur(est['max_property_price'])} fits your "
+                "income today."
+            )
+        else:
+            aim = (
+                f"Based on your income you could aim for about "
+                f"{_eur(est['max_property_price'])}."
+            )
         verdict = (
-            f"Your application was declined"
-            f"{' on ' + timeline['decided'] if timeline['decided'] else ''}"
-            f" because {timeline['rejection_text'] or 'of the bank assessment'}."
-            f" Based on your income you could aim for about "
-            f"{_eur(est['max_property_price'])}."
+            f"Your application was declined{when} because "
+            f"{timeline['rejection_text'] or 'of the bank assessment'}. {aim}"
         )
     elif est["months_to_deposit"] == 0:
         verdict = (
@@ -1411,6 +1544,8 @@ def home_readiness(txns, application=None, events=(), today=None, feats=None):
         "verdict": verdict,
         "max_loan": est["max_loan"],
         "max_payment": est["max_payment"],
+        "existing_debt_monthly": r2(debt),
+        "capped_by_application": capped,
         "application": timeline,
     }
 

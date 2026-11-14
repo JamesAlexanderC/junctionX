@@ -203,39 +203,47 @@ function insightsFor(p, ctx) {
   const list = []
   if (savingsRate >= 0.2) {
     list.push({ title: 'Strong savings rate', tone: 'good',
+      question: 'What kind of spender am I?',
       text: `You keep ${Math.round(savingsRate * 100)}% of your income. ` +
         'That is well above the 10–15% many people aim for.' })
   } else if (savingsRate < 0.05) {
     list.push({ title: 'Almost nothing left over', tone: 'warn',
+      question: 'What kind of spender am I?',
       text: `Only ${Math.round(savingsRate * 100)}% of income is left at month ` +
         'end. Even €50 a month into a buffer account helps.' })
   } else {
     list.push({ title: 'Room to save more', tone: 'info',
+      question: 'What kind of spender am I?',
       text: `You save ${Math.round(savingsRate * 100)}% of income. ` +
         'Nudging that to 15% would add up fast.' })
   }
   list.push({
     title: `${topLeak.category} is your biggest leak`,
     tone: leakage.share > 0.3 ? 'warn' : 'info',
+    question: `What if I cut ${topLeak.category.toLowerCase()} by 20%?`,
     text: `About ${eur(topLeak.monthly_avg)} a month. Cutting it by 20% ` +
       `frees ${eur(topLeak.monthly_avg * 0.2)} a month, ` +
       `${eur(topLeak.monthly_avg * 0.2 * 12)} a year.`,
   })
   if (lastSpend > avgSpend * 1.05) {
     list.push({ title: 'September ran hot', tone: 'warn',
+      question: 'Show my spending by basket',
       text: `You spent ${eur(lastSpend)} last month, ` +
         `${Math.round((lastSpend / avgSpend - 1) * 100)}% above your average.` })
   } else {
     list.push({ title: 'Spending under control', tone: 'good',
+      question: 'Show my spending by basket',
       text: `September spend of ${eur(lastSpend)} was at or below your ` +
         '12-month average.' })
   }
   list.push({ title: 'Bills before payday', tone: 'info',
+    question: 'What is safe to spend this week?',
     text: `${safe.upcoming_bills.length} bills totalling ` +
       `${eur(safe.upcoming_bills.reduce((s, b) => s + b.amount, 0))} are due ` +
       `before payday on ${Number(safe.next_payday.slice(8))} Oct.` })
   if (p.persona === 'investor') {
     list.push({ title: 'Investing habit', tone: 'good',
+      question: 'What kind of spender am I?',
       text: 'You moved money into investments in 11 of the last 12 months.' })
   }
   return list

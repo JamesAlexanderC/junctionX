@@ -15,7 +15,7 @@ export default function InsightsCard({ insights = [], onAsk }) {
               <button
                 type="button"
                 className={`insight tone-${tone}`}
-                onClick={() => onAsk(`Tell me more about this: ${it.title}`)}
+                onClick={() => onAsk(it.question || `Tell me more about ${it.title}`)}
               >
                 <span className="insight-icon" aria-hidden="true">
                   <Icon name={TONE_ICON[tone]} size={16} strokeWidth={2.5} />

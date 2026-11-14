@@ -17,7 +17,7 @@ from finance import analytics as a
 
 from .. import vocab
 from ..glossary import GLOSSARY, TERMS
-from ..tools import run_tool
+from ..tools import cat_label, chart, run_tool
 from .base import (
     Provider,
     chart_event,
@@ -61,6 +61,15 @@ INTENT_PATTERNS = {
             5,
         ),
     ],
+    "cash_buffer": [
+        (
+            r"\b(idle|spare|extra|surplus) (cash|money)\b|"
+            r"\bwhere should i (keep|put|park) my (money|savings|cash)\b|"
+            r"\bhow much (cash|money) should i keep\b|"
+            r"\bhow (big|much) should my (emergency fund|buffer) be\b",
+            5,
+        ),
+    ],
     "what_if": [
         (r"\bwhat if\b|\bwhat would happen if\b|\bhow much would i save\b", 3),
         (
@@ -69,6 +78,14 @@ INTENT_PATTERNS = {
             2,
         ),
         (r"\d+\s*(%|percent|per cent)", 1),
+    ],
+    "cashflow": [
+        (
+            r"\b(spending|money|finances) (has |have )?(changed|chang|trend)|"
+            r"\bmonth by month\b|\bcash ?flow\b|\bspending trend\b|"
+            r"\b(each|every) month\b.{0,20}\b(spend|spent|spending)\b",
+            5,
+        ),
     ],
     "taxi": [(r"\btax(i|is|ies)\b|\bcabs?\b|\buber\b|\bbolt\b|ride.?hailing", 4)],
     "safe_to_spend": [
@@ -207,6 +224,7 @@ def score_intents(text, slots):
     non_taxi = [x for x in slots.targets if x != vocab.TAXI]
     if non_taxi:
         scores["spending"] += 3
+        scores["cashflow"] = 0
     if vocab.TAXI in slots.targets:
         scores["taxi"] = max(scores["taxi"], 4)
     if scores["spending"] and slots.period:
@@ -465,7 +483,13 @@ def h_taxi(ans, s):
             ans.pick("Good news:", "Nice one:", "Easy answer:"),
             f"there were {b('no taxi rides')} {when}.",
         )
-        if six_rides:
+        if six_rides >= 4:
+            ans.say(
+                f"That's a quiet month for you, though: over the last 6 months "
+                f"you took {plural(six_rides, 'ride')} costing "
+                f"{b(E(six_total))}."
+            )
+        elif six_rides:
             ans.say(
                 f"Over the last 6 months you took {plural(six_rides, 'ride')} "
                 f"costing {b(E(six_total))}, so taxis are an occasional thing "
@@ -546,7 +570,12 @@ def h_baskets(ans, s):
     month = vocab.month_label(last["month"], False)
     lm = last["baskets"]["leakage"]
     cmp = compare_word(lm, leak["monthly_avg"])
-    if cmp:
+    if lm < 1 and leak["monthly_avg"] >= 1:
+        ans.say(
+            f"In {month} you had {b('no everyday leakage at all')}, against "
+            f"your usual {E(leak['monthly_avg'])} a month."
+        )
+    elif cmp:
         ans.say(
             f"In {month} your leakage was {b(E(lm))}, "
             + (
@@ -592,11 +621,116 @@ def _bill_lines(bills):
     return lines
 
 
+def _idle_tip(cash):
+    return (
+        f"keep about three months of spending ({b(E(cash['buffer']))}) in your "
+        f"account and move the rest, roughly {b(E(cash['idle']))}, to savings. "
+        f"At 3% that's about {b(E(cash['interest']))} a year of interest."
+    )
+
+
+def _safe_well_covered(ans, s, d, payday):
+    """Safe to spend for someone whose free money dwarfs their daily spend.
+
+    A "€3,888 a day" figure is meaningless here, so talk about the total and
+    the customer's normal pace instead.
+    """
+    typical = d["typical_spend_per_day"]
+    ans.say(
+        f"You're well covered{' this week' if s.week else ''}.",
+        f"After the bills due before payday on {b(payday)} and a "
+        f"{b(E(d['reserve']))} safety reserve, {b(E(d['amount']))} of your "
+        f"{E(d['balance'])} balance is free to spend.",
+    )
+    ans.say("Already set aside for bills:")
+    ans.bullets(_bill_lines(d["upcoming_bills"]))
+    if typical >= 1:
+        ans.say(
+            f"Your everyday spending usually runs about "
+            f"{b(E(typical * 7) + ' a week')}, so you can carry on as normal and "
+            "still have plenty left on payday."
+        )
+    cash = a.idle_cash(d["balance"], d["spend_monthly_avg"])
+    if cash["worth_moving"]:
+        ans.tip(_idle_tip(cash))
+    else:
+        ans.tip(
+            "check this number before bigger purchases. It already sets aside "
+            "your upcoming bills."
+        )
+    cat, _ = biggest_leak(ans.ctx)
+    ans.suggest(
+        "Where should I keep my spare cash?",
+        "Show my spending by basket",
+        f"What if I cut {vocab.display(cat)} by 20%?",
+    )
+
+
+def h_cash_buffer(ans, s):
+    d = ans.call("get_overview_summary", show_chart=False, show_concept=False)
+    cash = d["idle_cash"]
+    balance = d["balance"]
+    ans.concept = GLOSSARY["emergency_fund"]
+    ans.say(
+        "A good rule of thumb is to keep about three months of spending in an "
+        f"easy-to-reach emergency fund. For you that's {b(E(cash['buffer']))}."
+    )
+    if cash["worth_moving"]:
+        ans.say(
+            f"Your balance today is {b(E(balance))}, so about "
+            f"{b(E(cash['idle']))} is sitting idle above that buffer. In a "
+            f"savings account at 3% it would earn about "
+            f"{b(E(cash['interest']) + ' a year')}."
+        )
+        ans.charts.append(
+            chart(
+                "bar",
+                f"Your {E(balance)} balance",
+                [
+                    {"label": "3-month buffer", "value": cash["buffer"]},
+                    {"label": "Idle cash", "value": cash["idle"]},
+                ],
+            )
+        )
+        ans.tip(
+            "keep the buffer in your everyday account and move the rest in one "
+            "go. If you'd like to invest part of it, S-Pankki's advisers can "
+            "help you choose."
+        )
+    elif balance >= cash["buffer"]:
+        ans.say(
+            f"Your balance today is {b(E(balance))}, so your buffer is in place "
+            "with a little to spare."
+        )
+        ans.tip(
+            "keep it topped up with a small standing transfer on payday, so a "
+            "surprise bill never eats into it for long."
+        )
+    else:
+        short = cash["buffer"] - max(0.0, balance)
+        ans.say(
+            f"Your balance today is {b(E(balance))}, so you're about "
+            f"{b(E(short))} short of a full buffer. There's no spare cash to "
+            "move yet."
+        )
+        ans.tip(
+            "build the buffer first: a standing transfer on payday, even a small "
+            "one, gets you there without having to think about it."
+        )
+    ans.suggest(
+        "What kind of spender am I?",
+        "Am I ready to buy a home?",
+        "What is safe to spend this week?",
+    )
+
+
 def h_safe_to_spend(ans, s):
     d = ans.call("safe_to_spend")
     amount, per_day, days = d["amount"], d["per_day"], d["days_until_payday"]
     payday = vocab.day_label(d["next_payday"])
     typical = d["typical_spend_per_day"]
+    if d.get("well_covered"):
+        return _safe_well_covered(ans, s, d, payday)
     if amount > 0:
         if s.week:
             ans.say(
@@ -621,14 +755,9 @@ def h_safe_to_spend(ans, s):
                 f"Your everyday spending is usually only about "
                 f"{b(E(typical) + ' a day')}, so you have plenty of headroom."
             )
-            idle = d["balance"] - 3 * spend
-            if idle > 500:
-                ans.tip(
-                    f"keep about three months of spending ({b(E(3 * spend))}) "
-                    f"in your account and move the rest, roughly "
-                    f"{b(E(idle))}, to savings. At 3% that's about "
-                    f"{b(E(idle * 0.03))} a year of interest."
-                )
+            cash = a.idle_cash(d["balance"], spend)
+            if cash["worth_moving"]:
+                ans.tip(_idle_tip(cash))
             else:
                 ans.tip(category_tip(None))
         elif typical > 0 and per_day < typical:
@@ -765,13 +894,19 @@ PERSONA_INTRO = {
     "investor": "You're an {}.",
 }
 
+
+def _comfortable_tip(f):
+    cash = a.idle_cash(f["balance_now"], f["spend"])
+    if cash["worth_moving"]:
+        return _idle_tip(cash)
+    return (
+        "your cushion is healthy. A standing transfer on payday keeps it "
+        "growing without any effort."
+    )
+
+
 PERSONA_TIPS = {
-    "comfortable": lambda f: (
-        f"your average balance covers {b(f'{f['cushion_months']:.1f} months')} "
-        f"of spending. Keep about three months ({E(3 * f['spend'])}) as an "
-        f"emergency fund and put the rest, around "
-        f"{b(E(max(0, f['balance_avg'] - 3 * f['spend'])))}, to work in savings."
-    ),
+    "comfortable": _comfortable_tip,
     "steady_saver": lambda f: (
         f"automate it. A standing transfer of "
         f"{b(E(round((f['income'] - f['spend']) * 0.5, -1)))} on payday locks in "
@@ -895,9 +1030,13 @@ def h_home(ans, s):
                 f"{b(E(app['stress_payment']) + ' a month')}, which is "
                 f"{b(P(share))} of your average income of {E(income)}"
                 + (
-                    ", a little above the 35% comfort line, so keep a buffer."
-                    if share > 0.35
-                    else ", within the 35% comfort line."
+                    ", above the 35% comfort line, so keep a buffer."
+                    if share >= 0.355
+                    else (
+                        ", right at the 35% comfort line, so keep a buffer."
+                        if share > 0.335
+                        else ", within the 35% comfort line."
+                    )
                 )
             )
         spend = d["spend_monthly_avg"]
@@ -918,14 +1057,49 @@ def h_home(ans, s):
             f"{b(E(fin['property_price']))} home with {b(E(fin['equity']))} of "
             f"your own money (loan-to-value {P(fin['loan_to_value'])})."
         )
+        debt = d.get("existing_debt_monthly") or 0
+        if d.get("capped_by_application"):
+            basis = (
+                "The bank's own check was stricter than my rule of thumb, so "
+                f"aim below what was declined: a loan of about "
+                f"{b(E(d['max_loan']))} means a home around {b(E(mp))}"
+            )
+        elif debt:
+            basis = (
+                f"The bank also counted the {b(E(debt) + ' a month')} you "
+                f"already pay on loans. On your income of about {E(income)} a "
+                f"month that leaves room for a payment of {E(d['max_payment'])}, "
+                f"so a realistic target is a home around {b(E(mp))}"
+            )
+        else:
+            basis = (
+                f"Based on your income of about {b(E(income))} a month, a "
+                f"realistic target is a home around {b(E(mp))}"
+            )
         ans.say(
-            f"Based on your income of about {b(E(income))} a month, a realistic "
-            f"target is a home around {b(E(mp))}, which needs a deposit of about "
-            f"{b(E(deposit))}. I estimate you have {b(E(saved))} towards it."
+            f"{basis}, which needs a deposit of about {b(E(deposit))}. I "
+            f"estimate you have {b(E(saved))} towards it."
         )
+        usable = saved - a.idle_cash(saved, d["spend_monthly_avg"])["buffer"]
+        if usable > 2 * deposit and d["max_loan"] > 0:
+            ans.say(
+                f"You could also put more of your savings in: with "
+                f"{E(usable)} as deposit (keeping a three-month buffer), the "
+                f"same loan stretches to a home of about "
+                f"{b(E(d['max_loan'] + usable))}."
+            )
         tip = REASON_TIPS.get(
             app.get("rejection_reason"), REASON_TIPS["insufficient_equity"]
         )
+        if debt and app.get("rejection_reason") in (
+            "insufficient_income",
+            "existing_debt",
+        ):
+            tip = (
+                f"paying off the existing loan is the biggest lever: it would "
+                f"free up {E(debt)} a month for a mortgage payment. A "
+                "co-borrower's income would also count."
+            )
         ans.tip(tip.format(price=E(mp)))
     else:
         if months == 0:
@@ -971,7 +1145,12 @@ def h_home(ans, s):
                 f"{vocab.display(cat)} at {b(E(monthly))} a month; cutting it by "
                 f"20% saves {b(E(extra))} a month towards closing the gap."
             )
-        elif months and extra >= 10 and margin > 0:
+        elif (
+            months
+            and extra >= 10
+            and margin > 0
+            and math.ceil((deposit - saved) / (margin + extra)) < months
+        ):
             faster = math.ceil((deposit - saved) / (margin + extra))
             ans.tip(
                 f"cutting {vocab.display(cat)} by 20% adds {b(E(extra))} a month "
@@ -1047,12 +1226,25 @@ def h_spending(ans, s):
         else:
             ans.say(f"That's unusual for you: you average {b(E(avg))} a month.")
     change = t["change_pct"]
+    months = [m["amount"] for m in t["months"]]
+    recent, before = sum(months[-3:]) / 3, sum(months[-6:-3]) / 3
     if change is not None and abs(change) >= 0.15 and avg >= 10:
-        ans.say(
-            f"Over the last 3 months your {name} spending is "
-            f"{'up' if change > 0 else 'down'} {b(P(abs(change)))} on the 3 "
-            "months before."
-        )
+        if recent <= 0:
+            ans.say(
+                f"There's been no {name} spending at all in the last 3 months, "
+                f"after about {b(E(before))} a month in the 3 months before."
+            )
+        elif change > 1:
+            ans.say(
+                f"Over the last 3 months you averaged {b(E(recent))} a month on "
+                f"{name}, up from {E(before)} a month in the 3 months before."
+            )
+        else:
+            ans.say(
+                f"Over the last 3 months your {name} spending is "
+                f"{'up' if change > 0 else 'down'} {b(P(abs(change)))} on the 3 "
+                "months before."
+            )
     ans.tip(category_tip(target))
     ans.suggest(
         f"What if I cut {name} by 20%?",
@@ -1091,7 +1283,7 @@ def _spending_period(ans, period):
         return
     ans.say(f"You spent {b(E(d['total']))} {when}. The biggest categories:")
     ans.bullets(
-        f"{c['category']}: {b(E(c['amount']))} ({P(c['share'])})"
+        f"{cat_label(c['category'])}: {b(E(c['amount']))} ({P(c['share'])})"
         for c in d["categories"][:4]
     )
     leak = sum(c["amount"] for c in d["categories"] if c["basket"] == "leakage")
@@ -1130,7 +1322,7 @@ def h_biggest(ans, s):
             else ""
         )
         lines.append(
-            f"{b(E(i['amount']))} on {i['category'].lower()}{extra} "
+            f"{b(E(i['amount']))} on {vocab.display(i['category'])}{extra} "
             f"({vocab.day_label(i['date'])})"
         )
     ans.bullets(lines)
@@ -1196,14 +1388,14 @@ def h_compare(ans, s):
     if rows:
         ans.say("The biggest changes:")
         ans.bullets(
-            f"{r['category']}: {'up' if r['diff'] > 0 else 'down'} "
+            f"{cat_label(r['category'])}: {'up' if r['diff'] > 0 else 'down'} "
             f"{b(E(abs(r['diff'])))} ({E(r['a'])} → {E(r['b'])})"
             for r in rows
         )
     ups = [r for r in rows if r["diff"] > 0]
     if ups and ups[0]["category"] in a.LEAKAGE_CATEGORIES:
         ans.tip(
-            f"{ups[0]['category'].lower()} grew the most. "
+            f"{vocab.display(ups[0]['category'])} grew the most. "
             + _sentence(category_tip(ups[0]["category"]))
         )
     elif diff < 0:
@@ -1355,6 +1547,57 @@ def h_invest_advice(ans, s):
     )
 
 
+def h_cashflow(ans, s):
+    d = ans.call("monthly_cashflow")
+    avg, hi, lo = d["spend_monthly_avg"], d["highest"], d["lowest"]
+    ans.say(
+        f"Over the last 12 months you spent {b(E(avg))} a month on average "
+        f"and took in {E(d['income_monthly_avg'])}."
+    )
+    ans.bullets(
+        [
+            f"Busiest month: {b(vocab.month_label(hi['month']))} at "
+            f"{b(E(hi['spend']))}",
+            f"Lightest month: {b(vocab.month_label(lo['month']))} at "
+            f"{b(E(lo['spend']))}",
+            f"Months with money left over: {b(str(d['months_in_green']) + ' of 12')}",
+        ]
+    )
+    recent, before = d["recent_3_avg"], d["previous_3_avg"]
+    if before > 0:
+        change = (recent - before) / before
+        if abs(change) < 0.05:
+            trend = "about the same as the 3 months before"
+        elif change > 1:
+            trend = f"up from {E(before)} a month in the 3 months before"
+        else:
+            trend = (
+                f"{'up' if change > 0 else 'down'} {P(abs(change))} on the 3 "
+                "months before"
+            )
+        ans.say(
+            f"Lately you've averaged {b(E(recent))} a month over the last 3 "
+            f"months, {trend}."
+        )
+    if hi["spend"] > 1.4 * avg:
+        ans.tip(
+            f"{vocab.month_label(hi['month'], False)} was "
+            f"{E(hi['spend'] - avg)} above your usual month. Putting a little "
+            "aside every month for big one-offs keeps months like that from "
+            "hurting."
+        )
+    else:
+        ans.tip(
+            "your spending is fairly steady month to month, which makes it easy "
+            "to automate saving: set a standing transfer for payday."
+        )
+    ans.suggest(
+        "Compare my last two months",
+        "What are my biggest expenses?",
+        "Show my spending by basket",
+    )
+
+
 def h_greeting(ans, s):
     d = ans.call("get_overview_summary", show_chart=False, show_concept=False)
     keep = (
@@ -1432,6 +1675,8 @@ def h_fallback(ans, s):
 
 HANDLERS = {
     "taxi": h_taxi,
+    "cashflow": h_cashflow,
+    "cash_buffer": h_cash_buffer,
     "baskets": h_baskets,
     "safe_to_spend": h_safe_to_spend,
     "what_if": h_what_if,
@@ -1462,6 +1707,7 @@ TOOL_INTENTS = {
     "get_persona": "persona",
     "home_readiness": "home",
     "basket_breakdown": "baskets",
+    "monthly_cashflow": "cashflow",
 }
 
 

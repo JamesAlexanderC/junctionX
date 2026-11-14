@@ -65,3 +65,11 @@ export const personaInitials = (label = '') =>
     .slice(0, 2)
     .map((w) => w[0].toUpperCase())
     .join('')
+
+// Friendlier names for a few dataset categories (matches the coach's wording).
+const CATEGORY_NAMES = {
+  Restaurants: 'Dining out',
+  Lifestyle: 'Shopping & lifestyle',
+  Transportation: 'Transport',
+}
+export const categoryName = (category) => CATEGORY_NAMES[category] ?? category

@@ -27,13 +27,20 @@ export default function App() {
 
   const back = useCallback(() => setCustomer(null), [])
 
-  const { setDraft } = conversations
+  // Dashboard -> coach handoff: jump to the chat and ask straight away. If an
+  // answer is still streaming, leave the question in the composer instead.
+  const { get, send, setDraft } = conversations
   const ask = useCallback(
     (question) => {
-      if (customer && question) setDraft(customer.customer_id, question)
+      if (customer && question) {
+        const id = customer.customer_id
+        const current = get(id)
+        if (current.busy) setDraft(id, question)
+        else send(id, question, current.messages)
+      }
       setTab('chat')
     },
-    [customer, setDraft],
+    [customer, get, send, setDraft],
   )
 
   // Return to the top of each new screen.

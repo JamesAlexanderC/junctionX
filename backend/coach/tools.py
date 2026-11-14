@@ -205,6 +205,11 @@ def chart(kind, title, data, unit="€"):
     return {"kind": kind, "title": title, "unit": unit, "data": rows}
 
 
+def cat_label(category):
+    """Chart / list label for a category: 'Restaurants' -> 'Dining out'."""
+    return vocab.display(category)[:1].upper() + vocab.display(category)[1:]
+
+
 def _top_with_other(rows, n=MAX_CHART_POINTS - 1):
     rows = [r for r in rows if r["value"] > 0]
     if len(rows) <= n + 1:
@@ -235,8 +240,9 @@ def months_chart(kind, title, months, field="amount"):
 @tool(
     "get_overview_summary",
     "Headline money picture: 12-month average income and spend, savings rate, "
-    "balance, last month's totals, persona, safe-to-spend and the top "
-    "insights. Use for 'how am I doing' or general questions.",
+    "balance, last month's totals, persona, safe-to-spend, idle cash above a "
+    "3-month buffer and the top insights. Use for 'how am I doing', spare "
+    "cash or general questions.",
     "Looking at your overall picture…",
 )
 def get_overview_summary(ctx):
@@ -253,10 +259,18 @@ def get_overview_summary(ctx):
         "last_month": last,
         "last_6_months": flow[-6:],
         "safe_to_spend": {
-            k: sts[k] for k in ("amount", "per_day", "next_payday", "days_until_payday")
+            k: sts[k]
+            for k in (
+                "amount",
+                "per_day",
+                "next_payday",
+                "days_until_payday",
+                "well_covered",
+            )
         },
         "persona": {"label": persona["label"], "traits": persona["traits"]},
         "overdraft_days": feats["overdraft_days"],
+        "idle_cash": a.idle_cash(head["balance"], head["spend_monthly_avg"]),
         "insights": a.insights(ctx.txns, ctx.today, feats, limit=4),
     }
     return _result(
@@ -283,7 +297,10 @@ def spend_by_category(ctx, period=None, category=None):
     res = a.spend_by_category(ctx.txns, period, ctx.today)
     data = {k: res[k] for k in ("period", "start", "end", "total")}
     data["categories"] = res["categories"]
-    rows = [{"label": c["category"], "value": c["amount"]} for c in res["categories"]]
+    rows = [
+        {"label": cat_label(c["category"]), "value": c["amount"]}
+        for c in res["categories"]
+    ]
     out_chart = chart(
         "bar", f"Spending by category, {res['period']}", _top_with_other(rows)
     )
@@ -474,7 +491,9 @@ def compare_months(ctx, month_a=None, month_b=None):
         f"{vocab.month_short(b_key)}"
     )
     out_chart = chart(
-        "bar", title, [{"label": r["category"], "value": r["diff"]} for r in rows]
+        "bar",
+        title,
+        [{"label": cat_label(r["category"]), "value": r["diff"]} for r in rows],
     )
     return _result(data, out_chart)
 
@@ -501,7 +520,7 @@ def biggest_expenses(ctx, period=None, n=5):
         f"Biggest payments, {res['period']}",
         [
             {
-                "label": f"{vocab.day_label(i['date'])} {i['category']}",
+                "label": f"{vocab.day_label(i['date'])} {cat_label(i['category'])}",
                 "value": i["amount"],
             }
             for i in res["items"]
@@ -529,6 +548,7 @@ def get_persona(ctx):
             "leakage_share",
             "weekend_leakage_share",
             "invest_monthly",
+            "balance_now",
             "balance_avg",
             "balance_min",
             "overdraft_days",
@@ -595,6 +615,29 @@ def home_readiness(ctx):
             ],
         )
     return _result(data, out_chart, "ltv" if app else "stress_test")
+
+
+@tool(
+    "monthly_cashflow",
+    "Income, spending and money left over for each of the last 12 months, "
+    "with the busiest and lightest months and the last 3 months against the "
+    "3 before. Use for trends in overall spending.",
+    "Tracing your money month by month…",
+)
+def monthly_cashflow(ctx):
+    flow = a.monthly_cashflow(ctx.txns, ctx.today)
+    spends = [m["spend"] for m in flow]
+    data = {
+        "months": flow,
+        "spend_monthly_avg": a.r2(sum(spends) / len(spends)),
+        "income_monthly_avg": a.r2(sum(m["income"] for m in flow) / len(flow)),
+        "highest": max(flow, key=lambda m: m["spend"]),
+        "lowest": min(flow, key=lambda m: m["spend"]),
+        "months_in_green": sum(m["net"] >= 0 for m in flow),
+        "recent_3_avg": a.r2(sum(spends[-3:]) / 3),
+        "previous_3_avg": a.r2(sum(spends[-6:-3]) / 3),
+    }
+    return _result(data, months_chart("bar", "Spending by month", flow, "spend"))
 
 
 @tool(

@@ -946,6 +946,23 @@
     color: var(--warn);
   }
 }
+.safe-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  color: var(--body);
+  background: var(--good-soft);
+
+  svg {
+    flex: none;
+    margin-top: 2px;
+    color: var(--good);
+  }
+}
 .safe-unit {
   font-size: 18px;
   font-weight: 700;
