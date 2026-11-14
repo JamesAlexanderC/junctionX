@@ -213,3 +213,32 @@ def test_everything_json_serialisable(df_today, inc, bsk):
         "levels": levels.compute_levels(df_today, TODAY, inc, bsk),
     }
     json.dumps(out)
+
+
+def _no_bills(inc, partial_view):
+    return {**inc, "bills": [], "partial_view": partial_view}
+
+
+def test_level_1_reached_without_bills_on_a_partial_view(df_today, inc, bsk):
+    # #28: bills paid from another bank are not visible on a partial view.
+    lv = levels.compute_levels(df_today, TODAY, _no_bills(inc, True), bsk)
+    ladder = {step["level"]: step for step in lv["ladder"]}
+    assert ladder[1]["reached"] is True
+    assert lv["current"] == 2
+
+
+def test_level_1_without_bills_says_what_is_missing(df_today, inc, bsk):
+    lv = levels.compute_levels(df_today, TODAY, _no_bills(inc, False), bsk)
+    assert lv["current"] == 0
+    assert lv["next"] == 1
+    assert lv["next_missing"] == ["No regular monthly bills seen in your account yet"]
+
+
+def test_every_unreached_level_says_what_is_missing(df_today, inc, bsk):
+    lv = levels.compute_levels(df_today, TODAY, inc, bsk)
+    for step in lv["ladder"]:
+        if step["reached"]:
+            assert "missing" not in step
+        else:
+            assert step["missing"], step["level"]
+            assert all(isinstance(m, str) and m for m in step["missing"])

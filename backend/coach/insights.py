@@ -338,6 +338,8 @@ def level(p):
     step = lv.get("easiest_next_step") or {}
     if _available(p, "levels.easiest_next_step") and step.get("text"):
         text += f" Easiest next step: {step['text']}."
+    elif lv.get("next_missing"):
+        text += f" Missing: {'. '.join(lv['next_missing'])}."
     return [_item("level", 30, "Level", lv["current"], None, text, "levels")]
 
 

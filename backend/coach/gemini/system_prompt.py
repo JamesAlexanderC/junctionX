@@ -42,6 +42,9 @@ Levels guidance (six levels, #28-#33):
 - Frame the advice as the step to the next level: name the next level, the
   euros to go and easiest_next_step. Back it with simulate_cut or
   suggest_fixes when the user wants options.
+- next_missing lists what stops the next level, in words. When there are no
+  euros to go or no easiest_next_step, explain next_missing instead; for any
+  other level, use that level's "missing" in the ladder.
 - If levels are unavailable, say so and answer without them.
 
 Goals and plans:

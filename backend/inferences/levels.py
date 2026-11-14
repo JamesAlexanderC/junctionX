@@ -65,6 +65,41 @@ def _wealth_saver_ok(df, today, baskets, income_monthly):
     )
 
 
+def _level_1(income: dict) -> tuple[bool, list[str]]:
+    """#28: payday and at least one regular bill. On a partial view the bills
+    are paid from another bank, so a payday alone counts. Returns (reached,
+    what is missing)."""
+    missing = []
+    if not income.get("payday", {}).get("found"):
+        missing.append("No regular payday found yet")
+    if not income.get("bills") and not income.get("partial_view"):
+        missing.append("No regular monthly bills seen in your account yet")
+    return not missing, missing
+
+
+def _missing(readiness, has_income) -> dict[int, list[str]]:
+    """What stops each level 2 to 6, in words without numbers (the euro gap
+    is in euros_to_go), so the coach can explain levels with no euro gap."""
+    return {
+        2: (
+            ["Spend less than you earn for a full month"]
+            if has_income
+            else ["No income seen in the last full month"]
+        ),
+        3: ["Keep at least one month of essential spending in your account"],
+        4: ["Set a goal and keep it on track"],
+        5: (
+            ["Raise your mortgage readiness score"]
+            if readiness is not None
+            else ["Mortgage readiness cannot be scored from the data yet"]
+        ),
+        6: [
+            "Keep three months of essential spending in your account and save "
+            "a tenth of your income for three months running"
+        ],
+    }
+
+
 def compute_levels(
     df: pd.DataFrame,
     today,
@@ -84,8 +119,8 @@ def compute_levels(
     low = lowest_balance(df, today) if len(df) else 0.0
     low = low or 0.0
 
-    # #28 Level 1: payday and at least one regular bill detected.
-    l1 = bool(income.get("payday", {}).get("found")) and bool(income.get("bills"))
+    # #28 Level 1: payday and at least one regular bill (or a partial view).
+    l1, l1_missing = _level_1(income)
     # #29 Level 2.
     l2, l2_progress, l2_gap = _level_2(df, today, income_monthly)
     # #30 Level 3: buffer months = lowest balance (30 days) / monthly essentials.
@@ -140,17 +175,20 @@ def compute_levels(
             ),
         }
 
+    missing = {1: l1_missing, **_missing(readiness, l2_gap is not None)}
     ladder = []
     for lv in range(1, 7):
         entry = {"level": lv, "name": th.LEVEL_NAMES[lv], "reached": bool(reached[lv])}
         if not reached[lv]:
             entry["progress"] = r2(progress[lv])
+            entry["missing"] = missing[lv]
         ladder.append(entry)
     return {
         "current": current,
         "current_name": th.LEVEL_NAMES.get(current, "Not started"),
         "next": nxt,
         "next_name": th.LEVEL_NAMES.get(nxt) if nxt else None,
+        "next_missing": missing[nxt] if nxt else [],
         "progress": r2(progress[nxt]) if nxt else 1.0,
         "euros_to_go": r2(gap) if gap is not None else None,
         "buffer_months": r2(buffer_months),

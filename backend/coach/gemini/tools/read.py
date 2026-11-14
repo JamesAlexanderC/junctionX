@@ -99,7 +99,10 @@ def level_card(levels):
         "name": levels.get("next_name") or levels.get("current_name"),
         "progress": levels.get("progress", 1.0),
         "euros_to_go": levels.get("euros_to_go"),
-        "next_step": step.get("text"),
+        # No euro step (levels 1 and 4, or no small cut): say what is missing.
+        "next_step": step.get("text")
+        or ". ".join(levels.get("next_missing") or [])
+        or None,
         "ladder": [
             {"level": r["level"], "name": r["name"], "reached": r["level"] <= current}
             for r in levels.get("ladder") or []

@@ -151,3 +151,20 @@ def test_end_of_month_hidden_on_the_last_day():
     p = sample()
     p["forecast"]["end_of_month"] = {"expected": 500.0, "low": 500.0, "high": 500.0}
     assert "end_of_month" not in {i["key"] for i in insights.insights(p)}
+
+
+def test_level_insight_says_what_is_missing_without_a_euro_step():
+    p = sample()
+    p["levels"] = {
+        **p["levels"],
+        "current": 0,
+        "current_name": "Not started",
+        "next": 1,
+        "next_name": "Getting started",
+        "progress": 0.0,
+        "euros_to_go": None,
+        "easiest_next_step": None,
+        "next_missing": ["No regular payday found yet"],
+    }
+    (item,) = insights.level(p)
+    assert item["text"].endswith("Missing: No regular payday found yet.")
