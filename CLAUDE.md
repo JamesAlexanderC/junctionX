@@ -84,7 +84,16 @@ get_category_spend, get_safe_to_spend, get_safe_to_save, get_baskets, get_level,
 simulate_cut, forecast_balance, get_spender_type, list_goals, create_goal,
 rate_goal, get_detected_goals, get_mortgage_readiness, get_explainer,
 get_benchmark, get_alerts, explain_alert, suggest_fixes, simulate_plan,
-accept_plan, snooze_alert, send_reply.
+accept_plan, snooze_alert, list_inferences, get_inference, manage_goal,
+save_loan_details, dismiss_suggestion, send_reply.
+- Code in `coach/gemini/tools/` (one module per area, `registry.py` maps
+  names). Every profile item Gemini can read is one entry in
+  `coach/gemini/catalogue.py`; add an entry to expose a new inference.
+- Writes are proposed first and run only on a yes to the same proposal;
+  `manage_goal add_saved` may run at once when Python sees the amount in the
+  message and one goal fits. See `docs/gemini_tools.md`.
+- Card payloads are validated (`coach/gemini/cards.py`); numbers in cards
+  must come from tool results, like the reply text.
 
 ## Shared formulas the frontend copies
 - #24 monthly saving = p * mean monthly category spend; yearly = 12x.
