@@ -48,10 +48,22 @@ class _Snapshot(_Card):
     goal_date: str | None = None
 
 
+# #13 (live test): units are English words the app formats; anything else
+# ("kpl", "st") becomes "" so a count shows as a plain number. (A missing unit
+# would make the number card fall back to EUR.)
+KNOWN_UNITS = {"EUR", "€", "%", "date", "x", "days", "weeks", "months", "years"}
+
+
+def _english_unit(value):
+    return value if value is None or value in KNOWN_UNITS else ""
+
+
 class NumberCard(_Card):
     label: str
     value: float
     unit: str | None = None
+
+    _unit = field_validator("unit")(classmethod(lambda cls, v: _english_unit(v)))
 
 
 class ChartCard(_Card):
@@ -59,6 +71,8 @@ class ChartCard(_Card):
     title: str
     unit: str | None = None
     data: list[_Row] = Field(min_length=1)
+
+    _unit = field_validator("unit")(classmethod(lambda cls, v: _english_unit(v)))
 
 
 class BasketBarCard(_Card):

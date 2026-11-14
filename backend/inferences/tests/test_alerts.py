@@ -337,3 +337,26 @@ def test_merchant_ids_become_friendly_names(merchant, label):
     from inferences.common import merchant_name
 
     assert merchant_name(pd.DataFrame(), merchant) == label
+
+
+# --- #93 (live test 00020): a restaurant is not a yearly bill ---------------------
+
+
+def _yearly(merchant, category):
+    return make_df(
+        [
+            tx("2024-11-01 09:00", -89.0, merchant, category, "5999"),
+            tx("2025-11-01 09:00", -90.0, merchant, category, "5999"),
+        ]
+    )
+
+
+def test_a_restaurant_visited_once_a_year_is_not_a_yearly_bill():
+    df = _yearly("MRC-RES-0022", "restaurants")
+    assert alerts.rule_93_annual_bill(df, profile(), TODAY) == []
+
+
+def test_a_real_yearly_bill_still_triggers_in_plain_words():
+    df = _yearly("MRC-HEA-0003", "health")
+    (found,) = alerts.rule_93_annual_bill(df, profile(), TODAY)
+    assert found["text"].startswith("A health provider charges about EUR 90")

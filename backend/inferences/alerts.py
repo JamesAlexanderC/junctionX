@@ -1170,6 +1170,9 @@ def rule_93_annual_bill(df, profile, today, **ctx):
     for merchant, rows in _outflows(df).groupby("merchant_id"):
         if len(rows) < 2:
             continue
+        # A shop visited about once a year is not a bill (live test, #93).
+        if str(rows["category"].mode().iloc[0]).lower() in T.NOT_BILL_CATEGORIES:
+            continue
         gaps = rows["tx_date"].diff().dt.days.dropna()
         gap = gaps.iloc[-1]
         if not T.ANNUAL_GAP_MIN <= gap <= T.ANNUAL_GAP_MAX:
@@ -1185,7 +1188,8 @@ def rule_93_annual_bill(df, profile, today, **ctx):
                 93,
                 "amber",
                 "Yearly bill coming",
-                f"{_label(merchant)} charges about {_eur(amount)} once a year; "
+                f"{_capitalised(_label(merchant))} charges about {_eur(amount)} "
+                "once a year; "
                 f"next around {next_date:%d %b}.",
                 today,
                 next_date,

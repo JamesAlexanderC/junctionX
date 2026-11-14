@@ -219,7 +219,10 @@ _ENTRIES = [
     ),
     Entry(
         "forecast.seasonal",
-        "Next month's expected seasonal spending vs usual.",
+        # #23 (live test): Gemini called the pot "estimated October spend".
+        "Seasonal heads-up for next_month: ratio = that month's spending last "
+        "year / an average month (warn when above 1.25); pot = the extra amount "
+        "to set aside above a usual month, not the month's total.",
         gate="forecast.seasonal",
     ),
     Entry(
