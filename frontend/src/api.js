@@ -1,84 +1,87 @@
-// API client for the Django coach backend.
+// API client for the Django backend (contract: CLAUDE.md "API").
 //
-// Chat stream contract (SSE over POST /api/chat/). Each event is one line of
-// `data: <json>` followed by a blank line, where the JSON is one of:
-//   { "type": "token",   "text": "..." }                  streamed answer text
-//   { "type": "chart",   "chart": Chart }                 optional chart payload
-//   { "type": "concept", "title": "...", "text": "..." }  optional explainer
-//   { "type": "error",   "message": "..." }
-//   { "type": "done" }
+//   GET  /api/customers/                -> [{customer_id, customer_age, ...}]
+//   GET  /api/home/<customer_id>/       -> profile JSON
+//   POST /api/chat/  {customer_id, message, history, depth?} -> send_reply
+//   POST /api/goals/, PATCH /api/goals/<id>/, POST /api/goals/<id>/rate/
+//   POST /api/loans/ {customer_id, balance, interest_rate, years_left}
+//   POST /api/alerts/<id>/snooze/ {customer_id, days}
 //
-// Chart = {
-//   kind: "bar" | "line" | "pie",
-//   title: string,
-//   unit?: string,                      // e.g. "€"
-//   data: [{ label: string, value: number }]
-// }
-//
-// If the backend can't be reached, the app falls back to demo mode and uses
-// canned answers from mock.js so the UI can still be developed and shown.
+// When the backend can't be reached the app runs in demo mode: the profile
+// comes from shared/fixtures/profile_demo.json and chat from mock.js.
 
-import { mockChat, MOCK_CUSTOMERS } from './mock.js'
+import demoProfile from '@shared/fixtures/profile_demo.json'
+import { MOCK_CUSTOMERS, mockReply } from './mock.js'
 
 const API = import.meta.env.VITE_API_URL ?? ''
 
+export const DEMO_PROFILE = demoProfile
+
+async function request(path, { method = 'GET', body, signal } = {}) {
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    signal,
+  })
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`)
+    err.status = res.status
+    try {
+      err.detail = await res.json()
+    } catch {
+      // body was not JSON
+    }
+    throw err
+  }
+  return res.status === 204 ? null : res.json()
+}
+
 export async function getCustomers() {
   try {
-    const res = await fetch(`${API}/api/customers/`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const body = await res.json()
-    const customers = Array.isArray(body) ? body : body.results ?? []
+    const body = await request('/api/customers/')
+    const customers = Array.isArray(body) ? body : (body.results ?? [])
     return { customers, demo: false }
   } catch {
     return { customers: MOCK_CUSTOMERS, demo: true }
   }
 }
 
-function handleEvent(raw, onEvent) {
-  const data = raw
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => line.slice(5).trimStart())
-    .join('\n')
-  if (!data) return
-  let event
+export async function getProfile(customerId) {
   try {
-    event = JSON.parse(data)
+    const profile = await request(`/api/home/${encodeURIComponent(customerId)}/`)
+    return { profile, demo: false }
   } catch {
-    // Treat non-JSON data lines as plain answer text.
-    event = { type: 'token', text: data }
+    return { profile: structuredClone(demoProfile), demo: true }
   }
-  onEvent(event)
 }
 
-// Streams one coach reply. Calls onEvent for every event, resolves when done.
-export async function streamChat({ customerId, messages, demo, onEvent, signal }) {
-  if (demo) return mockChat({ customerId, messages, onEvent, signal })
+// Only the last 6 turns are sent (context.md "Controls").
+export async function sendChat({ customerId, message, history, depth, demo, profile }) {
+  const body = {
+    customer_id: customerId,
+    message,
+    history: history.slice(-6),
+    ...(depth ? { depth } : {}),
+  }
+  if (demo) return mockReply({ message, depth, profile })
+  return request('/api/chat/', { method: 'POST', body })
+}
 
-  const res = await fetch(`${API}/api/chat/`, {
+export const createGoal = (goal) =>
+  request('/api/goals/', { method: 'POST', body: goal })
+
+export const updateGoal = (id, patch) =>
+  request(`/api/goals/${id}/`, { method: 'PATCH', body: patch })
+
+export const rateGoal = (id, body) =>
+  request(`/api/goals/${encodeURIComponent(id)}/rate/`, { method: 'POST', body })
+
+export const saveLoan = (loan) =>
+  request('/api/loans/', { method: 'POST', body: loan })
+
+export const snoozeAlert = (customerId, alertId, days) =>
+  request(`/api/alerts/${encodeURIComponent(alertId)}/snooze/`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
-    body: JSON.stringify({ customer_id: customerId, messages }),
-    signal,
+    body: { customer_id: customerId, days },
   })
-  if (!res.ok || !res.body) throw new Error(`Chat failed (HTTP ${res.status})`)
-
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  for (;;) {
-    const { value, done } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
-    let split
-    while ((split = buffer.indexOf('\n\n')) !== -1) {
-      handleEvent(buffer.slice(0, split), onEvent)
-      buffer = buffer.slice(split + 2)
-    }
-  }
-  if (buffer.trim()) handleEvent(buffer, onEvent)
-  onEvent({ type: 'done' })
-}
