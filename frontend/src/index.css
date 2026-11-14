@@ -47,26 +47,7 @@ body {
 }
 
 #root {
-  /* Mobile web view; on a desktop it shows as a 390 x 844 phone frame. */
   height: 100dvh;
-  margin: 0 auto;
-  background: var(--bg);
-}
-
-@media (min-width: 520px) {
-  body {
-    background: #d9dedb;
-  }
-  #root {
-    width: 390px;
-    height: 844px;
-    margin: 24px auto;
-    border-radius: 32px;
-    overflow: hidden;
-    border: 10px solid #1d1d1d;
-    box-shadow: 0 20px 60px rgb(0 0 0 / 0.25);
-    box-sizing: content-box;
-  }
 }
 
 button,

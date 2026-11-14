@@ -16,19 +16,24 @@ real data, so they were left out of the code work.
   well-known finance app.
 
 ## Demo moments and the screens that support them
-| # | Moment | Screen / component (frontend/src) |
-|---|--------|-----------------------------------|
-| 1 | Home: safe to spend, level bar, four baskets | `screens/Home.jsx` (Focus home) |
-| 2 | Quick question -> number card -> "Go deeper" chips | `screens/Chat.jsx`, `components/Cards.jsx` (number), chips |
+The frontend is now a single chat-first page (`frontend/src/App.jsx`): a
+customer picker, an insights panel listing only what `GET /api/insights/<id>/`
+returns for that real customer, and the chat. There is no Home, Explore,
+alert inbox or demo data any more, so every moment runs through chat.
+
+| # | Moment | What supports it (frontend/src) |
+|---|--------|---------------------------------|
+| 1 | Pick a customer, insights appear (safe to spend, baskets, alerts) | `components/CustomerPicker.jsx`, `components/Insights.jsx` |
+| 2 | Quick question -> number card -> "Go deeper" chips | `components/Chat.jsx`, `components/Cards.jsx` (number), chips |
 | 3 | What-if slider: dining out -20% -> goal sooner | `components/Cards.jsx` SliderCard, `lib/formulas.js` (#24, #26) |
-| 4 | "Help me buy a flat" -> clarifying question -> goal card | Chat question + goal cards (needs backend depth-4 flow) |
-| 5 | "Help me clear my alerts" -> 2-step plan, before/after | `screens/Alerts.jsx`, plan + before_after cards (needs backend alert coach) |
-| 6 | Detected-goal nudge "Looks like you're saving. Name it?" | Home nudge (falls back to detected goal when no red/amber alert) |
-| 7 | Bonus: connect Nordea -> hidden car loan | Explore > Accounts (static view only; mock consent screen not built) |
+| 4 | "Help me buy a flat" -> clarifying question -> goal card | question + goal cards (needs backend depth-4 flow) |
+| 5 | "Help me clear my alerts" -> 2-step plan, before/after | type it, or tap an alert insight; plan + before_after cards |
+| 6 | Detected-goal nudge "Looks like you're saving. Name it?" | only if the backend returns it as an insight |
+| 7 | Bonus: connect Nordea -> hidden car loan | not in the UI; real data has one account per customer |
 
 ## Open items for the presenter
-- Pick the demo customer whose data produces moments 4, 5 and 6 together, or
-  switch customers mid-demo via the customer picker.
-- Moment 7 needs a mock consent screen ("Allow S-Bank to read your Nordea
-  account for 180 days?"); not built yet.
+- Pick the real demo customer whose data produces moments 3 to 6 together, or
+  switch customers mid-demo via the picker.
+- Moment 7 would need a mock second bank, which conflicts with the
+  "no demo data" rule; drop it or label it clearly as synthetic.
 - Cache the scripted questions (backend DEMO_MODE) before recording the video.
