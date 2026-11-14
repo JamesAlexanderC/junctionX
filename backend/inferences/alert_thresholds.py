@@ -8,28 +8,23 @@ MCC sets are guesses until the S-Bank data scientist confirms the real values
 # Priority weights: priority = weight / max(1, days until impact).
 SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
 
-# Buffer: max(EUR 50, 10% of monthly essentials) (#17, #99, #102).
-BUFFER_MIN_EUR = 50.0
-BUFFER_ESSENTIALS_SHARE = 0.10
+from inferences.thresholds import (  # noqa: F401  shared with the inferences
+    BUFFER_ESSENTIALS_SHARE,
+    BUFFER_MIN_EUR,
+    LOAN_CATEGORIES,
+    LOAN_MCCS,
+    OWN_TRANSFER_TYPES,
+    ROBUST_Z_CONST,
+    ROBUST_Z_FLAG,
+    STRESS_MONTHS,
+    UNUSUAL_CATEGORY_MULT,
+    UNUSUAL_MIN_HISTORY,
+)
+
+# Buffer: max(EUR 50, 10% of monthly essentials) (#17, #99, #102) and the
+# own-transfer / loan sets live in inferences/thresholds.py.
 
 # Transaction classification (TODO: confirm with real category values).
-OWN_TRANSFER_TYPES = {
-    "own_transfer",
-    "transfer_own",
-    "internal_transfer",
-    "savings_transfer",
-}
-LOAN_CATEGORIES = {
-    "loan",
-    "loans",
-    "loan_payment",
-    "mortgage",
-    "credit",
-    "credit_card",
-    "consumer_credit",
-    "bnpl",
-}
-LOAN_MCCS = {"6012", "6051", "6141"}
 FEE_CATEGORIES = {"fee", "fees", "bank_fee", "late_fee", "collection"}
 FEE_MCCS = {"7322"}  # collection agencies
 ATM_MCC = "6011"
@@ -37,10 +32,6 @@ GAMBLING_MCC = "7995"
 GAMBLING_SUPPORT_URL = "https://www.peluuri.fi/en"
 
 # #38 unusual charge
-ROBUST_Z_CONST = 0.6745
-ROBUST_Z_FLAG = 3.5
-UNUSUAL_MIN_HISTORY = 3
-UNUSUAL_CATEGORY_MULT = 3.0
 RECENT_DAYS = 30
 
 # #39 duplicate charge
@@ -64,8 +55,7 @@ DSTI_AMBER = 0.40
 DSTI_RED = 0.50
 
 # #77 / #82 FIN-FSA stress test
-STRESS_RATE = 0.06
-STRESS_MONTHS = 300
+STRESS_RATE = 0.06  # == thresholds.STRESS_ANNUAL_RATE
 STRESS_DSTI_MAX = 0.60
 AFFORD_FITS_MAX = 0.50
 

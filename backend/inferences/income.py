@@ -154,6 +154,7 @@ def regular_bills(df: pd.DataFrame, today) -> list[dict]:
                 "amount": r2(rec["median_amount"]),
                 "amount_cv": r2(rec["cv"]),
                 "median_gap_days": r2(rec["median_gap_days"]),
+                "first_date": iso(g["tx_date"].min()),
                 "last_date": iso(rec["last_date"]),
                 "next_date": iso(rec["next_date"]),
                 "is_subscription": bool(is_sub),

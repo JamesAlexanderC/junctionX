@@ -148,6 +148,18 @@ def test_payday_missed_only_after_three_days():
     assert a["trigger_values"]["expected_payday"] == "2026-10-23"
 
 
+def test_payday_missed_needs_detected_payday_and_data():
+    # #100 never fires without transactions or without a detected payday.
+    empty = make_df([])
+    assert alerts.rule_100_payday_missed(empty, profile(), date(2026, 10, 27)) is None
+    assert alerts.rule_100_payday_missed(None, profile(), date(2026, 10, 27)) is None
+    rows = [tx("2026-10-01 09:00", -20, "M_SHOP", "shopping", "5999", "card")]
+    p = profile()
+    p["income"]["payday"]["found"] = False
+    got = alerts.rule_100_payday_missed(make_df(rows), p, date(2026, 10, 27))
+    assert got is None
+
+
 # --- Earlier alerts ---------------------------------------------------------
 
 

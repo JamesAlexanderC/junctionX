@@ -62,8 +62,9 @@ Inputs per rule (profile keys use dotted paths):
 Loan alerts (#76 to #84) only fire when loan outflows are found; #77 and #82 need
 ``loans={balance, interest_rate, years_left, other_payments?}``.
 
-TODO: dedupe the small helpers here (recurrence, robust z, buffer) with
-inferences/models.py once that module exists.
+Constants shared with the inferences (own-transfer and loan sets, buffer, robust
+z, stress test) come from inferences/thresholds.py; buffer, CV and the annuity
+use inferences/common.py and inferences/models.py.
 """
 
 import calendar
@@ -73,6 +74,8 @@ import numpy as np
 import pandas as pd
 
 from inferences import alert_thresholds as thresholds
+from inferences import models
+from inferences.common import buffer_amount
 
 T = thresholds
 
@@ -190,7 +193,7 @@ def _buffer(profile):
     if buf is not None:
         return float(buf)
     essentials = float(_get(profile, "baskets.monthly_essentials", 0.0) or 0.0)
-    return max(T.BUFFER_MIN_EUR, T.BUFFER_ESSENTIALS_SHARE * essentials)
+    return buffer_amount(essentials)
 
 
 def _income(profile):
@@ -198,11 +201,7 @@ def _income(profile):
 
 
 def _cv(values):
-    values = np.asarray(values, dtype=float)
-    mean = values.mean() if len(values) else 0.0
-    if len(values) < 2 or mean == 0:
-        return 0.0
-    return float(values.std() / abs(mean))
+    return models.cv(values)
 
 
 def _ids(frame, limit=5):
@@ -238,8 +237,7 @@ def _last_expected_payday(profile, today):
 
 def stressed_payment(balance, rate=T.STRESS_RATE, months=T.STRESS_MONTHS):
     """Annuity payment at the FIN-FSA stress rate (#77, #82)."""
-    i = rate / 12
-    return balance * i / (1 - (1 + i) ** -months)
+    return models.annuity_payment(balance, rate / 12, months)
 
 
 def alert_priority(severity, impact_date, today):
@@ -1269,6 +1267,10 @@ def rule_98_gambling(df, profile, today, opted_in_gambling=False, **ctx):
 
 
 def rule_100_payday_missed(df, profile, today, **ctx):
+    # Only for a payday that was actually detected (#1) and with transactions
+    # to check against; no data is not a missed salary.
+    if df is None or len(df) == 0 or _get(profile, "income.payday.found") is not True:
+        return None
     expected = _last_expected_payday(profile, today)
     if expected is None:
         return None
