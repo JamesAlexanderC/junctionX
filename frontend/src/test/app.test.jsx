@@ -145,7 +145,7 @@ describe('waiting for a reply (F2)', () => {
     vi.useFakeTimers()
     render(<Chat messages={[]} busy onSend={() => {}} />)
     const status = screen.getByRole('status')
-    expect(status.querySelectorAll('.typing span')).toHaveLength(3)
+    expect(status.querySelector('.typing')).toBeNull()
     expect(status.textContent).toBe('Checking your numbers…')
     act(() => vi.advanceTimersByTime(5000))
     expect(status.textContent).toBe('Looking deeper into your data…')
