@@ -2,10 +2,13 @@
 // coach. Layout follows S-mobiili: green top bar, white list sections on grey,
 // bottom tabs on phones (Overview / Coach), two columns on wide screens.
 
-import { useCallback, useEffect, useState } from 'react'
-import { getInsights, sendChat } from '../api.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { getSpending, getGoals, getInsights, sendChat } from '../api.js'
+import Spending from './Spending.jsx'
 import Chat from './Chat.jsx'
+import Goals from './Goals.jsx'
 import Help from './Help.jsx'
+import Icon from './Icon.jsx'
 import Insights, { InsightsSkeleton } from './Insights.jsx'
 
 // Chat history in the API's shape: [{role, content}].
@@ -19,8 +22,8 @@ const toHistory = (messages) =>
     )
 
 const TABS = [
-  ['overview', 'Overview', 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z'],
-  ['coach', 'Coach', 'M4 5h16v11H8l-4 4z'],
+  ['overview', 'Overview'],
+  ['coach', 'Coach'],
 ]
 
 export default function CustomerView({
@@ -31,33 +34,49 @@ export default function CustomerView({
   onCloseHelp,
 }) {
   const [conversationId] = useState(() => crypto.randomUUID())
-  const [revision, setRevision] = useState(0)
   const [insights, setInsights] = useState([])
   const [insightsError, setInsightsError] = useState(null)
-  const [insightsLoading, setInsightsLoading] = useState(true)
+  const [goals, setGoals] = useState(null)
+  const [goalsError, setGoalsError] = useState(null)
+  const [spending, setSpending] = useState(null)
+  const [spendingError, setSpendingError] = useState(null)
+  const [overviewLoading, setOverviewLoading] = useState(true)
   const [messages, setMessages] = useState([])
   const [busy, setBusy] = useState(false)
+  // What the coach is doing right now: {step, thought} from the stream.
+  const [progress, setProgress] = useState({})
   const [tab, setTab] = useState('overview')
+  const overviewCtrl = useRef(null)
+
+  // Insights, goals and spending load side by side, so one failing never hides
+  // the other. Called on open and after a reply that changed state (a goal or
+  // plan written): the backend has already rebuilt the profile.
+  const loadOverview = useCallback(async () => {
+    overviewCtrl.current?.abort()
+    const ctrl = new AbortController()
+    overviewCtrl.current = ctrl
+    const [ins, gls, spd] = await Promise.allSettled([
+      getInsights(customerId, { signal: ctrl.signal }),
+      getGoals(customerId, { signal: ctrl.signal }),
+      getSpending(customerId, { signal: ctrl.signal }),
+    ])
+    if (ctrl.signal.aborted) return
+    // A failed refresh keeps the last good data on screen beside the error.
+    if (ins.status === 'fulfilled') setInsights(ins.value)
+    setInsightsError(ins.status === 'rejected' ? ins.reason.message : null)
+    if (gls.status === 'fulfilled') setGoals(gls.value)
+    setGoalsError(gls.status === 'rejected' ? gls.reason.message : null)
+    if (spd.status === 'fulfilled') setSpending(spd.value)
+    setSpendingError(spd.status === 'rejected' ? spd.reason.message : null)
+    setOverviewLoading(false)
+  }, [customerId])
 
   // The view is keyed on customerId, so this runs once per customer and
-  // insightsLoading already starts true.
+  // overviewLoading already starts true.
   useEffect(() => {
-    const ctrl = new AbortController()
-    getInsights(customerId, { signal: ctrl.signal })
-      .then((items) => {
-        if (ctrl.signal.aborted) return
-        setInsights(items)
-        setInsightsError(null)
-      })
-      .catch((e) => {
-        if (e?.name === 'AbortError') return
-        setInsightsError(e.message)
-      })
-      .finally(() => {
-        if (!ctrl.signal.aborted) setInsightsLoading(false)
-      })
-    return () => ctrl.abort()
-  }, [customerId, revision])
+    loadOverview()
+    return () => overviewCtrl.current?.abort()
+  }, [loadOverview])
 
   const send = useCallback(
     async (text, depth) => {
@@ -65,19 +84,26 @@ export default function CustomerView({
       const history = toHistory(messages)
       setMessages((m) => [...m, { role: 'user', content: text }])
       setBusy(true)
+      setProgress({})
+      const onProgress = (e) => setProgress((p) => ({ ...p, [e.type]: e.text }))
       try {
         const reply = await sendChat({
-          customerId, message: text, history, depth, conversationId,
+          customerId,
+          message: text,
+          history,
+          depth,
+          conversationId,
+          onProgress,
         })
         setMessages((m) => [...m, { role: 'assistant', reply }])
-        if (reply.state_changed) setRevision((r) => r + 1)
+        if (reply.state_changed) loadOverview()
       } catch (e) {
         setMessages((m) => [...m, { role: 'assistant', error: e.message }])
       } finally {
         setBusy(false)
       }
     },
-    [customerId, busy, messages, conversationId],
+    [customerId, busy, messages, conversationId, loadOverview],
   )
 
   // Tapping an insight asks the coach, so on phones jump to the Coach tab.
@@ -114,6 +140,7 @@ export default function CustomerView({
             </a>
             <span className="who">{customerId}</span>
             <button type="button" className="logout" onClick={onHelp}>
+              <Icon name="help" size={16} />
               Help
             </button>
             <button
@@ -122,37 +149,42 @@ export default function CustomerView({
               aria-label="Exit to demo"
               onClick={onExit}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
+              <Icon name="close" size={20} />
             </button>
           </div>
         </header>
 
         <main className="layout">
           <section className="pane overview" aria-label="Overview">
-            {insightsError && (
-              <p className="error banner" role="alert">
-                {insightsError}{' '}
-                <button type="button" onClick={() => setRevision((r) => r + 1)}>
-                  Retry Overview
-                </button>
-              </p>
-            )}
-            {insightsLoading ? (
+            {[goalsError, spendingError, insightsError]
+              .filter((e, i, all) => e && all.indexOf(e) === i)
+              .map((e) => (
+                <p key={e} className="error banner" role="alert">
+                  <Icon name="error" />
+                  {e}{' '}
+                  <button type="button" onClick={loadOverview}>
+                    Retry Overview
+                  </button>
+                </p>
+              ))}
+            {overviewLoading ? (
               <InsightsSkeleton />
             ) : (
-              <Insights items={insights} onAsk={ask} />
+              <>
+                {goals && <Goals goals={goals} onAsk={ask} />}
+                {spending && <Spending spending={spending} onAsk={ask} />}
+                <Insights items={insights} onAsk={ask} />
+              </>
             )}
           </section>
 
           <section className="pane coach" aria-label="Coach">
-            <Chat messages={messages} busy={busy} onSend={send} />
+            <Chat messages={messages} busy={busy} progress={progress} onSend={send} />
           </section>
         </main>
 
         <nav className="tabbar" aria-label="Sections">
-          {TABS.map(([key, label, icon]) => (
+          {TABS.map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -160,9 +192,7 @@ export default function CustomerView({
               aria-current={tab === key ? 'page' : undefined}
               onClick={() => setTab(key)}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d={icon} />
-              </svg>
+              <Icon name={key} size={24} />
               {label}
             </button>
           ))}

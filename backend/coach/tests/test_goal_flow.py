@@ -60,8 +60,8 @@ def test_goal_is_saved_after_request_proposal_and_yes(client, aino, fake_gemini)
     )
     assert goal.priority == "high"
     assert [c["type"] for c in second["cards"]] == ["goal"]
-    insights = client.get(f"/api/insights/{AINO}/").json()["insights"]
-    assert any(i["title"] == "House deposit" for i in insights)
+    goals = client.get(f"/api/goals/?customer_id={AINO}").json()["active"]
+    assert [g["name"] for g in goals] == ["House deposit"]
 
 
 def test_yes_saves_the_proposed_goal_not_new_arguments(client, aino, fake_gemini):

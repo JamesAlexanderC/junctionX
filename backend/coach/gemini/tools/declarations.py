@@ -41,7 +41,21 @@ SNAPSHOT = {
 
 CARD_SCHEMA = {
     "type": "object",
-    "description": "A UI card; extra fields depend on type (see CLAUDE.md).",
+    # Spelled out per type: the model cannot see CLAUDE.md, and a missing field
+    # (often a number card's label) costs a whole extra round to fix.
+    "description": (
+        "A UI card. Fields by type (? = optional): "
+        "number {label, value, unit?}; "
+        "chart: attach get_chart's card unchanged; "
+        "basket_bar {essential, surprise, leaky, saver}; "
+        "slider {category, monthly_spend, min_pct, max_pct, pct, goal?}; "
+        "goal {name, target, saved, target_date, difficulty, monthly_needed}; "
+        "level_progress: attach get_level's card unchanged; "
+        "question {question, options, quick_answer?}; "
+        "alert {id, severity, title, text}; "
+        "plan {steps: [{text, monthly_impact, clears}]}; "
+        "before_after {before, after}."
+    ),
     "properties": {
         "type": {
             "type": "string",

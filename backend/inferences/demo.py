@@ -2,8 +2,8 @@
 
 - income_levels: every customer's income fifth (1 = lowest), from mean
   monthly income with own-account transfers excluded (#2, #41).
-- pick_spender_demos: one demo per spender type (#16), the clearest example
-  of that type, spread so every income level appears at least once.
+- pick_level_demos: one demo per app level (#28 to #33), the customer most
+  solidly at that level, spread over income levels and spender types (#16).
 """
 
 from itertools import product
@@ -11,7 +11,6 @@ from itertools import product
 import pandas as pd
 
 from . import thresholds as th
-from .habits import TRAIT_LABELS
 
 INCOME_LABELS = {
     1: "Lowest income",
@@ -21,9 +20,8 @@ INCOME_LABELS = {
     5: "Highest income",
 }
 NO_INCOME_LABEL = "No income"
-# Display order; the trait types first, then the two calm ones.
-SPENDER_TYPES = (*TRAIT_LABELS.values(), "Steady Planner", "Balanced")
-_TRAIT_OF = {label: trait for trait, label in TRAIT_LABELS.items()}
+# Same label compute_levels uses for level 0.
+NOT_STARTED = "Not started"
 
 
 def income_levels(monthly_income, levels=None):
@@ -38,67 +36,73 @@ def income_levels(monthly_income, levels=None):
     return out
 
 
-def clarity(spender_type, scores):
-    """How clearly a customer is their spender type, higher = clearer.
-    Trait types: lead of the trait over the next highest trait. Steady
-    Planner and Balanced: how far every trait stays below its flag."""
-    if not scores:
+def level_clarity(progress):
+    """How solidly a customer sits at their app level, higher = clearer:
+    1 - progress towards the next level, so a customer about to move up is
+    a weaker example of the level they are on."""
+    if progress is None or pd.isna(progress):
         return None
-    trait = _TRAIT_OF.get(spender_type)
-    if trait is None:
-        return 1.0 - max(scores.values())
-    if trait not in scores:
-        return None
-    others = [v for k, v in scores.items() if k != trait]
-    return scores[trait] - max(others, default=0.0)
+    return 1.0 - min(1.0, max(0.0, float(progress)))
 
 
-def pick_spender_demos(index):
-    """index: DataFrame with customer_id, income_level, spender_type,
-    spender_scores (dict), months. Returns demo dicts, lowest income first,
-    numbered from 1."""
+def pick_level_demos(index):
+    """index: DataFrame with customer_id, income_level, spender_type, level,
+    level_progress, months. Returns one demo dict per app level found, lowest
+    level first, numbered from 1."""
     df = index[
         (index["months"] >= th.DEMO_MIN_HISTORY_MONTHS)
         & (index["income_level"] > 0)
-        & index["spender_type"].isin(SPENDER_TYPES)
+        & index["level"].notna()
     ].copy()
     if df.empty:
         return []
-    df["clarity"] = [
-        clarity(t, s) for t, s in zip(df["spender_type"], df["spender_scores"])
-    ]
+    df["level"] = df["level"].astype(int)
+    df["clarity"] = df["level_progress"].map(level_clarity)
     df = df.dropna(subset=["clarity"])
 
-    # Clearest customer per (spender type, income level).
+    # Clearest customer per (app level, income level); on a tie the longer
+    # history, which gives the demo more to show.
     best = {}
-    for (stype, level), group in df.groupby(["spender_type", "income_level"]):
-        row = group.loc[group["clarity"].idxmax()]
-        best[(stype, int(level))] = (float(row["clarity"]), row["customer_id"])
-    types = [t for t in SPENDER_TYPES if any(k[0] == t for k in best)]
-    levels = sorted({k[1] for k in best})
+    for (level, inc), group in df.groupby(["level", "income_level"]):
+        row = group.sort_values(["clarity", "months"], kind="stable").iloc[-1]
+        best[(int(level), int(inc))] = (
+            float(row["clarity"]),
+            row["customer_id"],
+            row["spender_type"] if isinstance(row["spender_type"], str) else None,
+        )
+    levels = sorted({k[0] for k in best})
+    incomes = sorted({k[1] for k in best})
 
-    # Assign each type an income level: cover as many levels as possible,
-    # then take the clearest examples. 5 levels ^ 6 types = 15,625 options.
+    # Assign each app level an income level: cover as many income levels and
+    # spender types as possible, then take the clearest examples. At most
+    # 5 income levels ^ 7 app levels = 78,125 options; in practice 5 ^ 4.
     choice, choice_key = None, None
-    for combo in product(levels, repeat=len(types)):
-        cells = list(zip(types, combo))
+    for combo in product(incomes, repeat=len(levels)):
+        cells = list(zip(levels, combo))
         if any(c not in best for c in cells):
             continue
-        key = (len(set(combo)), sum(best[c][0] for c in cells))
+        types = {best[c][2] for c in cells} - {None}
+        key = (len(set(combo)), len(types), sum(best[c][0] for c in cells))
         if choice_key is None or key > choice_key:
             choice, choice_key = cells, key
     if choice is None:
         return []
 
-    choice.sort(key=lambda c: (c[1], SPENDER_TYPES.index(c[0])))
     return [
         {
             "demo": n,
             "customer_id": str(best[c][1]),
+            "level": c[0],
+            "level_name": level_name(c[0]),
             "income_level": c[1],
             "income_label": INCOME_LABELS.get(c[1], f"Level {c[1]}"),
-            "spender_type": c[0],
+            "spender_type": best[c][2],
             "clarity": round(best[c][0], 2),
         }
         for n, c in enumerate(choice, 1)
     ]
+
+
+def level_name(level):
+    """#28 to #33 ladder name; level 0 is "Not started"."""
+    return th.LEVEL_NAMES.get(int(level), NOT_STARTED)

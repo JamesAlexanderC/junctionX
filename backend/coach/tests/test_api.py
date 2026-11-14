@@ -268,6 +268,59 @@ def test_pause_goal_never_off_track(client, aino):
     assert _active(res.json()["profile"], "Bike")[0]["on_track"]
 
 
+def test_goal_list_needs_auth_and_customer(anon_client, client, aino):
+    assert anon_client.get(f"/api/goals/?customer_id={AINO}").status_code == 401
+    assert client.get("/api/goals/").status_code == 400
+    assert client.get("/api/goals/?customer_id=nobody").status_code == 404
+
+
+def test_goal_list_returns_profile_numbers(client, aino):
+    res = client.get(f"/api/goals/?customer_id={AINO}")
+    assert res.status_code == 200
+    assert res.json()["active"] == [] and res.json()["clash"] is None
+    goal = client.post(
+        "/api/goals/",
+        {"customer_id": AINO, "name": "Bike", "amount": 300, "date": "2027-03-01"},
+        content_type="application/json",
+    ).json()["goal"]
+    client.patch(
+        f"/api/goals/{goal['id']}/", {"saved": 60}, content_type="application/json"
+    )
+    profile = client.get(f"/api/home/{AINO}/").json()
+    body = client.get(f"/api/goals/?customer_id={AINO}").json()
+    assert body["customer_id"] == AINO and body["as_of"] == "2026-10-18"
+    [row] = body["active"]
+    [src] = _active(profile, "Bike")
+    for key in ("saved", "target", "progress_pct", "monthly_needed", "on_track"):
+        assert row[key] == src[key]
+    assert row["saved"] == 60 and not row["paused"]
+    assert body["clash"]["total_needed"] == profile["goals"]["clash"]["total_needed"]
+
+    client.patch(
+        f"/api/goals/{goal['id']}/", {"paused": True}, content_type="application/json"
+    )
+    body = client.get(f"/api/goals/?customer_id={AINO}").json()
+    assert body["active"][0]["paused"] is True
+
+
+def test_spending_list_needs_auth_and_customer(anon_client, client, aino):
+    assert anon_client.get(f"/api/spending/?customer_id={AINO}").status_code == 401
+    assert client.get("/api/spending/").status_code == 400
+    assert client.get("/api/spending/?customer_id=nobody").status_code == 404
+
+
+def test_spending_list_returns_profile_numbers(client, aino):
+    profile = client.get(f"/api/home/{AINO}/").json()
+    body = client.get(f"/api/spending/?customer_id={AINO}").json()
+    assert body["customer_id"] == AINO and body["as_of"] == "2026-10-18"
+    assert body["categories"] == profile["spending"]["categories"]
+    assert body["savings"] == profile["spending"]["savings"]
+    saved = {r["category"] for r in body["savings"]}
+    assert not saved & {c["category"] for c in body["categories"]}
+    assert body["month"] == profile["spending"]["month"]
+    assert body["total"] == round(sum(c["total"] for c in body["categories"]), 2)
+
+
 def test_rate_goal_weight(client, aino):
     for up in (True, True, False):
         res = client.post(
@@ -331,9 +384,18 @@ def test_demo_directory_lists_demos_and_every_customer(client, db, monkeypatch):
     assert [rows[f"C-L{i}"]["income_level"] for i in range(1, 6)] == [1, 2, 3, 4, 5]
     assert rows["C-L1"]["income_label"] == "Lowest income"
     assert rows["C-L1"]["spender_type"]
-    # Same spending habits at every income level: one spender type, one demo.
+    assert all(isinstance(rows[f"C-L{i}"]["level"], int) for i in range(1, 6))
+    assert rows["C-L1"]["level_name"]
+    # Same habits scaled by income: every customer is at the same app level,
+    # so there is one demo, for that level.
     assert len(body["demos"]) == 1
-    assert body["demos"][0]["demo"] == 1
+    demo = body["demos"][0]
+    assert demo["demo"] == 1
+    assert demo["level"] == rows[demo["customer_id"]]["level"]
+    assert demo["level_name"] == rows[demo["customer_id"]]["level_name"]
+    # No goals, no readiness model: the index level is the profile's level.
+    profile = services.get_profile(demo["customer_id"])
+    assert profile["levels"]["current"] == demo["level"]
 
 
 def test_demo_directory_not_built(client, db):

@@ -6,6 +6,14 @@ const insight = (title) => ({
   insights: [{ key: 'goal', title, text: title, section: 'goals' }],
 })
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status })
+const EMPTY_GOALS = { active: [], completed: [], clash: null }
+const EMPTY_SPENDING = { month: null, total: 0, categories: [], savings: [] }
+// Goals and spending load beside insights; only insights reads are counted.
+const otherPanel = (url) => {
+  if (url.startsWith('/api/goals/')) return json(EMPTY_GOALS)
+  if (url.startsWith('/api/spending/')) return json(EMPTY_SPENDING)
+  return null
+}
 afterEach(() => vi.unstubAllGlobals())
 
 it('refreshes after a write, preserves old insights on failure and can retry', async () => {
@@ -16,6 +24,8 @@ it('refreshes after a write, preserves old insights on failure and can retry', a
       ids.push(JSON.parse(init.body).conversation_id)
       return json({ text: 'Saved.', depth: 4, cards: [], state_changed: true })
     }
+    const other = otherPanel(url)
+    if (other) return other
     reads += 1
     if (reads === 2) return json({ error: 'Refresh failed' }, 503)
     return json(insight(reads === 1 ? 'Old goal' : 'New goal'))
@@ -44,6 +54,8 @@ it('does not refresh for a read-only reply', async () => {
     if (url.startsWith('/api/chat/')) {
       return json({ text: 'Hello.', depth: 1, cards: [], state_changed: false })
     }
+    const other = otherPanel(url)
+    if (other) return other
     reads += 1
     return json(insight('Current goal'))
   }))

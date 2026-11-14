@@ -33,6 +33,19 @@
     "monthly_essentials": 890.0,
     "monthly_saving": 150.0
   },
+  "spending": {
+    "month": "2026-10",
+    "is_current": true,
+    "total": 1212.99,
+    "categories": [
+      {"category": "Housing", "total": 650.0, "share": 53.6, "count": 1, "usual": 650.0, "vs_usual": 0.0},
+      {"category": "Groceries", "total": 240.0, "share": 19.8, "count": 6, "usual": 240.0, "vs_usual": 0.0},
+      {"category": "Utilities", "total": 150.0, "share": 12.4, "count": 2, "usual": null, "vs_usual": null},
+      {"category": "Restaurants", "total": 172.99, "share": 14.3, "count": 14, "usual": 160.0, "vs_usual": 12.99}
+    ],
+    "savings": [{"category": "Invest Deposit", "total": 150.0, "count": 1}],
+    "savings_total": 150.0
+  },
   "habits": {
     "weekend": {"share": 0.31, "flag": false},
     "night": {"share": 0.04, "flag": false},

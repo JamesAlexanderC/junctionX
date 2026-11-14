@@ -1,6 +1,8 @@
 // Small schematic pictures for the help page: shapes only, never numbers, so
 // they illustrate a card without inventing data (CLAUDE.md: no demo data).
 
+import Icon from './Icon.jsx'
+
 const Art = ({ children, label }) => (
   <svg className="help-art" viewBox="0 0 120 64" role="img" aria-label={label}>
     {children}
@@ -192,14 +194,5 @@ export function BeforeAfterArt() {
 
 // Icons for "How it works".
 export function StepIcon({ kind }) {
-  const paths = {
-    ask: 'M4 5h16v11H8l-4 4z',
-    numbers: 'M5 19V11M10 19V5M15 19v-6M20 19V8',
-    cards: 'M4 6h10v12H4zM16 9h4v9h-4',
-  }
-  return (
-    <svg className="help-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <path d={paths[kind]} />
-    </svg>
-  )
+  return <Icon name={kind} size={28} className="help-icon" />
 }

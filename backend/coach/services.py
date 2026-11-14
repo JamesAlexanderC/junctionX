@@ -171,19 +171,19 @@ def customer_money_stats():
 
 
 def build_customer_index(workers=None, progress=None):
-    """Income level and spender type for every customer, plus the demo
-    picks; both cached as artifacts."""
+    """Income level, spender type and app level for every customer, plus the
+    demo picks (one per app level); both cached as artifacts."""
     import pandas as pd
 
     from inferences.demo import INCOME_LABELS, NO_INCOME_LABEL
-    from inferences.demo import income_levels, pick_spender_demos
+    from inferences.demo import income_levels, level_name, pick_level_demos
 
     from .customer_index import summarise_all
 
     money = customer_money_stats()
     ids = list(Customer.objects.order_by("customer_id").values_list("pk", flat=True))
     summary = pd.DataFrame(summarise_all(ids, workers=workers, progress=progress))
-    for col in ("spender_type", "spender_scores"):
+    for col in ("spender_type", "spender_scores", "level", "level_progress"):
         if col not in summary:
             summary[col] = None
     if summary.empty:
@@ -201,7 +201,7 @@ def build_customer_index(workers=None, progress=None):
     df["spender_scores"] = df["spender_scores"].apply(
         lambda s: s if isinstance(s, dict) else {}
     )
-    demos = pick_spender_demos(df)
+    demos = pick_level_demos(df)
 
     def clean(v):
         return None if pd.isna(v) else v
@@ -212,6 +212,8 @@ def build_customer_index(workers=None, progress=None):
             "income_level": int(r.income_level),
             "income_label": INCOME_LABELS.get(int(r.income_level), NO_INCOME_LABEL),
             "spender_type": clean(r.spender_type),
+            "level": None if pd.isna(r.level) else int(r.level),
+            "level_name": None if pd.isna(r.level) else level_name(r.level),
         }
         for r in df.itertuples()
     ]

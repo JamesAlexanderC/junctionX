@@ -5,12 +5,19 @@ import { useState } from 'react'
 import { eur, formatValue, longDate } from '../lib/format.js'
 import { cutSaving, goalWithCut } from '../lib/formulas.js'
 import ChartCard from './Chart.jsx'
+import Icon from './Icon.jsx'
 
-function Bar({ value }) {
-  const w = Math.max(0, Math.min(1, Number(value) || 0)) * 100
+const pct = (v) => Math.max(0, Math.min(1, Number(v) || 0)) * 100
+
+// Progress bar for a 0..1 share; `marker` (0..1) draws a tick, e.g. where the
+// goal should be by now (#52).
+export function Bar({ value, marker }) {
   return (
     <div className="bar">
-      <div style={{ width: `${w}%` }} />
+      <div style={{ width: `${pct(value)}%` }} />
+      {marker != null && (
+        <i className="bar-marker" style={{ left: `${pct(marker)}%` }} />
+      )}
     </div>
   )
 }
@@ -186,6 +193,7 @@ function AlertCard({ card, onSend }) {
         className="btn-primary"
         onClick={() => onSend(`Help me fix the "${card.title}" alert`, 4)}
       >
+        <Icon name="fix" size={16} />
         Fix this
       </button>
     </div>
@@ -208,6 +216,7 @@ export function PlanCard({ card, onSend }) {
         })}
       </ol>
       <button type="button" className="btn-primary" onClick={() => onSend('Accept plan', 4)}>
+        <Icon name="check" size={16} />
         Accept plan
       </button>
     </div>

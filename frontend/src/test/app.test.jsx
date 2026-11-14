@@ -3,16 +3,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
 import { ReplyCard } from '../components/Cards.jsx'
 import Chat from '../components/Chat.jsx'
+import Goals from '../components/Goals.jsx'
 import Insights from '../components/Insights.jsx'
+import Spending from '../components/Spending.jsx'
 import { niceTicks, shortLabel } from '../lib/chart.js'
 import { SUGGESTIONS } from '../lib/suggestions.js'
 
+const NO_GOALS = { customer_id: 'CUST00001', active: [], completed: [], clash: null }
+const NO_SPENDING = { customer_id: 'CUST00001', month: null, total: 0, categories: [] }
+
 // Test-only shape of GET /api/customers/demo/.
+const LEVEL_NAMES = ['Not started', 'Getting started', 'In control', 'Safety net']
 const row = (n, spender) => ({
   customer_id: `CUST0000${n}`,
   income_level: n,
   income_label: `Income ${n}`,
   spender_type: spender,
+  level: n - 1,
+  level_name: LEVEL_NAMES[n - 1],
 })
 const SPENDERS = ['Night Owl', 'Payday Splurger', 'Balanced']
 const DEMO = {
@@ -20,6 +28,8 @@ const DEMO = {
   demos: SPENDERS.map((t, i) => ({
     demo: i + 1,
     customer_id: `CUST0000${i + 1}`,
+    level: i,
+    level_name: LEVEL_NAMES[i],
     income_level: i + 1,
     income_label: `Income ${i + 1}`,
     spender_type: t,
@@ -137,6 +147,186 @@ describe('insights panel', () => {
   })
 })
 
+describe('goals panel', () => {
+  const bike = {
+    id: 7,
+    name: 'Bike',
+    emoji: null,
+    target: 300,
+    saved: 60,
+    progress_pct: 20,
+    expected_pct: 10,
+    on_track: true,
+    paused: false,
+    target_date: '2027-03-01',
+    difficulty: 'Easy',
+    monthly_needed: 50,
+    realistic: true,
+    tip: null,
+  }
+  const goals = (active, extra = {}) => ({ ...NO_GOALS, active, ...extra })
+
+  it('shows the backend numbers for each goal', () => {
+    render(<Goals goals={goals([bike])} onAsk={() => {}} />)
+    expect(screen.getByText('Bike')).toBeTruthy()
+    expect(screen.getByText('20%')).toBeTruthy()
+    expect(screen.getByText(/€60 of €300 · by 1 March 2027/)).toBeTruthy()
+    expect(screen.getByText(/€50 a month needed · on track/)).toBeTruthy()
+  })
+
+  it('shows behind, the realistic amount, the tip and a clash', () => {
+    const late = {
+      ...bike,
+      on_track: false,
+      realistic: false,
+      suggested_monthly: 30,
+      suggested_date: '2027-09-01',
+      tip: { text: 'Cut takeaway by 20% to catch up', shortfall: 12 },
+    }
+    const clash = { clash: true, total_needed: 50, safe_to_save_monthly: 30 }
+    render(<Goals goals={goals([late], { clash })} onAsk={() => {}} />)
+    expect(screen.getByText(/· behind/)).toBeTruthy()
+    expect(screen.getByText(/Realistic: €30 a month, done by 1 September 2027/))
+      .toBeTruthy()
+    expect(screen.getByText('Cut takeaway by 20% to catch up')).toBeTruthy()
+    expect(screen.getByText(/need €50 a month/)).toBeTruthy()
+  })
+
+  it('empty state and tapping ask the coach', () => {
+    const onAsk = vi.fn()
+    const { rerender } = render(<Goals goals={goals([])} onAsk={onAsk} />)
+    fireEvent.click(screen.getByText('No goals yet'))
+    expect(onAsk).toHaveBeenCalledWith('Help me set a goal', 2)
+    rerender(<Goals goals={goals([bike])} onAsk={onAsk} />)
+    fireEvent.click(screen.getByText('Bike'))
+    expect(onAsk).toHaveBeenCalledWith('Tell me about my Bike goal', 2)
+  })
+
+  it('reloads goals after a chat reply', async () => {
+    let created = false
+    const fetch = vi.fn(async (url) => {
+      if (url.startsWith('/api/insights/')) return new Response('[]')
+      if (url.startsWith('/api/spending/')) return new Response(JSON.stringify(NO_SPENDING))
+      if (url.startsWith('/api/goals/')) {
+        return new Response(JSON.stringify(goals(created ? [bike] : [])))
+      }
+      created = true
+      return new Response(
+        JSON.stringify({ text: 'Goal added', depth: 1, state_changed: true }),
+      )
+    })
+    vi.stubGlobal('fetch', fetch)
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    expect(await screen.findByText('No goals yet')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'yes' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByText('Bike')).toBeTruthy()
+    expect(screen.queryByText('No goals yet')).toBeNull()
+  })
+
+  it('a goals error is shown while insights still render', async () => {
+    const items = [
+      { key: 'payday', title: 'Next payday', value: null, text: 'Soon', section: 'income' },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) =>
+        url.startsWith('/api/goals/')
+          ? new Response(JSON.stringify({ detail: 'Goals broke' }), { status: 500 })
+          : new Response(JSON.stringify({ insights: items })),
+      ),
+    )
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    expect((await screen.findByRole('alert')).textContent).toContain('Goals broke')
+    expect(screen.getByText('Next payday')).toBeTruthy()
+  })
+})
+
+describe('spending panel', () => {
+  const housing = {
+    category: 'Housing',
+    total: 650,
+    share: 61.2,
+    count: 1,
+    usual: 650,
+    vs_usual: 0,
+  }
+  const groceries = {
+    category: 'Home & Tech',
+    total: 412.5,
+    share: 38.8,
+    count: 3,
+    usual: 380,
+    vs_usual: 32.5,
+  }
+  const spending = (categories) => ({
+    ...NO_SPENDING,
+    month: '2026-10',
+    total: 1062.5,
+    categories,
+  })
+
+  it('shows each data category with its share and total', () => {
+    render(<Spending spending={spending([housing, groceries])} onAsk={() => {}} />)
+    expect(screen.getByText('Spending by category (2026-10)')).toBeTruthy()
+    expect(screen.getByText('Housing')).toBeTruthy()
+    expect(screen.getByText('Home & Tech')).toBeTruthy()
+    expect(screen.getByText('61%')).toBeTruthy()
+    expect(screen.getByText(/€650 · 1 payment$/)).toBeTruthy()
+    expect(screen.getByText(/· 3 payments$/)).toBeTruthy()
+  })
+
+  it('shows each category against its usual month', () => {
+    const fresh = { category: 'Travel', total: 90, share: 10, count: 1, usual: null }
+    const s = { ...spending([housing, groceries, fresh]), is_current: true }
+    render(<Spending spending={s} onAsk={() => {}} />)
+    expect(screen.getByText('Usually €650 a month · about the same')).toBeTruthy()
+    expect(screen.getByText('Usually €380 a month · €32.50 more so far')).toBeTruthy()
+    expect(screen.getAllByText(/^Usually/)).toHaveLength(2) // none for Travel
+  })
+
+  it('lists savings apart, labelled and outside the total', () => {
+    const s = {
+      ...spending([housing]),
+      savings: [{ category: 'Invest Deposit', total: 235.72, count: 1 }],
+      savings_total: 235.72,
+    }
+    render(<Spending spending={s} onAsk={() => {}} />)
+    const saved = screen.getByRole('list', { name: 'Savings' })
+    expect(saved.textContent).toContain('Invest Deposit')
+    expect(saved.textContent).toContain('Savings')
+    expect(screen.getByText(/not counted as spending/)).toBeTruthy()
+    expect(screen.getByText('Total spent: €1,062.50')).toBeTruthy()
+  })
+
+  it('empty state and tapping ask the coach', () => {
+    const onAsk = vi.fn()
+    const { rerender } = render(<Spending spending={spending([])} onAsk={onAsk} />)
+    expect(screen.getByText('No spending this month yet')).toBeTruthy()
+    rerender(<Spending spending={spending([housing])} onAsk={onAsk} />)
+    fireEvent.click(screen.getByText('Housing'))
+    expect(onAsk).toHaveBeenCalledWith('Tell me about my Housing spending', 2)
+  })
+
+  it('loads categories in the customer view', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) => {
+        if (url.startsWith('/api/spending/')) {
+          return new Response(JSON.stringify(spending([housing])))
+        }
+        if (url.startsWith('/api/goals/')) return new Response(JSON.stringify(NO_GOALS))
+        return new Response('[]')
+      }),
+    )
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    expect(await screen.findByText('Housing')).toBeTruthy()
+  })
+})
+
 describe('no fallbacks', () => {
   it('API down shows "Backend not reachable" and no customers', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
@@ -152,6 +342,12 @@ describe('no fallbacks', () => {
       }
       if (url.startsWith('/api/insights/')) {
         return new Response('[]', { status: 200 })
+      }
+      if (url.startsWith('/api/goals/')) {
+        return new Response(JSON.stringify(NO_GOALS), { status: 200 })
+      }
+      if (url.startsWith('/api/spending/')) {
+        return new Response(JSON.stringify(NO_SPENDING), { status: 200 })
       }
       return new Response(JSON.stringify({ error: 'Gemini is not configured' }), {
         status: 503,
@@ -188,6 +384,75 @@ describe('waiting for a reply (F2)', () => {
     render(<Chat messages={[]} busy={false} onSend={() => {}} />)
     expect(screen.queryByRole('status')).toBeNull()
   })
+
+  it('shows the step the coach is on and its thought heading', () => {
+    render(
+      <Chat
+        messages={[]}
+        busy
+        progress={{ step: 'Checking your goals', thought: 'Planning the answer' }}
+        onSend={() => {}}
+      />,
+    )
+    const status = screen.getByRole('status')
+    expect(status.textContent).toBe('Checking your goals…Planning the answer')
+  })
+
+  // A chat response whose NDJSON lines the test pushes one at a time.
+  function streamingApi() {
+    let ctrl
+    const body = new ReadableStream({ start: (c) => (ctrl = c) })
+    const enc = new TextEncoder()
+    const push = (...events) =>
+      ctrl.enqueue(enc.encode(events.map((e) => JSON.stringify(e) + '\n').join('')))
+    const fetch = vi.fn(async (url) =>
+      url.startsWith('/api/chat/')
+        ? new Response(body, { headers: { 'Content-Type': 'application/x-ndjson' } })
+        : new Response('[]'),
+    )
+    return { fetch, push, close: () => ctrl.close() }
+  }
+
+  async function ask() {
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    fireEvent.change(await screen.findByLabelText('Message'), {
+      target: { value: 'Safe to spend?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+  }
+
+  it('streams what the coach is doing, then shows the reply', async () => {
+    const api = streamingApi()
+    vi.stubGlobal('fetch', api.fetch)
+    await ask()
+    api.push(
+      { type: 'step', text: 'Working out what is safe to spend' },
+      { type: 'thought', text: 'Weighing upcoming bills' },
+    )
+    expect(await screen.findByText('Working out what is safe to spend…')).toBeTruthy()
+    expect(screen.getByText('Weighing upcoming bills')).toBeTruthy()
+    api.push({
+      type: 'reply',
+      reply: { text: 'EUR 64', depth: 1, cards: [], chips: [] },
+    })
+    api.close()
+    expect(await screen.findByText('EUR 64')).toBeTruthy()
+    expect(screen.queryByRole('status')).toBeNull()
+    const [url] = api.fetch.mock.calls.find(([u]) => u.startsWith('/api/chat/'))
+    expect(url).toBe('/api/chat/?stream=1')
+  })
+
+  it('an error event in the stream is shown as the reply', async () => {
+    const api = streamingApi()
+    vi.stubGlobal('fetch', api.fetch)
+    await ask()
+    api.push({ type: 'error', error: 'The coach stopped unexpectedly.' })
+    api.close()
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toContain('stopped unexpectedly'),
+    )
+  })
 })
 
 describe('demo landing page', () => {
@@ -198,13 +463,13 @@ describe('demo landing page', () => {
         : new Response('[]', { status: 200 }),
     )
 
-  it('demo buttons name only the demo, income level and spender type', async () => {
+  it('demo buttons name the demo, level, income and spender type', async () => {
     vi.stubGlobal('fetch', fetchOk())
     render(<App />)
     const list = await screen.findByRole('list', { name: 'Demo customers' })
     const rows = list.querySelectorAll('li')
     expect(rows).toHaveLength(3)
-    expect(rows[0].textContent).toBe('Demo 1Income 1 · Night Owl')
+    expect(rows[0].textContent).toBe('Demo 1Level 0: Not startedIncome 1 · Night Owl')
     expect(list.textContent).not.toContain('CUST')
     fireEvent.click(screen.getByRole('button', { name: /Demo 2/ }))
     expect(window.location.hash).toBe('#/c/CUST00002')
@@ -215,7 +480,9 @@ describe('demo landing page', () => {
     render(<App />)
     const all = await screen.findByRole('list', { name: 'All customers' })
     expect(all.querySelectorAll('li')).toHaveLength(4)
-    expect(all.textContent).toContain('CUST00004Income 4 · Weekend Treater')
+    expect(all.textContent).toContain(
+      'CUST00004Safety net · Income 4 · Weekend Treater',
+    )
     expect(screen.queryByLabelText('Search customer')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /CUST00004/ }))
     expect(window.location.hash).toBe('#/c/CUST00004')

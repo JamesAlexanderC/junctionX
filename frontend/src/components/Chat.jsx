@@ -4,10 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import { DEPTH_NAMES } from '../lib/format.js'
 import { SUGGESTIONS } from '../lib/suggestions.js'
 import { ReplyCard } from './Cards.jsx'
+import Icon from './Icon.jsx'
 
 const nextDepth = (d) => Math.min(4, (d ?? 1) + 1)
 
-// F2: replies can take a while; say what is happening as the wait grows.
+// F2: replies can take a while. The backend streams what the coach is doing
+// (coach/gemini/progress.py): `step` is the tool it is running, `thought` the
+// heading of Gemini's reasoning. Until the first step arrives, or if the
+// stream gives none, the text changes with the wait instead.
 const PROGRESS_STEPS = [
   { after: 0, text: 'Checking your numbers…' },
   { after: 4000, text: 'Looking deeper into your data…' },
@@ -15,18 +19,18 @@ const PROGRESS_STEPS = [
 ]
 const PROGRESS_TICK_MS = 1000
 
-function Progress() {
+function Progress({ step, thought }) {
   const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
     const started = Date.now()
     const id = setInterval(() => setElapsed(Date.now() - started), PROGRESS_TICK_MS)
     return () => clearInterval(id)
   }, [])
-  const step = PROGRESS_STEPS.filter((s) => elapsed >= s.after).at(-1)
-  // Text that changes with the wait (F2); no typing dots.
+  const waiting = PROGRESS_STEPS.filter((s) => elapsed >= s.after).at(-1).text
   return (
     <div className="msg coach progress" role="status" aria-live="polite">
-      <span className="progress-text">{step.text}</span>
+      <span className="progress-text">{step ? `${step}…` : waiting}</span>
+      {thought && <span className="progress-thought">{thought}</span>}
     </div>
   )
 }
@@ -59,7 +63,7 @@ function CoachMessage({ reply, onSend, isLast }) {
   )
 }
 
-export default function Chat({ messages, busy, onSend, disabled }) {
+export default function Chat({ messages, busy, progress = {}, onSend, disabled }) {
   const [draft, setDraft] = useState('')
   const endRef = useRef(null)
 
@@ -85,6 +89,7 @@ export default function Chat({ messages, busy, onSend, disabled }) {
                 {SUGGESTIONS.map(([feature, text, depth]) => (
                   <li key={feature}>
                     <button type="button" onClick={() => onSend(text, depth)}>
+                      <Icon name="suggest" size={16} />
                       {text}
                     </button>
                   </li>
@@ -100,6 +105,7 @@ export default function Chat({ messages, busy, onSend, disabled }) {
             </div>
           ) : m.error ? (
             <div key={i} className="msg error" role="alert">
+              <Icon name="error" />
               {m.error}
             </div>
           ) : (
@@ -111,7 +117,7 @@ export default function Chat({ messages, busy, onSend, disabled }) {
             />
           ),
         )}
-        {busy && <Progress />}
+        {busy && <Progress step={progress.step} thought={progress.thought} />}
         <div ref={endRef} />
       </div>
       <form
@@ -132,6 +138,7 @@ export default function Chat({ messages, busy, onSend, disabled }) {
           disabled={disabled}
         />
         <button type="submit" className="send" disabled={busy || disabled || !draft.trim()}>
+          <Icon name="send" size={16} />
           Send
         </button>
       </form>
