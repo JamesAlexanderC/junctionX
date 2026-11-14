@@ -71,7 +71,10 @@ class Command(BaseCommand):
             for cid, injects in plan.items():
                 df = demo_events.remove_synthetic(_frame(cid))
                 for inject in injects:
-                    df = inject(df, ref)
+                    try:
+                        df = inject(df, ref)
+                    except ValueError as exc:
+                        raise CommandError(f"{cid}: {exc}") from exc
                 _write(cid, df)
                 added = int(df["is_synthetic"].sum())
                 self.stdout.write(

@@ -163,3 +163,55 @@ def test_build_profiles_uses_the_shared_reference_date(tmp_path, client):
     )
     call_command("build_profiles", stdout=io.StringIO())
     assert client.get("/api/home/C2/").json()["today"] == services.today().isoformat()
+
+
+def _load_c1(tmp_path):
+    data = write_csvs(tmp_path)
+    call_command(
+        "load_data", "--customers", "C1", "--data-dir", str(data), stdout=io.StringIO()
+    )
+
+
+def test_refresh_profile_fills_stress_test_for_real_customers(tmp_path):
+    from coach.models import LoanDetails
+
+    _load_c1(tmp_path)
+    LoanDetails.objects.create(
+        customer_id="C1", balance=200000, interest_rate=0.04, years_left=25
+    )
+    out = services.refresh_profile("C1")
+    assert out["mortgage"]["stress_test"] is not None
+
+
+def test_build_profile_receives_goals_with_on_track(tmp_path, monkeypatch):
+    from coach.models import Goal
+    from inferences import profile as profile_mod
+
+    _load_c1(tmp_path)
+    Goal.objects.create(
+        customer_id="C1",
+        name="Trip",
+        target=600,
+        saved=590,
+        start_date="2026-09-01",
+        target_date="2027-03-01",
+    )
+    seen = {}
+    real = profile_mod.build_profile
+
+    def spy(df, customer, today, goals=None, loans=None):
+        seen["goals"] = goals
+        return real(df, customer, today, goals=goals, loans=loans)
+
+    monkeypatch.setattr(profile_mod, "build_profile", spy)
+    services.refresh_profile("C1")
+    assert seen["goals"][0]["on_track"] is True
+
+
+def test_refresh_profile_ignores_demo_fixture_date(tmp_path, settings, monkeypatch):
+    from datetime import date
+
+    _load_c1(tmp_path)
+    settings.DEMO_MODE = True
+    monkeypatch.setattr(services, "today", lambda: date(2026, 10, 26))
+    assert services.refresh_profile("C1")["today"] == "2026-10-26"

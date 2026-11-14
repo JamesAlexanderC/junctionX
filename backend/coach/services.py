@@ -205,6 +205,35 @@ def active_alerts(customer_id, profile, on=None):
 # --- recomputation -------------------------------------------------------
 
 
+def build_customer_profile(customer_id, df, on):
+    """Full profile for a customer with transactions, as of `on`.
+
+    Goals get `on_track` first so levels (#31) are computed once, correctly;
+    recompute_goals_locally then adds the full goal metrics, and the stress
+    test (#77) is added when the user has given loan details.
+    """
+    from inferences import profile as profile_mod
+
+    customer = Customer.objects.filter(customer_id=customer_id).first()
+    cust = {
+        "customer_id": customer_id,
+        "age": customer.age if customer else None,
+        "postal_code": customer.postal_code if customer else "",
+    }
+    goals = goal_dicts(customer_id)
+    loans = latest_loan(customer_id)
+    scored = [
+        {**g, "on_track": goal_metrics(g, {}, on)["on_track"]}
+        for g in goals
+        if g["status"] == "active"
+    ]
+    data = profile_mod.build_profile(df, cust, on, goals=scored, loans=loans)
+    recompute_goals_locally(data, goals, on)
+    if loans:
+        data["mortgage"]["stress_test"] = stress_test(data, loans["balance"])
+    return data
+
+
 def refresh_profile(customer_id):
     """Rerun goal and level inferences after a goal or loan change.
 
@@ -216,18 +245,7 @@ def refresh_profile(customer_id):
     goals = goal_dicts(customer_id)
     loans = latest_loan(customer_id)
     if df is not None:
-        from inferences.profile import build_profile
-
-        customer = Customer.objects.filter(customer_id=customer_id).first()
-        cust = {
-            "customer_id": customer_id,
-            "age": customer.age if customer else None,
-            "postal_code": customer.postal_code if customer else "",
-        }
-        base = get_profile(customer_id) or {}
-        p_today = profile_today(base) if base else today()
-        data = build_profile(df, cust, p_today, goals=goals, loans=loans)
-        recompute_goals_locally(data, goals, p_today)
+        data = build_customer_profile(customer_id, df, today())
         save_profile(customer_id, data, write_file=True)
         return data
 

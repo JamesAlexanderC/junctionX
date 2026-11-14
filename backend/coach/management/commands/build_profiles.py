@@ -18,11 +18,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **opts):
-        try:
-            from inferences.profile import build_profile
-        except ImportError as exc:
-            raise CommandError(f"inferences.profile is not available: {exc}") from exc
-
         ids = opts["customer"] or list(
             Customer.objects.filter(transactions__isnull=False)
             .distinct()
@@ -30,29 +25,13 @@ class Command(BaseCommand):
         )
         if not ids:
             raise CommandError("No customers with transactions. Run load_data first.")
+        # P1.1: one reference date (max tx_date) for every customer.
+        today = date.fromisoformat(opts["today"]) if opts["today"] else services.today()
         for cid in ids:
             df = services.transactions_df(cid)
             if df is None:
                 self.stderr.write(f"{cid}: no transactions, skipped")
                 continue
-            today = (
-                date.fromisoformat(opts["today"])
-                if opts["today"]
-                else services.today()  # P1.1 reference date = max(tx_date)
-            )
-            cust = Customer.objects.get(customer_id=cid)
-            goals = services.goal_dicts(cid)
-            data = build_profile(
-                df,
-                {
-                    "customer_id": cid,
-                    "age": cust.age,
-                    "postal_code": cust.postal_code,
-                },
-                today,
-                goals=goals,
-                loans=services.latest_loan(cid),
-            )
-            services.recompute_goals_locally(data, goals, today)
+            data = services.build_customer_profile(cid, df, today)
             services.save_profile(cid, data, write_file=True)
             self.stdout.write(self.style.SUCCESS(f"{cid}: profile saved ({today})"))

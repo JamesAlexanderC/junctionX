@@ -13,6 +13,7 @@ import math
 import pandas as pd
 
 from . import alerts as alert_rules
+from . import models
 from .baskets import compute_baskets
 from .common import iso, latest_balance, prepare, r2, to_date
 from .detected_goals import detect_travel_goal
@@ -26,8 +27,6 @@ from .whatif import compute_whatif
 AGE_BANDS = ((55, "55+"), (40, "40-54"), (30, "30-39"), (25, "25-29"), (18, "18-24"))
 AREA_DIGITS = 2  # #37: first 2 digits of the postcode
 RECOMMENDED_GOAL_MONTHS = 5  # safety-net goal spread over 5 months
-EASY_MONTHS, STRETCH_MONTHS = 2, 6  # #49 difficulty bands
-LOAN_BURDEN_ALERT = 76
 
 
 def age_band(age) -> str | None:
@@ -50,22 +49,14 @@ def _customer(customer: dict) -> dict:
     }
 
 
-def _difficulty(monthly_needed: float, rate: float) -> str:
-    """#49: months needed at the current Saver rate."""
-    if rate <= 0:
-        return "Hard"
-    months = math.ceil(monthly_needed * RECOMMENDED_GOAL_MONTHS / rate)
-    if months <= EASY_MONTHS:
-        return "Easy"
-    return "Stretch" if months <= STRETCH_MONTHS else "Hard"
-
-
 def _recommended(levels: dict, baskets: dict) -> dict | None:
     """Next-level goal: the euros still missing for the next level."""
     to_go = levels.get("euros_to_go") or 0.0
     if not to_go or not levels.get("next"):
         return None
-    monthly = 5 * math.ceil(to_go / (5 * RECOMMENDED_GOAL_MONTHS))
+    monthly = models.monthly_needed(to_go, 0.0, RECOMMENDED_GOAL_MONTHS)
+    rate = baskets.get("monthly_saving") or 0.0
+    months = math.ceil(to_go / rate) if rate > 0 else None  # #26
     return {
         "id": f"rec-level-{levels['next']}",
         "type": "safety_net" if levels["next"] == 3 else "level",
@@ -73,7 +64,7 @@ def _recommended(levels: dict, baskets: dict) -> dict | None:
         "name": levels.get("next_name", ""),
         "target": r2(to_go),
         "monthly_needed": float(monthly),
-        "difficulty": _difficulty(monthly, baskets.get("monthly_saving") or 0.0),
+        "difficulty": models.goal_difficulty(months),  # #49
         "weight": 0.5,
     }
 
@@ -117,11 +108,16 @@ def _goals(df, today, levels, baskets, forecast) -> dict:
     }
 
 
-def _mortgage(alerts: list[dict]) -> dict:
-    burden = next((a for a in alerts if a["inference"] == LOAN_BURDEN_ALERT), None)
-    dsti = burden["trigger_values"].get("dsti") if burden else None
+def _mortgage(df: pd.DataFrame, today, income: dict) -> dict:
+    """Loan payments and DSTI (#42, #76), whether or not alert #76 fires.
+
+    stress_test (#77) needs the user's loan details: coach.services adds it.
+    """
+    payments = alert_rules.monthly_loan_payments(df, today) if len(df) else 0.0
+    monthly = income.get("monthly_income") or 0.0
+    dsti = r2(payments / monthly) if payments > 0 and monthly > 0 else None
     return {
-        "loan_payments_found": burden is not None,
+        "loan_payments_found": payments > 0,
         "dsti": dsti,
         "stress_test": None,
         "readiness": None,
@@ -172,5 +168,5 @@ def build_profile(df, customer, today, goals=None, loans=None) -> dict:
         },
     }
     profile["alerts"] = alert_rules.run_all_alerts(df, profile, today, loans=loans)
-    profile["mortgage"] = _mortgage(profile["alerts"])
+    profile["mortgage"] = _mortgage(df, today, income)
     return profile

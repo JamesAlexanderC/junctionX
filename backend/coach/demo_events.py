@@ -15,6 +15,9 @@ BONUS_EUR = 5000.0
 BONUS_DAYS_BEFORE_REF = 10
 OVERDRAFT_DIP_EUR = 40.0  # the charge takes the balance to EUR -40
 OVERDRAFT_MIN_CHARGE_EUR = 10.0
+# A bigger synthetic charge would distort baskets, anomalies and buffers, so
+# the splurger must be someone whose balance actually runs low this month.
+OVERDRAFT_MAX_CHARGE_EUR = 1500.0
 OVERDRAFT_FEE_EUR = 5.0
 FEE_MARGIN_DAYS = 2  # leave room for the fee to land before the ref date
 
@@ -39,7 +42,7 @@ def _add_row(df: pd.DataFrame, row: dict) -> pd.DataFrame:
     ts, amount = pd.Timestamp(row["tx_timestamp"]), float(row["tx_amount_eur"])
     later = out["tx_timestamp"] > ts
     out["balance_after_eur"] = out["balance_after_eur"].where(
-        ~later, out["balance_after_eur"] + amount
+        ~later, (out["balance_after_eur"] + amount).round(2)
     )
     before = out[~later]
     prev = float(before["balance_after_eur"].iloc[-1]) if len(before) else 0.0
@@ -100,6 +103,12 @@ def inject_overdraft(df: pd.DataFrame, ref: date) -> pd.DataFrame:
     charge = max(
         float(low["balance_after_eur"]) + OVERDRAFT_DIP_EUR, OVERDRAFT_MIN_CHARGE_EUR
     )
+    if charge > OVERDRAFT_MAX_CHARGE_EUR:
+        raise ValueError(
+            f"lowest balance this month is EUR {low['balance_after_eur']:.0f}: an "
+            f"overdraft needs a charge above EUR {OVERDRAFT_MAX_CHARGE_EUR:.0f}. "
+            "Pick a splurger whose balance runs low."
+        )
     ts = pd.Timestamp(low["tx_timestamp"]) + pd.Timedelta(minutes=1)
     cid = out["customer_id"].iloc[0]
     out = _add_row(

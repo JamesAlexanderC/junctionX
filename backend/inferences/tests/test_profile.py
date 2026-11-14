@@ -1,6 +1,7 @@
 """build_profile: every inference in the shape of profile_demo.json."""
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -79,3 +80,41 @@ def test_empty_frame_does_not_crash():
     out = build_profile(empty, CUSTOMER, TODAY)
     assert out["balance"] is None
     json.dumps(out)
+
+
+def test_moderate_loan_payments_are_reported_below_alert_threshold():
+    # Review: loan_payments_found and dsti must not depend on alert #76 firing.
+    from inferences.tests.fixtures import make_df
+
+    rows = []
+    for m in (7, 8, 9, 10):
+        rows.append(
+            dict(
+                ts=f"2026-{m:02d}-01 08:00",
+                amount=3000,
+                ttype="salary",
+                category="Salary",
+                mcc="",
+            )
+        )
+        rows.append(
+            dict(
+                ts=f"2026-{m:02d}-05 08:00",
+                amount=-300,
+                category="loan",
+                mcc="6141",
+                merchant="M_BANK_LOAN",
+            )
+        )
+    out = build_profile(make_df(rows), CUSTOMER, TODAY)
+    assert out["mortgage"]["loan_payments_found"] is True
+    assert out["mortgage"]["dsti"] == pytest.approx(0.1, abs=0.01)
+
+
+def test_recommended_goal_uses_shared_difficulty_maths(profile):
+    from inferences import models
+
+    rec = profile["goals"]["recommended"]
+    rate = profile["baskets"]["monthly_saving"]
+    months = math.ceil(rec["target"] / rate) if rate > 0 else None
+    assert rec["difficulty"] == models.goal_difficulty(months)

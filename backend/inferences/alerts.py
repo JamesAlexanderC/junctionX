@@ -740,6 +740,11 @@ def rule_62_life_change(df, profile, today, **ctx):
     return found
 
 
+def monthly_loan_payments(df, today) -> float:
+    """Public alias for the profile builder (mortgage.dsti)."""
+    return _monthly_loan_payments(df, today)
+
+
 def rule_76_loan_burden(df, profile, today, **ctx):
     payments = _monthly_loan_payments(df, today)
     income = _income(profile)
