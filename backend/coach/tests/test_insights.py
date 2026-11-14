@@ -61,12 +61,43 @@ def test_availability_map_is_respected():
     assert "monthly_income" in keys
 
 
-def test_empty_current_month_falls_back_to_last_full_month():
-    p = sample()
+def test_baskets_left_to_basket_panel():
+    assert "baskets" not in {i["key"] for i in insights.insights(sample())}
+
+
+def test_basket_summary_picks_computed_fields():
+    p = copy.deepcopy(sample())
+    out = insights.basket_summary(p)
+    assert out["month"] == "2026-10"
+    assert out["total"] == 1212.99
+    assert [b["key"] for b in out["buckets"]] == ["essential", "leaky", "saver"]
+    leaky = out["buckets"][1]
+    assert leaky["name"] == "Leaky"
+    assert leaky["total"] == 172.99
+    assert leaky["share"] == 14.3
+    assert leaky["trend"] == 1.3
+    assert leaky["categories"][0] == {"category": "takeaway", "total": 90.0}
+    assert out["monthly_saving"] == 150.0
+
+
+def test_basket_summary_falls_back_to_last_full_month():
+    p = copy.deepcopy(sample())
     p["baskets"]["totals"] = {k: 0.0 for k in p["baskets"]["totals"]}
-    item = next(i for i in insights.insights(p) if i["key"] == "baskets")
-    assert item["title"] == "Where the money went (2026-09)"
-    assert item["value"]["surprise"] == 400.0
+    out = insights.basket_summary(p)
+    assert out["month"] == "2026-09"
+    surprise = next(b for b in out["buckets"] if b["key"] == "surprise")
+    assert surprise["total"] == 400.0
+    assert surprise["trend"] is None  # trend is for the current month only
+
+
+def test_basket_summary_empty_profile():
+    assert insights.basket_summary({}) == {
+        "month": None,
+        "total": 0,
+        "buckets": [],
+        "monthly_essentials": None,
+        "monthly_saving": None,
+    }
 
 
 def test_zero_and_unflagged_values_are_omitted():

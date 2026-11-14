@@ -101,6 +101,11 @@ def test_basket_split_october():
     assert split["shares"]["essential"] == 73.4
     assert split["shares"]["leaky"] == 14.3
     assert split["shares"]["saver"] == 12.4
+    # Categories inside each basket add up to the basket total.
+    for b, rows in split["categories"].items():
+        assert round(sum(r["total"] for r in rows), 2) == split["totals"][b]
+    leaky = split["categories"]["leaky"]
+    assert leaky == sorted(leaky, key=lambda r: -r["total"])
 
 
 def test_compute_baskets_shape(bsk):
@@ -110,6 +115,8 @@ def test_compute_baskets_shape(bsk):
     cats = [c["category"] for c in bsk["leaky_categories"]]
     assert cats[0] == "takeaway"
     assert set(bsk["totals"]) >= {"essential", "surprise", "leaky", "saver"}
+    assert set(bsk["categories"]) == set(bsk["totals"])
+    assert all("categories" in h for h in bsk["history"])
 
 
 # --- What-ifs --------------------------------------------------------------------

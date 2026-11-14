@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
 import { ReplyCard } from '../components/Cards.jsx'
 import Chat from '../components/Chat.jsx'
+import Baskets from '../components/Baskets.jsx'
 import Goals from '../components/Goals.jsx'
 import Insights from '../components/Insights.jsx'
 import { niceTicks, shortLabel } from '../lib/chart.js'
 import { SUGGESTIONS } from '../lib/suggestions.js'
 
 const NO_GOALS = { customer_id: 'CUST00001', active: [], completed: [], clash: null }
+const NO_BASKETS = { customer_id: 'CUST00001', month: null, total: 0, buckets: [] }
 
 // Test-only shape of GET /api/customers/demo/.
 const row = (n, spender) => ({
@@ -184,6 +186,7 @@ describe('goals panel', () => {
     let created = false
     const fetch = vi.fn(async (url) => {
       if (url.startsWith('/api/insights/')) return new Response('[]')
+      if (url.startsWith('/api/baskets/')) return new Response(JSON.stringify(NO_BASKETS))
       if (url.startsWith('/api/goals/')) {
         return new Response(JSON.stringify(goals(created ? [bike] : [])))
       }
@@ -219,6 +222,67 @@ describe('goals panel', () => {
   })
 })
 
+describe('baskets panel', () => {
+  const leaky = {
+    key: 'leaky',
+    name: 'Leaky',
+    total: 172.99,
+    share: 14.3,
+    trend: 1.3,
+    categories: [
+      { category: 'takeaway', total: 90 },
+      { category: 'coffee', total: 50 },
+      { category: 'snacks', total: 20 },
+      { category: 'kiosk', total: 12.99 },
+    ],
+  }
+  const essential = {
+    key: 'essential',
+    name: 'Essentials',
+    total: 890,
+    share: 73.4,
+    trend: null,
+    categories: [{ category: 'rent', total: 650 }, { category: 'groceries', total: 240 }],
+  }
+  const baskets = (buckets) => ({ ...NO_BASKETS, month: '2026-10', total: 1062.99, buckets })
+
+  it('shows each bucket with its share, total and categories', () => {
+    render(<Baskets baskets={baskets([essential, leaky])} onAsk={() => {}} />)
+    expect(screen.getByText('Where your money went (2026-10)')).toBeTruthy()
+    expect(screen.getByText('73%')).toBeTruthy()
+    expect(screen.getByText('rent €650 · groceries €240')).toBeTruthy()
+    expect(screen.getByText(/· \+1 pts vs usual/)).toBeTruthy()
+    expect(screen.getByText(/takeaway €90 · coffee €50 · snacks €20 · \+1 more/))
+      .toBeTruthy()
+    expect(screen.getByText('All 4 categories')).toBeTruthy()
+  })
+
+  it('empty state and tapping ask the coach', () => {
+    const onAsk = vi.fn()
+    const { rerender } = render(<Baskets baskets={baskets([])} onAsk={onAsk} />)
+    expect(screen.getByText('No spending this month yet')).toBeTruthy()
+    rerender(<Baskets baskets={baskets([leaky])} onAsk={onAsk} />)
+    fireEvent.click(screen.getByText('Leaky'))
+    expect(onAsk).toHaveBeenCalledWith("What's in my Leaky spending?", 2)
+  })
+
+  it('loads buckets in the customer view', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) => {
+        if (url.startsWith('/api/baskets/')) {
+          return new Response(JSON.stringify(baskets([essential])))
+        }
+        if (url.startsWith('/api/goals/')) return new Response(JSON.stringify(NO_GOALS))
+        return new Response('[]')
+      }),
+    )
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    expect(await screen.findByText('Essentials')).toBeTruthy()
+  })
+})
+
 describe('no fallbacks', () => {
   it('API down shows "Backend not reachable" and no customers', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
@@ -237,6 +301,9 @@ describe('no fallbacks', () => {
       }
       if (url.startsWith('/api/goals/')) {
         return new Response(JSON.stringify(NO_GOALS), { status: 200 })
+      }
+      if (url.startsWith('/api/baskets/')) {
+        return new Response(JSON.stringify(NO_BASKETS), { status: 200 })
       }
       return new Response(JSON.stringify({ error: 'Gemini is not configured' }), {
         status: 503,

@@ -93,8 +93,25 @@ def classify(df: pd.DataFrame, today, bills: list[dict] | None = None):
     return outs
 
 
+def _basket_categories(m: pd.DataFrame) -> dict:
+    """Spending per category inside each basket for one month, largest first.
+
+    Net of Saver withdrawals, so a category that ends at zero or below is left
+    out: there is no spending in it to show.
+    """
+    out = {b: [] for b in BASKETS}
+    if not len(m):
+        return out
+    sums = m.groupby(["basket", "category"])["amount"].sum()
+    for (basket, category), v in sums.sort_values(ascending=False).items():
+        if basket in out and r2(float(v)) > 0:
+            out[basket].append({"category": str(category), "total": r2(float(v))})
+    return out
+
+
 def basket_split(classified: pd.DataFrame, month: str) -> dict:
-    """#10 for one month: totals and shares (% of total outflow, 1 dp)."""
+    """#10 for one month: totals, shares (% of total outflow, 1 dp) and the
+    categories that make up each basket."""
     m = classified[classified["month"] == month] if len(classified) else classified
     sums = m.groupby("basket")["amount"].sum() if len(m) else {}
     totals = {b: r2(float(sums.get(b, 0.0)) if len(m) else 0.0) for b in BASKETS}
@@ -103,7 +120,12 @@ def basket_split(classified: pd.DataFrame, month: str) -> dict:
         b: round(models.share(v, total) * 100, 1) if total else 0.0
         for b, v in totals.items()
     }
-    return {"month": month, "totals": totals, "shares": shares}
+    return {
+        "month": month,
+        "totals": totals,
+        "shares": shares,
+        "categories": _basket_categories(m),
+    }
 
 
 def compute_baskets(df: pd.DataFrame, today, bills: list[dict] | None = None):
@@ -123,9 +145,12 @@ def compute_baskets(df: pd.DataFrame, today, bills: list[dict] | None = None):
     }
     window = full_months(today, th.WINDOW_FULL_MONTHS, prepared)
     hist_months = full_months(today, 6, prepared)
-    history = [
-        {"month": m, "totals": basket_split(cls, m)["totals"]} for m in hist_months
-    ]
+    history = []
+    for m in hist_months:
+        s = basket_split(cls, m)
+        history.append(
+            {"month": m, "totals": s["totals"], "categories": s["categories"]}
+        )
     win_splits = [basket_split(cls, m)["totals"] for m in window]
 
     def win_mean(b):
@@ -145,6 +170,7 @@ def compute_baskets(df: pd.DataFrame, today, bills: list[dict] | None = None):
         "month": current,
         "totals": split["totals"],
         "shares": split["shares"],
+        "categories": split["categories"],
         "trend": trend,
         "history": history,
         "leaky_categories": [

@@ -4,6 +4,7 @@
 //   GET  /api/insights/<customer_id>/  -> [{key, inference, title, value,
 //                                          unit, text, section, severity?}]
 //   GET  /api/goals/?customer_id=<id> -> {active, completed, clash}
+//   GET  /api/baskets/?customer_id=<id> -> {month, total, buckets, ...}
 //   POST /api/chat/ {customer_id, message, history, depth?} -> send_reply
 //   POST /api/auth/login/ {username, password} -> {token, user}
 //   POST /api/auth/logout/                      -> 204
@@ -112,6 +113,23 @@ export async function getGoals(customerId, { signal } = {}) {
     active: Array.isArray(body?.active) ? body.active : [],
     completed: Array.isArray(body?.completed) ? body.completed : [],
     clash: body?.clash ?? null,
+  }
+}
+
+// Backend shape: {customer_id, as_of, month, total, buckets: [{key, name,
+// total, share, trend, categories: [{category, total}]}], monthly_essentials,
+// monthly_saving}.
+export async function getBaskets(customerId, { signal } = {}) {
+  const body = await request(
+    `/api/baskets/?customer_id=${encodeURIComponent(customerId)}`,
+    { signal },
+  )
+  return {
+    month: body?.month ?? null,
+    total: body?.total ?? 0,
+    buckets: Array.isArray(body?.buckets) ? body.buckets : [],
+    monthly_essentials: body?.monthly_essentials ?? null,
+    monthly_saving: body?.monthly_saving ?? null,
   }
 }
 

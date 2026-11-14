@@ -1356,6 +1356,14 @@ button {
   }
 }
 
+.basket-cats {
+  overflow-wrap: anywhere;
+}
+
+.basket-all {
+  margin: 0 16px 8px;
+}
+
 /* Icons (components/Icon.jsx). Lucide draws in currentColor, so an icon takes
    its parent's text colour. Anything holding an icon and a label lines them
    up with the same gap. */
