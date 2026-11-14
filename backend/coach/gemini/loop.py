@@ -49,6 +49,13 @@ def build_config():
             function_calling_config=types.FunctionCallingConfig(mode="ANY")
         ),
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        # Flash thinks by default, which more than doubled reply time
+        # (11 s -> 5.6 s for "safe to spend" at "low"). Empty = model default.
+        thinking_config=(
+            types.ThinkingConfig(thinking_level=settings.GEMINI_THINKING_LEVEL)
+            if settings.GEMINI_THINKING_LEVEL
+            else None
+        ),
     )
 
 
