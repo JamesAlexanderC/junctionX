@@ -36,6 +36,7 @@ TOOLS = {
     "get_inference": inference.get_inference,
     "get_chart": inference.get_chart,
     "manage_goal": goals.manage_goal,
+    "calculate_goal": goals.calculate_goal,
     "dismiss_suggestion": goals.dismiss_suggestion,
     "save_loan_details": loans.save_loan_details,
 }

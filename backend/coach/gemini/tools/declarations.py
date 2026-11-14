@@ -220,6 +220,21 @@ DECLARATIONS = [
         },
         ["goal_id", "action"],
     ),
+    _decl(
+        "calculate_goal",
+        "Goal maths for amounts the user types: how long saving amount takes at "
+        "their average monthly saving (or a monthly amount they give), and for a "
+        "date the monthly amount needed, difficulty and whether it is realistic "
+        "with a realistic amount and date. Saves nothing. Use it; never work out "
+        "months, dates or amounts yourself.",
+        {
+            "amount": NUM,
+            "date": {"type": "string", "description": "YYYY-MM-DD"},
+            "monthly": NUM,
+            "saved": NUM,
+        },
+        ["amount"],
+    ),
     _decl("get_detected_goals", "Goals detected from the data, as suggestions."),
     _decl(
         "dismiss_suggestion",
