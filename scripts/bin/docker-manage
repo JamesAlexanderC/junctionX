@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Run a Django management command in the running backend container.
+#
+# Usage: scripts/bin/docker-manage <command> [args...]
+#   e.g. scripts/bin/docker-manage load_data
+#        scripts/bin/docker-manage build_profiles
+#        scripts/bin/docker-manage createsuperuser
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+case "${1:-}" in
+    ""|-h|--help)
+        sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'
+        exit 0
+        ;;
+esac
+
+cd "${REPO_ROOT}"
+TTY=()
+[ -t 0 ] || TTY=(-T)
+docker compose -f docker-compose.prod.yml exec ${TTY[@]+"${TTY[@]}"} backend \
+    python manage.py "$@"

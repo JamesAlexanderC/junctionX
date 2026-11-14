@@ -1,5 +1,7 @@
-# Production stack: only the nginx frontend is published on the host.
-#   docker compose -f docker-compose.prod.yml up -d --build
+# Production stack: only the Caddy frontend is published on the host.
+# Use the scripts: scripts/bin/docker-build, docker-up, docker-down, ...
+name: saldo-prod
+
 services:
   db:
     image: postgres:17
@@ -36,10 +38,21 @@ services:
   frontend:
     build: ./frontend
     restart: unless-stopped
+    environment:
+      # ":80" = plain HTTP; a domain name turns on automatic HTTPS.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
     depends_on:
       - backend
     ports:
       - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      # Caddy's certificates and state; keep them across rebuilds.
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

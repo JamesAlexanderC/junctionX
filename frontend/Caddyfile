@@ -1,0 +1,20 @@
+# SITE_ADDRESS ":80" serves plain HTTP; set it to a domain (e.g. saldo.example.com)
+# and Caddy gets and renews a TLS certificate automatically.
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	# Django API on the internal compose network (never published). Caddy
+	# has no proxy read timeout by default, so long Gemini turns are fine.
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		root * /srv
+		# Hashed build assets can be cached forever.
+		header /assets/* Cache-Control "public, max-age=31536000, immutable"
+		# SPA routing: unknown paths fall back to index.html.
+		try_files {path} /index.html
+		file_server
+	}
+}
