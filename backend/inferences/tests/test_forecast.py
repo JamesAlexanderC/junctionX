@@ -108,3 +108,56 @@ def test_safe_to_spend_is_never_negative():
 def test_safe_to_spend_uses_a_full_week_only_when_payday_is_far():
     # D <= 7: everything available may be spent before payday.
     assert forecast.safe_to_spend_week(500, 0, 0, 100, 3, 30) == pytest.approx(400)
+
+
+# --- FC-8: the rest of the forecast rules -----------------------------------------
+
+
+def test_no_payday_makes_the_forecast_items_unavailable():
+    from inferences.availability import availability
+
+    profile = build_profile(aino_df(until=date(2026, 9, 30)), CUSTOMER, "2026-09-30")
+    profile["income"]["payday"] = {**profile["income"]["payday"], "found": False}
+    flags = availability(profile)
+    for item in (
+        "forecast.safe_to_spend_week",
+        "forecast.safe_to_save_today",
+        "forecast.end_of_month",
+        "forecast.danger_days",
+    ):
+        assert flags[item]["available"] is False, item
+        assert "payday" in flags[item]["reason"], item
+
+
+def test_danger_days_are_exactly_the_days_below_50_before_payday():
+    from inferences import thresholds as th
+
+    today = date(2026, 10, 18)
+    f = _forecast(today)
+    df = aino_df(until=today)
+    payday = income.compute_income(df, today)["payday"]["next_payday"]
+    expected = [
+        p["date"]
+        for p in f["daily_path"]
+        if p["date"] < payday and p["low"] < th.DANGER_BALANCE_EUR
+    ]
+    assert f["danger_days"] == expected
+
+
+def test_surprise_fund_divides_by_months_of_data_up_to_12():
+    from unittest.mock import patch
+
+    today = date(2026, 10, 31)
+    df = aino_df(until=today)
+    with patch.object(forecast, "months_spanned", return_value=4):
+        four = forecast.surprise_fund(df, today, {})
+    with patch.object(forecast, "months_spanned", return_value=30):
+        capped = forecast.surprise_fund(df, today, {})
+    assert four > 0
+    assert capped == pytest.approx(four * 4 / 12)
+
+
+def test_seasonal_needs_a_full_year():
+    # Aino has 4 months of data: no ratio, no warning (#23 unavailable).
+    out = forecast.seasonal(aino_df(until=date(2026, 10, 18)), date(2026, 10, 18))
+    assert out["ratio"] is None and out["warn"] is False
