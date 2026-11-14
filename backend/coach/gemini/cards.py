@@ -159,3 +159,54 @@ def data_fields(card: dict) -> dict:
     """The parts of a cleaned card whose numbers must come from tools."""
     skip = ALWAYS_NOT_DATA | NOT_DATA.get(card["type"], set())
     return {k: v for k, v in card.items() if k not in skip}
+
+
+# --- what a card showed, as one line for the chat history (conversation A) ---
+
+SUMMARY_FIELDS = {
+    "alert": ("id", "title", "text"),
+    "number": ("label", "value", "unit"),
+    "goal": ("name", "saved", "target", "target_date"),
+    "chart": ("title",),
+    "basket_bar": ("essential", "surprise", "leaky", "saver"),
+    "slider": ("category", "monthly_spend", "pct"),
+    "level_progress": ("current_level", "current_name", "level", "name"),
+    "question": ("question", "options"),
+    "plan": ("steps",),
+    "before_after": ("before", "after"),
+}
+LABEL_FIELDS = {"id", "title", "text", "label", "name", "question"}
+
+
+def _short(value):
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return f"{value:g}"
+    if isinstance(value, dict):
+        return ", ".join(f"{k} {_short(v)}" for k, v in value.items() if v is not None)
+    if isinstance(value, list):
+        return ", ".join(_short(v) for v in value)
+    return str(value)
+
+
+def _steps(steps):
+    return "; ".join(
+        f"{s.get('text')} ({_short(s.get('monthly_impact'))} a month)"
+        for s in steps
+        if isinstance(s, dict)
+    )
+
+
+def card_summary(card: dict) -> str:
+    """'alert a-38 | Unusual charge | EUR 15.64 at ...': the facts a card
+    showed, so the next turn can refer to it ("looks familiar")."""
+    kind = card.get("type", "card")
+    parts = []
+    for field in SUMMARY_FIELDS.get(kind, ()):
+        value = card.get(field)
+        if value in (None, "", [], {}):
+            continue
+        text = _steps(value) if field == "steps" else _short(value)
+        parts.append(text if field in LABEL_FIELDS else f"{field} {text}")
+    if kind == "chart":
+        parts.append(f"{len(card.get('data') or [])} points")
+    return " | ".join([kind, *parts])

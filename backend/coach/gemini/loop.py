@@ -17,6 +17,7 @@ from . import router
 from .system_prompt import FALLBACK_REPLY, SYSTEM_PROMPT
 from .tools import ToolContext, call_tool, tool_declarations
 from .tools.inference import list_inferences
+from .cards import card_summary
 from .validate import ReplyError, validate_reply
 
 log = logging.getLogger("coach.gemini")
@@ -24,6 +25,12 @@ log = logging.getLogger("coach.gemini")
 # The spec's 5 rounds (F2: speed); call tools together to fit deeper answers.
 MAX_ROUNDS = 5
 HISTORY_TURNS = 6
+SUMMARY_ALERTS = 5  # open alerts named in the profile summary (conversation A)
+CONVERSATION_NOTE = (
+    "This message is conversation, not a data question. Reply warmly and "
+    "briefly with send_reply. Use the earlier turns and what was shown if they "
+    "help; offer one follow-up chip if useful."
+)
 # Total size of tool results per turn, so the context stays small (~15k tokens).
 MAX_TURN_RESULT_CHARS = 60_000
 LAST_ROUND_NOTE = (
@@ -83,6 +90,11 @@ def profile_summary(profile):
             .get("label"),
             "goals": [{"id": g["id"], "name": g["name"]} for g in goals],
             "alert_count": len(profile.get("alerts", [])),
+            # Conversation A: lets "that one" / "looks familiar" find an alert.
+            "alerts": [
+                {"id": a.get("id"), "title": a.get("title")}
+                for a in profile.get("alerts", [])[:SUMMARY_ALERTS]
+            ],
             "inferences_available": _available_count(profile),
             "leaky_categories": [
                 c["category"]
@@ -114,6 +126,25 @@ def _call_within_budget(ctx, name, args, used):
     return result, used + size
 
 
+def _with_cards_shown(reply):
+    """The reply text plus a line naming what its cards showed (conversation
+    A): without it "looks familiar" had nothing to refer to."""
+    text = reply.get("text") or ""
+    shown = [card_summary(c) for c in reply.get("cards") or [] if isinstance(c, dict)]
+    if shown:
+        text = f"{text}\n[Shown: {'; '.join(shown)}]".strip()
+    return text
+
+
+def _earlier_coach_replies(customer_id):
+    """What the coach said in the last HISTORY_TURNS turns (conversation B):
+    its numbers were checked against tools when first said."""
+    stored = ChatTurn.objects.filter(customer_id=customer_id).order_by(
+        "-created_at", "-id"
+    )[:HISTORY_TURNS]
+    return [t.reply for t in stored]
+
+
 def _history_contents(customer_id, history):
     turns = list(
         ChatTurn.objects.filter(customer_id=customer_id).order_by("-created_at", "-id")[
@@ -124,8 +155,9 @@ def _history_contents(customer_id, history):
     if turns:
         for t in turns:
             contents.append(_text("user", t.message))
-            if t.reply.get("text"):
-                contents.append(_text("model", t.reply["text"]))
+            said = _with_cards_shown(t.reply)
+            if said:
+                contents.append(_text("model", said))
         return contents
     for item in (history or [])[-HISTORY_TURNS * 2 :]:
         role = "model" if item.get("role") in ("assistant", "model") else "user"
@@ -213,11 +245,17 @@ def chat(
     ctx.user_numbers = [
         ctx.previous_pending,
         *_earlier_user_messages(customer_id, history),
+        *_earlier_coach_replies(customer_id),
     ]
+    # Conversation C: small talk gets one round with send_reply only. Never
+    # while a proposal waits, so "ok" / "yes" still confirms it.
+    ctx.conversational = not ctx.previous_pending and router.is_conversational(message)
 
     if client is None:
         raise GeminiNotConfigured("Gemini is not configured: set GEMINI_API_KEY")
 
+    if ctx.conversational and depth is None:
+        depth = 1  # small talk: no router call needed
     routed = depth is None
     if routed:
         with _timed(ctx, "router"):
@@ -232,6 +270,7 @@ def chat(
             f"Profile summary: {profile_summary(profile)}\n"
             f"Answer at depth {depth}.\n"
             + (f"{router.LEVELS_HINT}\n" if router.wants_levels(message) else "")
+            + (f"{CONVERSATION_NOTE}\n" if ctx.conversational else "")
             + f"User: {message}",
         )
     )
@@ -257,6 +296,7 @@ def chat(
         "model": settings.GEMINI_MODEL,
         "depth": depth,
         "routed": routed,
+        "conversational": ctx.conversational,
         "tools": ctx.tools_called,
         "rounds": rounds,
         "fallback": bool(reason),
@@ -303,7 +343,11 @@ def _run(client, contents, ctx):
             resp = client.models.generate_content(
                 model=settings.GEMINI_MODEL,
                 contents=contents,
-                config=final_config if round_no == MAX_ROUNDS else config,
+                config=(
+                    final_config
+                    if round_no == MAX_ROUNDS or ctx.conversational
+                    else config
+                ),
             )
         contents.append(resp.candidates[0].content)
         parts = []

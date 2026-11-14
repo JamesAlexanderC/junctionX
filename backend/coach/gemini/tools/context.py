@@ -31,6 +31,7 @@ class ToolContext:
         self.validation_errors = []  # rejected send_reply reasons (F3)
         self.user_numbers = []  # earlier user messages and proposal (F1)
         self.timings = []  # [{step, ms, ...}] for router, gemini, tool (F2)
+        self.conversational = False  # small talk: one round, send_reply only
         self.alert_runner = None
         self._profile = None
 
