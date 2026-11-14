@@ -21,4 +21,4 @@ WORKDIR /app/backend
 EXPOSE 8000
 
 # Gemini turns can take a while, so allow long requests.
-CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn conf.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout 120 --access-logfile -"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn conf.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout 240 --access-logfile -"]
