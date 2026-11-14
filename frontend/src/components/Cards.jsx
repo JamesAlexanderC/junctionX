@@ -64,8 +64,9 @@ const sliderStart = (pct) => {
   return Math.round(p / 5) * 5
 }
 
-export function SliderCard({ card }) {
+export function SliderCard({ card, onSend }) {
   const [p, setP] = useState(() => sliderStart(card.pct))
+  const [sent, setSent] = useState(null)
   const saving = cutSaving(card.monthly_spend, p / 100)
   const goal =
     card.goal &&
@@ -106,6 +107,24 @@ export function SliderCard({ card }) {
             : `Goal date: ${longDate(goal.afterDate)}` +
               (goal.monthsSooner > 0 ? ` (${goal.monthsSooner} months sooner)` : '')}
         </p>
+      )}
+      {onSend && (
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={p <= 0 || sent === p}
+          onClick={() => {
+            setSent(p)
+            onSend(
+              `Save cutting ${card.category} by ${p}% as my plan ` +
+                `(${eur(saving.monthly)} a month)`,
+              4,
+            )
+          }}
+        >
+          <Icon name="check" size={16} />
+          {sent === p ? 'Sent to the coach' : `Cut ${card.category} by ${p}%`}
+        </button>
       )}
     </div>
   )
@@ -161,6 +180,22 @@ function LevelProgressCard({ card }) {
         {card.euros_to_go != null && `${eur(card.euros_to_go)} to go`}
         {card.next_step && ` · ${card.next_step}`}
       </small>
+      {card.requirement?.text && (
+        <div className="level-req">
+          <p>{card.requirement.text}</p>
+          {card.requirement.checks?.length > 0 && (
+            <ul aria-label="What this level needs">
+              {card.requirement.checks.map((c) => (
+                <li key={c.text} className={c.met ? 'met' : 'todo'}>
+                  <Icon name={c.met ? 'check' : 'behind'} size={14} />
+                  {c.text}
+                  <span className="sr-only">{c.met ? ' (done)' : ' (to do)'}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -202,6 +237,13 @@ function AlertCard({ card, onSend }) {
 
 export function PlanCard({ card, onSend }) {
   const steps = card.steps ?? []
+  // One tap only: the backend also refuses to save the same plan twice.
+  const [accepted, setAccepted] = useState(false)
+  const accept = () => {
+    if (accepted) return
+    setAccepted(true)
+    onSend('Accept plan', 4)
+  }
   return (
     <div className="card">
       <ol>
@@ -215,9 +257,14 @@ export function PlanCard({ card, onSend }) {
           )
         })}
       </ol>
-      <button type="button" className="btn-primary" onClick={() => onSend('Accept plan', 4)}>
+      <button
+        type="button"
+        className="btn-primary"
+        disabled={accepted}
+        onClick={accept}
+      >
         <Icon name="check" size={16} />
-        Accept plan
+        {accepted ? 'Plan accepted' : 'Accept plan'}
       </button>
     </div>
   )

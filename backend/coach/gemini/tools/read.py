@@ -1,8 +1,7 @@
 """Read-only tools: numbers from the profile and the transactions."""
 
+import math
 import re
-
-from inferences.models import months_to_goal
 
 from ...models import Transaction
 from ... import services
@@ -99,10 +98,9 @@ def level_card(levels):
         "name": levels.get("next_name") or levels.get("current_name"),
         "progress": levels.get("progress", 1.0),
         "euros_to_go": levels.get("euros_to_go"),
-        # No euro step (levels 1 and 4, or no small cut): say what is missing.
-        "next_step": step.get("text")
-        or ". ".join(levels.get("next_missing") or [])
-        or None,
+        "next_step": step.get("text"),
+        # What the next level needs, with the customer's own numbers.
+        "requirement": levels.get("next_requirement") if nxt else None,
         "ladder": [
             {"level": r["level"], "name": r["name"], "reached": r["level"] <= current}
             for r in levels.get("ladder") or []
@@ -155,8 +153,9 @@ def simulate_cut(ctx, category, pct, goal_id=None):
         out["goal"] = {"found": False}
     elif goal is not None:
         rate = float(ctx.profile.get("baskets", {}).get("monthly_saving") or 0)
-        before = months_to_goal(goal["target"], goal["saved"], rate)
-        after = months_to_goal(goal["target"], goal["saved"], rate + monthly)
+        remaining = float(goal["target"]) - float(goal["saved"])
+        before = math.ceil(remaining / rate) if rate > 0 else None
+        after = math.ceil(remaining / (rate + monthly)) if rate + monthly > 0 else None
         out["goal"] = {
             "id": goal["id"],
             "name": goal["name"],

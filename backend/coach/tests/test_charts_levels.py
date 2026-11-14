@@ -117,6 +117,9 @@ def test_get_level_includes_a_ready_level_card(aino):
     assert card["name"] == out["next_name"]
     assert card["euros_to_go"] == out["euros_to_go"]
     assert [r["level"] for r in card["ladder"]] == [1, 2, 3, 4, 5, 6]
+    # The card says what the next level needs, as the levels profile does.
+    assert card["requirement"] == out["next_requirement"]
+    assert card["requirement"]["checks"]
 
 
 @pytest.mark.parametrize(
@@ -156,20 +159,3 @@ def test_chat_answers_saving_with_the_level_card(client, aino, fake_gemini):
     )
     body = _chat(client, "How can I save more?").json()
     assert body["cards"] == [card]
-
-
-def test_level_card_explains_a_level_without_a_euro_gap():
-    from coach.gemini.tools.read import level_card
-
-    levels = {
-        "current": 0,
-        "current_name": "Not started",
-        "next": 1,
-        "next_name": "Getting started",
-        "progress": 0.0,
-        "euros_to_go": None,
-        "easiest_next_step": None,
-        "next_missing": ["No regular payday found yet"],
-        "ladder": [],
-    }
-    assert level_card(levels)["next_step"] == "No regular payday found yet"

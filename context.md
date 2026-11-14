@@ -233,7 +233,7 @@ How it's calculated
 28
 Level 1: Getting started
 #1, #4
-Reached when payday and at least one regular bill are detected. On a partial view (income.partial_view: most money lives at another bank) the bills are not visible, so a payday alone counts. Every unreached level lists what is missing in words (`missing`, `next_missing`).
+Reached when payday and at least one regular bill are detected. On a partial view (income.partial_view: most money lives at another bank) the bills are not visible, so a payday alone counts.
 29
 Level 2: In control
 monthly flows

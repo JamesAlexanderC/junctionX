@@ -153,18 +153,12 @@ def test_end_of_month_hidden_on_the_last_day():
     assert "end_of_month" not in {i["key"] for i in insights.insights(p)}
 
 
-def test_level_insight_says_what_is_missing_without_a_euro_step():
-    p = sample()
-    p["levels"] = {
-        **p["levels"],
-        "current": 0,
-        "current_name": "Not started",
-        "next": 1,
-        "next_name": "Getting started",
-        "progress": 0.0,
-        "euros_to_go": None,
-        "easiest_next_step": None,
-        "next_missing": ["No regular payday found yet"],
+def test_level_insight_says_what_is_still_to_do():
+    p = copy.deepcopy(sample())
+    p["levels"]["next_requirement"] = {
+        "text": "Have an active goal that is on track.",
+        "checks": [{"text": "No active goal yet", "met": False}],
     }
-    (item,) = insights.level(p)
-    assert item["text"].endswith("Missing: No regular payday found yet.")
+    item = next(i for i in insights.insights(p) if i["key"] == "level")
+    assert "To get there: Have an active goal that is on track." in item["text"]
+    assert "Still to do: No active goal yet." in item["text"]

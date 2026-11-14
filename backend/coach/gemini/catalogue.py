@@ -255,6 +255,12 @@ _ENTRIES = [
         "Smallest cut that reaches the next level.",
         gate="levels.easiest_next_step",
     ),
+    Entry(
+        "levels.next_requirement",
+        "What the next level needs (text) and each part of it with the "
+        "customer's own numbers and whether it is met (checks).",
+        gate="levels",
+    ),
     # --- goals (#44 to #74) ---
     Entry(
         "goals.active",

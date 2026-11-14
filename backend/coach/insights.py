@@ -335,11 +335,15 @@ def level(p):
         if _num(lv.get("euros_to_go")) and lv["euros_to_go"] > 0:
             text += f", {_eur(lv['euros_to_go'])} to go"
         text += "."
+        req = lv.get("next_requirement") or {}
+        if req.get("text"):
+            text += f" To get there: {req['text']}"
+            missing = [c["text"] for c in req.get("checks") or [] if not c["met"]]
+            if missing:
+                text += " Still to do: " + "; ".join(missing) + "."
     step = lv.get("easiest_next_step") or {}
     if _available(p, "levels.easiest_next_step") and step.get("text"):
         text += f" Easiest next step: {step['text']}."
-    elif lv.get("next_missing"):
-        text += f" Missing: {'. '.join(lv['next_missing'])}."
     return [_item("level", 30, "Level", lv["current"], None, text, "levels")]
 
 

@@ -105,6 +105,57 @@ describe('cards', () => {
     )
     expect(screen.getByText(/clears 3 alerts/)).toBeTruthy()
   })
+
+  it('a plan can be accepted only once', () => {
+    const onSend = vi.fn()
+    render(
+      <ReplyCard
+        card={{
+          type: 'plan',
+          steps: [{ text: 'Cut takeaway 20%', monthly_impact: 18, clears: [] }],
+        }}
+        onSend={onSend}
+      />,
+    )
+    const button = screen.getByRole('button', { name: /Accept plan/ })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    expect(onSend).toHaveBeenCalledTimes(1)
+    expect(onSend).toHaveBeenCalledWith('Accept plan', 4)
+    const done = screen.getByRole('button', { name: /Plan accepted/ })
+    expect(done.disabled).toBe(true)
+  })
+
+  it('slider has a button that sends the chosen cut to the coach', () => {
+    const onSend = vi.fn()
+    render(
+      <ReplyCard
+        card={{ type: 'slider', category: 'takeaway', monthly_spend: 90, pct: 20 }}
+        onSend={onSend}
+      />,
+    )
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '25' } })
+    fireEvent.click(screen.getByRole('button', { name: /Cut takeaway by 25%/ }))
+    expect(onSend).toHaveBeenCalledWith(
+      'Save cutting takeaway by 25% as my plan (€22.50 a month)',
+      4,
+    )
+    expect(screen.getByRole('button', { name: /Sent to the coach/ }).disabled).toBe(true)
+    // Moving the slider again allows sending the new amount.
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '30' } })
+    expect(screen.getByRole('button', { name: /Cut takeaway by 30%/ }).disabled).toBe(false)
+  })
+
+  it('slider button is off at 0%', () => {
+    render(
+      <ReplyCard
+        card={{ type: 'slider', category: 'takeaway', monthly_spend: 90, pct: 0 }}
+        onSend={() => {}}
+      />,
+    )
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '0' } })
+    expect(screen.getByRole('button', { name: /Cut takeaway by 0%/ }).disabled).toBe(true)
+  })
 })
 
 describe('chat', () => {
@@ -641,6 +692,27 @@ describe('level card', () => {
     expect(container.querySelectorAll('.ladder li.reached')).toHaveLength(2)
     expect(screen.getByLabelText('Level 3 Safety net, next')).toBeTruthy()
     expect(screen.getByText(/€445 to go/)).toBeTruthy()
+  })
+
+  it('says what the next level needs and what is done', () => {
+    const card = {
+      type: 'level_progress',
+      level: 6,
+      name: 'Wealth builder',
+      progress: 0.4,
+      requirement: {
+        text: 'Keep 3 months of essentials as a buffer and save 10% of income.',
+        checks: [
+          { text: 'Buffer: 1.2 of 3 months', met: false },
+          { text: 'Saved 10% of income in 3 of the last 3 months', met: true },
+        ],
+      },
+    }
+    render(<ReplyCard card={card} onSend={() => {}} />)
+    expect(screen.getByText(/Keep 3 months of essentials/)).toBeTruthy()
+    const list = screen.getByRole('list', { name: 'What this level needs' })
+    expect(list.querySelector('li.todo').textContent).toContain('Buffer: 1.2 of 3 months')
+    expect(list.querySelector('li.met').textContent).toContain('(done)')
   })
 })
 
