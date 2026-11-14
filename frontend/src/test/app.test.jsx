@@ -389,3 +389,68 @@ describe('chat suggestions', () => {
     expect(screen.queryByRole('list', { name: 'Suggested questions' })).toBeNull()
   })
 })
+
+describe('help page', () => {
+  const api = () =>
+    vi.fn(async (url) => {
+      if (url.startsWith('/api/chat/')) {
+        return new Response(
+          JSON.stringify({ text: 'EUR 64', depth: 1, cards: [], chips: [] }),
+        )
+      }
+      return new Response('[]')
+    })
+
+  it('the picker page has no Help button', () => {
+    vi.stubGlobal('fetch', api())
+    render(<App />)
+    expect(screen.queryByRole('button', { name: 'Help' })).toBeNull()
+  })
+
+  it('Help sits left of the exit button in the customer view', async () => {
+    vi.stubGlobal('fetch', api())
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    const help = await screen.findByRole('button', { name: 'Help' })
+    const exit = screen.getByRole('button', { name: 'Exit to demo' })
+    expect(help.nextElementSibling).toBe(exit)
+    fireEvent.click(help)
+    expect(await screen.findByRole('heading', { name: 'Charts' })).toBeTruthy()
+    expect(window.location.hash).toBe('#/c/CUST00001/help')
+  })
+
+  it('Back returns to the same customer with the chat kept', async () => {
+    vi.stubGlobal('fetch', api())
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    fireEvent.change(await screen.findByLabelText('Message'), {
+      target: { value: 'Safe to spend?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByText('EUR 64')
+    fireEvent.click(screen.getByRole('button', { name: 'Help' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(window.location.hash).toBe('#/c/CUST00001'))
+    expect(screen.getByText('EUR 64')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Charts' })).toBeNull()
+  })
+
+  it('a Try asking question closes help and asks the coach', async () => {
+    const fetch = api()
+    vi.stubGlobal('fetch', fetch)
+    window.location.hash = '#/c/CUST00001/help'
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /How can I save more/ }))
+    await screen.findByText('EUR 64')
+    expect(window.location.hash).toBe('#/c/CUST00001')
+    const [, init] = fetch.mock.calls.find(([url]) => url.startsWith('/api/chat/'))
+    expect(JSON.parse(init.body)).toMatchObject({ message: 'How can I save more?', depth: 3 })
+  })
+
+  it('the help page needs a login like every other page', () => {
+    localStorage.clear()
+    window.location.hash = '#/c/CUST00001/help'
+    render(<App />)
+    expect(screen.getByLabelText('Username')).toBeTruthy()
+  })
+})

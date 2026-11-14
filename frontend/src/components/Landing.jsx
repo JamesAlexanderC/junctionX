@@ -15,9 +15,11 @@ export default function Landing({ onEnter }) {
             S
           </span>
           <h1>Saldo</h1>
-          <button type="button" className="logout" onClick={logout}>
-            Log out
-          </button>
+          <div className="topbar-actions">
+            <button type="button" className="logout" onClick={logout}>
+              Log out
+            </button>
+          </div>
         </div>
       </header>
 
