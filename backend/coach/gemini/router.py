@@ -27,9 +27,12 @@ ROUTER_PROMPT = (
 
 
 # Saving or progress questions get the user's level in the answer (#28-#33).
+# Only questions about getting better or the level itself; plain "save" in a
+# fact, goal or bonus question is not one (live tests: the level card was
+# attached to unrelated answers).
 LEVELS_RE = re.compile(
-    r"\b(sav(e|es|ed|ing)|spend less|level|next step|doing well|improve|"
-    r"säästä\w*|taso\w*)\b",
+    r"\b(how (can|do|could) i save|save more|saving more|spend less|levels?|"
+    r"next step|doing well|how am i doing|improve|miten säästä\w*|taso\w*)\b",
     re.I,
 )
 

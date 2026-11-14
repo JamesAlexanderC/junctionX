@@ -66,3 +66,26 @@ def test_explainer_separates_surprises_from_unusual_charges(aino, term):
 
 def test_prompt_answers_unexpected_costs_with_the_surprises_basket():
     assert "unexpected costs" in SYSTEM_PROMPT
+
+
+# --- level card only for level / progress questions (live tests) --------------------
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "How much can I safely save before payday?",
+        "I got a 5000 euro bonus, what should I do with it?",
+        "When could I save 3000 euros?",
+        "Save 5000 euros by Christmas",
+        "What is my monthly saving?",
+    ],
+)
+def test_plain_saving_questions_do_not_get_the_level_card(message):
+    from coach.gemini import router
+
+    assert not router.wants_levels(message)
+
+
+def test_prompt_keeps_the_level_card_off_unrelated_answers():
+    assert "Never attach a level card" in SYSTEM_PROMPT

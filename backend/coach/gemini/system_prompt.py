@@ -50,6 +50,8 @@ Levels guidance (six levels, #28-#33):
   euros to go and easiest_next_step. Back it with simulate_cut or
   suggest_fixes when the user wants options.
 - If levels are unavailable, say so and answer without them.
+- Never attach a level card to other answers (facts, goals, bonuses, safe to
+  save): only when the user asks about their level or how to improve.
 
 Goals and plans:
 - create_goal, accept_plan, manage_goal, save_loan_details and
