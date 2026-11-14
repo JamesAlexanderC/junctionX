@@ -15,7 +15,7 @@ def data_path(name, data_dir=None):
     path = (data_dir or settings.DATA_DIR) / name
     if not path.exists():
         raise CommandError(
-            f"{path} not found. Put the S-Bank CSVs in data/ (see context.md)."
+            f"{path} not found. Put the S-Bank CSVs in DATA_DIR (see README.md)."
         )
     head = path.read_bytes()[:200] if path.stat().st_size < 1024 else None
     if head is None:
@@ -67,14 +67,35 @@ def iter_transactions(data_dir=None, customers=None, chunksize=CHUNK_ROWS):
         yield clean(chunk)
 
 
+SAS_FORMAT = "%d%b%y:%H:%M:%S"  # e.g. 03OCT24:09:04:04 (docs/vocabulary.md)
+
+
+def parse_timestamp(values):
+    """Parse the CSVs' SAS datetimes into naive local timestamps.
+
+    Falls back to ISO parsing for any value that is not SAS formatted, so
+    hand-made test CSVs keep working. Unparseable values become NaT.
+    """
+    import pandas as pd
+
+    if values is None:
+        return pd.Series(dtype="datetime64[ns]")
+    raw = pd.Series(values).astype("string").str.strip()
+    ts = pd.to_datetime(raw, format=SAS_FORMAT, errors="coerce")
+    missing = ts.isna() & raw.notna()
+    if missing.any():
+        iso = pd.to_datetime(raw[missing], errors="coerce", utc=True)
+        ts.loc[missing] = iso.dt.tz_localize(None)
+    return ts
+
+
 def clean(df):
     import pandas as pd
 
     df = df.copy()
     df["tx_id"] = df["customer_id"].astype(str) + "-" + df["tx_id"].astype(str)
     df["tx_date"] = pd.to_datetime(df["tx_date"], errors="coerce")
-    ts = pd.to_datetime(df.get("tx_timestamp"), errors="coerce", utc=True)
-    df["tx_timestamp"] = ts.fillna(df["tx_date"].dt.tz_localize("UTC"))
+    df["tx_timestamp"] = parse_timestamp(df.get("tx_timestamp")).fillna(df["tx_date"])
     for col in ("tx_amount_eur", "balance_after_eur"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["mcc_code"] = (

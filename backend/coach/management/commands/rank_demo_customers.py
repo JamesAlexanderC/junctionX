@@ -1,7 +1,8 @@
 """P1.2: rank customers for demo stories and suggest 5.
 
 Stories: payday splurger (#14), secret saver (#75), nearly mortgage-ready
-(#30 buffer 1-3 months, applied for a mortgage), multi-account (#41-#43).
+(#30 buffer 1-3 months, applied for a mortgage). There is no multi-account
+story: every customer in the S-Bank data has one account (docs/vocabulary.md).
 The scan is chunked and keeps only per-customer daily totals.
 """
 
@@ -12,13 +13,11 @@ from django.core.management.base import BaseCommand
 from coach.management import csvdata
 
 
-def _own_types():
-    try:
-        from inferences.thresholds import OWN_TRANSFER_TYPES
+def _types():
+    from inferences.thresholds import OWN_TRANSFER_TYPES, SAVER_TYPES
 
-        return {t.lower() for t in OWN_TRANSFER_TYPES}
-    except ImportError:
-        return {"own_transfer", "savings_transfer"}
+    own = {t.lower() for t in OWN_TRANSFER_TYPES}
+    return own, {t.lower() for t in SAVER_TYPES}
 
 
 class Command(BaseCommand):
@@ -32,15 +31,16 @@ class Command(BaseCommand):
         import pandas as pd
 
         data_dir = Path(opts["data_dir"]) if opts["data_dir"] else None
-        own = _own_types()
-        daily_parts, accounts = [], {}
+        own, saver = _types()
+        daily_parts = []
         for chunk in csvdata.iter_transactions(data_dir):
             amt = chunk["tx_amount_eur"]
-            is_own = chunk["transaction_type"].str.lower().isin(own)
+            kind = chunk["transaction_type"].str.lower()
+            is_own = kind.isin(own)
             chunk = chunk.assign(
                 inflow=amt.where((amt > 0) & ~is_own, 0.0),
                 spend=(-amt).where((amt < 0) & ~is_own, 0.0),
-                saved=(-amt).where((amt < 0) & is_own, 0.0),
+                saved=(-amt).where((amt < 0) & kind.isin(saver), 0.0),
                 day=chunk["tx_date"].dt.normalize(),
             )
             daily_parts.append(
@@ -51,8 +51,6 @@ class Command(BaseCommand):
                     balance=("balance_after_eur", "last"),
                 )
             )
-            for cid, acc in chunk[["customer_id", "bank_account_id"]].values:
-                accounts.setdefault(cid, set()).add(acc)
         daily = (
             pd.concat(daily_parts)
             .groupby(level=[0, 1])
@@ -67,14 +65,13 @@ class Command(BaseCommand):
         rows = []
         for cid, d in daily.groupby(level=0):
             d = d.droplevel(0)
-            rows.append(self._score(cid, d, accounts.get(cid, set()), applicants))
+            rows.append(self._score(cid, d, applicants))
         scores = pd.DataFrame(rows).set_index("customer_id")
         picks = []
         for story, col, asc in (
             ("payday splurger", "payday_ratio", False),
             ("secret saver", "saver_share", False),
             ("nearly mortgage-ready", "mortgage_score", False),
-            ("multi-account", "accounts", False),
         ):
             top = scores.sort_values(col, ascending=asc).head(10)
             self.stdout.write(f"\n== {story} ({col}) ==")
@@ -88,13 +85,13 @@ class Command(BaseCommand):
                 break
             if cid not in [p[0] for p in picks]:
                 picks.append((cid, "extra"))
-        self.stdout.write("\nSuggested DEMO_CUSTOMERS:")
+        self.stdout.write("\nSuggested demo customers:")
         for cid, story in picks:
             self.stdout.write(f"  {cid}  ({story})")
         self.stdout.write("DEMO_CUSTOMERS=" + ",".join(p[0] for p in picks))
 
     @staticmethod
-    def _score(cid, d, accs, applicants):
+    def _score(cid, d, applicants):
         months = d.groupby(d.index.to_period("M"))
         income = months["inflow"].sum()
         spend_m = months["spend"].sum()
@@ -120,5 +117,4 @@ class Command(BaseCommand):
             "saver_share": saver,
             "buffer_months": buffer,
             "mortgage_score": mortgage + min(saver, 0.3),
-            "accounts": len(accs),
         }
