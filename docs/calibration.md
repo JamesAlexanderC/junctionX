@@ -108,3 +108,12 @@ passed).
   0.88, p90 1.24). Re-check on the chosen demo customers before the demo.
 - Re-run with the fitted mortgage model and peer table from the data owner's
   build step to calibrate #35 to #37.
+- **#1 payday CV window (scan of all 5,100 customers, as of 2026-09-30).**
+  Payday is found for 5,009 (98.2%). Of the 91 without one, 77 fail the
+  amount check (CV >= 0.15, measured over all salary history) and 14 have no
+  income source in 3 of the last 4 months. Measuring the CV over the 4-month
+  window only would find 33 more and lose 16 (net +17, 0.3%), and never
+  picks a different income source. Example: CUST05085 is paid every month
+  (Jun to Sep: 903, 821, 1,048, 922, window CV ~0.09) but has a two-year CV
+  of 0.22, so safe-to-spend and the forecast are unavailable. The missing
+  payday reason now says which check failed (`income.payday.reason`).
