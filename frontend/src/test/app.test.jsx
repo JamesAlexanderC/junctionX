@@ -418,6 +418,75 @@ describe('waiting for a reply (F2)', () => {
     render(<Chat messages={[]} busy={false} onSend={() => {}} />)
     expect(screen.queryByRole('status')).toBeNull()
   })
+
+  it('shows the step the coach is on and its thought heading', () => {
+    render(
+      <Chat
+        messages={[]}
+        busy
+        progress={{ step: 'Checking your goals', thought: 'Planning the answer' }}
+        onSend={() => {}}
+      />,
+    )
+    const status = screen.getByRole('status')
+    expect(status.textContent).toBe('Checking your goals…Planning the answer')
+  })
+
+  // A chat response whose NDJSON lines the test pushes one at a time.
+  function streamingApi() {
+    let ctrl
+    const body = new ReadableStream({ start: (c) => (ctrl = c) })
+    const enc = new TextEncoder()
+    const push = (...events) =>
+      ctrl.enqueue(enc.encode(events.map((e) => JSON.stringify(e) + '\n').join('')))
+    const fetch = vi.fn(async (url) =>
+      url.startsWith('/api/chat/')
+        ? new Response(body, { headers: { 'Content-Type': 'application/x-ndjson' } })
+        : new Response('[]'),
+    )
+    return { fetch, push, close: () => ctrl.close() }
+  }
+
+  async function ask() {
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    fireEvent.change(await screen.findByLabelText('Message'), {
+      target: { value: 'Safe to spend?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+  }
+
+  it('streams what the coach is doing, then shows the reply', async () => {
+    const api = streamingApi()
+    vi.stubGlobal('fetch', api.fetch)
+    await ask()
+    api.push(
+      { type: 'step', text: 'Working out what is safe to spend' },
+      { type: 'thought', text: 'Weighing upcoming bills' },
+    )
+    expect(await screen.findByText('Working out what is safe to spend…')).toBeTruthy()
+    expect(screen.getByText('Weighing upcoming bills')).toBeTruthy()
+    api.push({
+      type: 'reply',
+      reply: { text: 'EUR 64', depth: 1, cards: [], chips: [] },
+    })
+    api.close()
+    expect(await screen.findByText('EUR 64')).toBeTruthy()
+    expect(screen.queryByRole('status')).toBeNull()
+    const [url] = api.fetch.mock.calls.find(([u]) => u.startsWith('/api/chat/'))
+    expect(url).toBe('/api/chat/?stream=1')
+  })
+
+  it('an error event in the stream is shown as the reply', async () => {
+    const api = streamingApi()
+    vi.stubGlobal('fetch', api.fetch)
+    await ask()
+    api.push({ type: 'error', error: 'The coach stopped unexpectedly.' })
+    api.close()
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toContain('stopped unexpectedly'),
+    )
+  })
 })
 
 describe('demo landing page', () => {

@@ -13,7 +13,7 @@ from google.genai import types
 
 from .. import services
 from ..models import ChatTurn, DemoCache
-from . import router
+from . import progress, router
 from .system_prompt import FALLBACK_REPLY, SYSTEM_PROMPT
 from .tools import ToolContext, call_tool, tool_declarations
 from .tools.inference import list_inferences
@@ -49,7 +49,21 @@ def build_config():
             function_calling_config=types.FunctionCallingConfig(mode="ANY")
         ),
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        thinking_config=_thinking_config(),
     )
+
+
+def _thinking_config():
+    """Flash thinks by default, which more than doubled reply time (11 s ->
+    5.6 s for "safe to spend" at "low"); empty level = model default.
+    include_thoughts adds thought summaries the chat shows while it waits
+    (progress.py); they cost no extra rounds."""
+    opts = {}
+    if settings.GEMINI_THINKING_LEVEL:
+        opts["thinking_level"] = settings.GEMINI_THINKING_LEVEL
+    if settings.GEMINI_SHOW_THOUGHTS:
+        opts["include_thoughts"] = True
+    return types.ThinkingConfig(**opts) if opts else None
 
 
 def normalise_question(text):
@@ -171,6 +185,26 @@ def chat(
     customer_id, message, history=None, depth=None, client=None, alert_runner=None
 ):
     """Answer one user message. Returns (reply, meta)."""
+    for event in chat_stream(
+        customer_id,
+        message,
+        history=history,
+        depth=depth,
+        client=client,
+        alert_runner=alert_runner,
+    ):
+        if event["type"] == "done":
+            return event["reply"], event["meta"]
+    raise RuntimeError("chat_stream ended without a reply")
+
+
+def chat_stream(
+    customer_id, message, history=None, depth=None, client=None, alert_runner=None
+):
+    """Answer one user message, yielding progress as it goes: {"type":
+    "step"|"thought", "text"} events (progress.py), then one {"type": "done",
+    "reply", "meta"}. LookupError and GeminiNotConfigured are raised before
+    the first event, so a caller can still answer 404 / 503."""
     started = time.monotonic()
     profile = services.get_profile(customer_id)
     if profile is None:
@@ -184,7 +218,8 @@ def chat(
             ChatTurn.objects.create(
                 customer_id=customer_id, message=message, reply=cached.reply
             )
-            return cached.reply, {"cached": True, "tools": []}
+            yield {"type": "done", "reply": cached.reply, "meta": {"cached": True}}
+            return
 
     client = client if client is not None else get_client()
     previous = (
@@ -208,6 +243,7 @@ def chat(
 
     routed = depth is None
     if routed:
+        yield {"type": "step", "text": progress.ROUTER_STEP}
         with _timed(ctx, "router"):
             depth = router.route(
                 message, client=client, model=settings.GEMINI_ROUTER_MODEL
@@ -224,7 +260,7 @@ def chat(
         )
     )
     try:
-        reply, rounds, reason, detail = _run(client, contents, ctx)
+        reply, rounds, reason, detail = yield from _run(client, contents, ctx)
     except genai_errors.APIError as exc:
         log.exception("Gemini call failed for %s", customer_id)
         reply, rounds, reason, detail = None, 0, "gemini_error", str(exc)
@@ -254,7 +290,7 @@ def chat(
         "timings": ctx.timings,
     }
     log.info("chat %s", meta)
-    return reply, meta
+    yield {"type": "done", "reply": reply, "meta": meta}
 
 
 def _explain_fallback(ctx, reply, reason, detail, rounds):
@@ -280,8 +316,8 @@ def _explain_fallback(ctx, reply, reason, detail, rounds):
 
 def _run(client, contents, ctx):
     """The tool loop: at most MAX_ROUNDS rounds, one retry on a bad reply.
-
-    Returns (reply, rounds, fallback reason or None, detail).
+    A generator: yields progress events, returns (reply, rounds, fallback
+    reason or None, detail).
     """
     config = build_config()
     retried = False
@@ -292,9 +328,14 @@ def _run(client, contents, ctx):
                 model=settings.GEMINI_MODEL, contents=contents, config=config
             )
         contents.append(resp.candidates[0].content)
+        yield from progress.thoughts(resp)
         parts = []
         for call in resp.function_calls or []:
             args = dict(call.args or {})
+            if call.name == "send_reply" and retried:
+                yield {"type": "step", "text": progress.RETRY_STEP}
+            else:
+                yield progress.step(call.name)
             if call.name == "send_reply":
                 try:
                     with _timed(ctx, "validate"):

@@ -222,4 +222,9 @@ AS_OF_DATE = os.environ.get("AS_OF_DATE", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_ROUTER_MODEL = os.environ.get("GEMINI_ROUTER_MODEL", "gemini-3.5-flash-lite")
+# "low" or "high"; empty = the model's default (dynamic thinking, slower).
+GEMINI_THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "low")
+# Ask Gemini for thought summaries; the chat shows their headings while it
+# waits (coach/gemini/progress.py). "0" turns them off.
+GEMINI_SHOW_THOUGHTS = os.environ.get("GEMINI_SHOW_THOUGHTS", "1") == "1"
 DEMO_MODE = os.environ.get("DEMO_MODE", "0") == "1"
