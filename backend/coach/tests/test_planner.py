@@ -4,7 +4,7 @@ import copy
 import json
 
 import pytest
-from django.conf import settings
+from pathlib import Path
 
 from coach import planner
 
@@ -12,7 +12,7 @@ TODAY_STR = "2026-10-18"
 
 
 def base_profile():
-    path = settings.SHARED_FIXTURES_DIR / "profile_demo.json"
+    path = Path(__file__).parent / "fixtures" / "profile_demo.json"
     p = json.loads(path.read_text())
     p["goals"]["active"] = []  # keep goal actions out of the scripted test
     p["alerts"] = [

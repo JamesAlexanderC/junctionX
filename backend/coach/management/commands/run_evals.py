@@ -36,7 +36,7 @@ class Command(BaseCommand):
     help = "Run the Gemini eval set 3x per question and report the pass rate."
 
     def add_arguments(self, parser):
-        parser.add_argument("--customer", default="demo-aino")
+        parser.add_argument("--customer", required=True, help="A loaded customer id")
         parser.add_argument("--runs", type=int, default=3)
 
     def handle(self, *args, **opts):

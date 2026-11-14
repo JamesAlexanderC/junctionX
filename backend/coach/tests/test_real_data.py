@@ -1,6 +1,5 @@
 """SAS timestamps (P1.2), the reference date and verify_handoff."""
 
-import json
 from datetime import date
 
 import pandas as pd
@@ -15,11 +14,13 @@ from coach.models import Account, Customer, Transaction
 
 def test_parses_sas_timestamp():
     out = csvdata.parse_timestamps(pd.Series(["03OCT24:09:04:04"]))
-    assert out.iloc[0] == pd.Timestamp("2024-10-03 09:04:04", tz="UTC")
+    # Naive timestamps, the same convention as services.transactions_df.
+    assert out.iloc[0] == pd.Timestamp("2024-10-03 09:04:04")
 
 
 def test_raises_when_over_one_percent_fail():
-    bad = pd.Series(["03OCT24:09:04:04"] * 98 + ["nonsense", "2024-10-03"])
+    # ISO values still parse (test CSVs); only unparseable ones count.
+    bad = pd.Series(["03OCT24:09:04:04"] * 98 + ["nonsense", "garbage"])
     with pytest.raises(CommandError, match="tx_timestamp"):
         csvdata.parse_timestamps(bad)
 
@@ -30,8 +31,9 @@ def test_tolerates_one_percent_failures():
 
 
 @pytest.mark.django_db
-def test_reference_date_is_latest_transaction(monkeypatch):
-    monkeypatch.setattr(services, "today", services._reference_date_or_now)
+def test_reference_date_is_latest_transaction(settings):
+    settings.AS_OF_DATE = ""
+    services.reset_as_of_cache()
     cust = Customer.objects.create(customer_id="C1")
     acc = Account.objects.create(bank_account_id="A1", customer=cust)
     for i, day in enumerate((date(2026, 9, 1), date(2026, 9, 30))):
@@ -44,6 +46,7 @@ def test_reference_date_is_latest_transaction(monkeypatch):
             tx_amount_eur=-1.0,
         )
     assert services.today() == date(2026, 9, 30)
+    services.reset_as_of_cache()
 
 
 @pytest.mark.parametrize(
@@ -54,10 +57,9 @@ def test_reference_date_is_latest_transaction(monkeypatch):
         (0.62, "model", False),
     ],
 )
-def test_mortgage_check_enforces_auc_rule(tmp_path, monkeypatch, auc, mode, ok):
-    report = tmp_path / "mortgage_model.json"
-    report.write_text(json.dumps({"cv_auc": auc, "mode": mode, "features": ["a"]}))
-    monkeypatch.setattr(vh, "MODEL_REPORT", report)
+def test_mortgage_check_enforces_auc_rule(monkeypatch, auc, mode, ok):
+    report = {"cv_auc": auc, "mode": mode, "features": ["a"]}
+    monkeypatch.setattr(vh, "_model_report", lambda: report)
     assert vh.check_mortgage_model()[0] is ok
 
 

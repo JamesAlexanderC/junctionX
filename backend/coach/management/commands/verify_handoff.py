@@ -17,7 +17,6 @@ from coach.management import csvdata
 REPO = Path(settings.BASE_DIR).parent
 PROFILE_MD = REPO / "docs" / "data_profile.md"
 THRESHOLDS_PY = Path(settings.BASE_DIR) / "inferences" / "thresholds.py"
-MODEL_REPORT = REPO / "docs" / "mortgage_model.json"
 LFS_POINTER = b"version https://git-lfs"
 TX_COLUMNS = {
     "customer_id",
@@ -157,13 +156,35 @@ def check_loaded_and_served():
     return True, "rows match CSV, timestamps parsed, /api/home/ 200 for all"
 
 
+def _model_report():
+    """The fitted model's summary as stored by build_artifacts (#34).
+
+    Normalised to {cv_auc, mode, features}; None when no model is stored.
+    """
+    from coach.models import ComputedArtifact
+    from coach.services import MORTGAGE_MODEL_KEY
+
+    row = ComputedArtifact.objects.filter(key=MORTGAGE_MODEL_KEY).first()
+    if row is None:
+        return None
+    data = row.data or {}
+    method = data.get("method")
+    return {
+        "cv_auc": data.get("auc"),
+        "mode": "model" if method == "logistic_regression" else method,
+        "features": list((data.get("coef") or {}).keys()),
+    }
+
+
 def check_mortgage_model():
     """Step 6: model report with AUC, mode chosen by the 0.70 rule."""
-    if not MODEL_REPORT.exists():
-        return False, f"missing {MODEL_REPORT.name}: run fit_mortgage_model"
-    report = json.loads(MODEL_REPORT.read_text())
+    report = _model_report()
+    if report is None:
+        return False, "no mortgage model stored: run manage.py build_artifacts"
     auc, mode = report.get("cv_auc"), report.get("mode")
     features = report.get("features", [])
+    if mode == "percentile_fallback" and auc is None:
+        return True, "too few applicants for a model -> percentile_fallback"
     if auc is None or mode not in MODEL_MODES:
         return False, f"report needs cv_auc and mode in {sorted(MODEL_MODES)}"
     expected = "model" if auc >= AUC_TARGET else "percentile_fallback"

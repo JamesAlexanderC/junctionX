@@ -94,19 +94,8 @@ def _text(role, text):
     return types.Content(role=role, parts=[types.Part.from_text(text=text)])
 
 
-def offline_reply(profile):
-    """Canned send_reply used when no Gemini key is configured (P2.1)."""
-    safe = profile.get("forecast", {}).get("safe_to_spend_week")
-    if safe is None:
-        return copy.deepcopy(FALLBACK_REPLY)
-    return {
-        "text": f"You can safely spend EUR {safe:g} this week. (Offline demo reply.)",
-        "depth": 1,
-        "cards": [
-            {"type": "number", "label": "Safe to spend", "value": safe, "unit": "EUR"}
-        ],
-        "chips": ["Show me why", "What can I do?", "Make it a goal"],
-    }
+class GeminiNotConfigured(RuntimeError):
+    """No GEMINI_API_KEY: the API answers 503 instead of a made-up reply."""
 
 
 def chat(
@@ -140,9 +129,7 @@ def chat(
     ctx.alert_runner = alert_runner
 
     if client is None:
-        reply = offline_reply(profile)
-        ChatTurn.objects.create(customer_id=customer_id, message=message, reply=reply)
-        return reply, {"offline": True, "tools": []}
+        raise GeminiNotConfigured("Gemini is not configured: set GEMINI_API_KEY")
 
     routed = depth is None
     if routed:

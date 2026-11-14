@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -96,7 +97,10 @@ WSGI_APPLICATION = "conf.wsgi.application"
 
 # Credentials come from .env, the same file the docker-compose `db` service uses.
 
-if os.environ.get("USE_SQLITE") == "1":
+# Tests (pytest) default to SQLite so they need no Postgres; USE_SQLITE=0
+# forces Postgres, USE_SQLITE=1 forces SQLite anywhere.
+_RUNNING_PYTEST = "pytest" in sys.modules
+if os.environ.get("USE_SQLITE", "1" if _RUNNING_PYTEST else "0") == "1":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -188,12 +192,13 @@ SPECTACULAR_SETTINGS = {
 
 
 # Saldo app settings
-# Customer ids kept by `manage.py load_data` (see context.md, P1.2).
+# Customer ids suggested for the demo script (manage.py rank_demo_customers).
 DEMO_CUSTOMERS = [c for c in os.environ.get("DEMO_CUSTOMERS", "").split(",") if c]
 # Folder holding the four S-Bank CSVs. Relative paths resolve from the repo root.
 DATA_DIR = BASE_DIR.parent / os.environ.get("DATA_DIR", "data")
-PROFILES_DIR = BASE_DIR / "profiles"
-SHARED_FIXTURES_DIR = BASE_DIR.parent / "shared" / "fixtures"
+# "Today" for every inference (YYYY-MM-DD). Empty = the date of the last
+# loaded transaction (the S-Bank data ends 2026-09-30).
+AS_OF_DATE = os.environ.get("AS_OF_DATE", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_ROUTER_MODEL = os.environ.get("GEMINI_ROUTER_MODEL", "gemini-2.5-flash-lite")
