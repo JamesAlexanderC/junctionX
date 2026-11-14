@@ -121,6 +121,21 @@ def _history_contents(customer_id, history):
     return contents
 
 
+def _earlier_user_messages(customer_id, history):
+    """What the user said in the last HISTORY_TURNS turns (stored or sent)."""
+    stored = ChatTurn.objects.filter(customer_id=customer_id).order_by(
+        "-created_at", "-id"
+    )[:HISTORY_TURNS]
+    said = [t.message for t in stored]
+    if said:
+        return said
+    return [
+        item.get("text") or item.get("content") or ""
+        for item in (history or [])[-HISTORY_TURNS * 2 :]
+        if item.get("role") not in ("assistant", "model")
+    ]
+
+
 def _text(role, text):
     return types.Content(role=role, parts=[types.Part.from_text(text=text)])
 
@@ -158,6 +173,12 @@ def chat(
         customer_id, message, previous_pending=previous.pending if previous else {}
     )
     ctx.alert_runner = alert_runner
+    # F1: numbers the user gave earlier, or that sit in the stored proposal,
+    # may be repeated in the reply ("A 20,000 euro goal by 2028?").
+    ctx.user_numbers = [
+        ctx.previous_pending,
+        *_earlier_user_messages(customer_id, history),
+    ]
 
     if client is None:
         raise GeminiNotConfigured("Gemini is not configured: set GEMINI_API_KEY")
@@ -184,7 +205,9 @@ def chat(
     ChatTurn.objects.create(
         customer_id=customer_id, message=message, reply=reply, pending=ctx.pending
     )
-    if settings.DEMO_MODE and not reason:
+    # A turn that left a proposal waiting is never cached: a replay would not
+    # restore the proposal, so the user's "yes" could not confirm it (F1).
+    if settings.DEMO_MODE and not reason and not ctx.pending:
         DemoCache.objects.update_or_create(
             customer_id=customer_id, question=question, defaults={"reply": reply}
         )
@@ -243,7 +266,9 @@ def _run(client, contents, ctx):
             args = dict(call.args or {})
             if call.name == "send_reply":
                 try:
-                    reply = validate_reply(args, ctx.results, ctx.message)
+                    reply = validate_reply(
+                        args, ctx.results + ctx.user_numbers, ctx.message
+                    )
                     return reply, round_no, None, None
                 except ReplyError as exc:
                     log.warning("send_reply rejected: %s", exc)
