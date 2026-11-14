@@ -524,6 +524,133 @@ table.card thead th {
   text-align: right;
 }
 
+/* Chart card (Chart.jsx): single series in S-green, recessive grid */
+
+.chart-title {
+  font-size: 0.9rem;
+}
+
+.chart-readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 1.5em;
+  font-size: 0.85rem;
+}
+
+.chart-readout strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-svg {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  overflow: visible;
+  touch-action: pan-y;
+  border-radius: 4px;
+}
+
+.chart-svg:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 2px;
+}
+
+.chart-svg .grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.chart-svg .tick {
+  font-size: 11px;
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-svg .col {
+  fill: var(--brand-green);
+}
+
+.chart-svg .col.active {
+  fill: var(--brand);
+}
+
+.chart-svg .line {
+  fill: none;
+  stroke: var(--brand-green);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-svg .area {
+  fill: var(--brand-green);
+  opacity: 0.1;
+}
+
+.chart-svg .crosshair {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.chart-svg .dot {
+  fill: var(--brand-green);
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+
+.chart-svg .hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Level ladder (level_progress card) */
+
+.card .ladder {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ladder li {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+}
+
+.ladder li.reached {
+  color: var(--on-brand);
+  background: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.ladder li.target {
+  color: var(--brand);
+  border: 2px solid var(--brand-green);
+}
+
 /* Buttons */
 
 button {

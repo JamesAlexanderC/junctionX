@@ -25,6 +25,8 @@ class Chart:
     kind: str  # "bar" or "line", as in the chart card
     label_key: str | None = None
     value_key: str | None = None
+    title: str = ""  # chart card title (get_chart)
+    unit: str | None = None  # "EUR", "%" or None for plain numbers
 
 
 @dataclass(frozen=True)
@@ -62,7 +64,7 @@ _ENTRIES = [
         "income.monthly_income_series",
         "Income for each month.",
         gate="income.monthly_income",
-        chart=Chart("bar", "month", "value"),
+        chart=Chart("bar", "month", "value", "Income by month", "EUR"),
         keep="last",
     ),
     Entry(
@@ -105,13 +107,13 @@ _ENTRIES = [
         "baskets.totals",
         "This month's spending per basket in EUR.",
         gate="baskets",
-        chart=Chart("bar"),
+        chart=Chart("bar", title="Spending by basket this month", unit="EUR"),
     ),
     Entry(
         "baskets.shares",
         "This month's spending per basket as a percent of the total.",
         gate="baskets",
-        chart=Chart("bar"),
+        chart=Chart("bar", title="Share of spending by basket", unit="%"),
     ),
     Entry(
         "baskets.trend",
@@ -187,7 +189,7 @@ _ENTRIES = [
         "forecast.daily_path",
         "Expected balance (with low and high) for each day until payday.",
         gate="forecast.end_of_month",
-        chart=Chart("line", "date", "expected"),
+        chart=Chart("line", "date", "expected", "Expected balance until payday", "EUR"),
     ),
     Entry(
         "forecast.danger_days",
@@ -219,12 +221,15 @@ _ENTRIES = [
         "whatif.category_means",
         "Average monthly spend per category (base for cuts).",
         gate="whatif.category_cut",
-        chart=Chart("bar"),
+        chart=Chart("bar", title="Average monthly spend by category", unit="EUR"),
     ),
     Entry(
         "whatif.subscription_savings",
         "What dropping each subscription would save.",
         gate="whatif.subscription_savings",
+        chart=Chart(
+            "bar", "name", "yearly_saving", "Yearly saving per subscription", "EUR"
+        ),
     ),
     Entry(
         "whatif.habit_translation",

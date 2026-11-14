@@ -137,3 +137,19 @@ def test_unknown_fields_are_dropped_from_cards():
 def test_unknown_card_types_are_still_dropped_quietly():
     out = validate_reply(_reply({"type": "hologram", "value": 4242}), [])
     assert out["cards"] == []
+
+
+def test_chips_repeating_question_options_are_dropped():
+    card = {
+        "type": "question",
+        "question": "When would you like to achieve this goal?",
+        "options": ["July 2027", "October 2027", "December 2027"],
+    }
+    args = {
+        "text": "When?",
+        "depth": 4,
+        "cards": [card],
+        "chips": ["July 2027", "october 2027 ", "Different goal"],
+    }
+    reply = validate_reply(args, [], "")
+    assert reply["chips"] == ["Different goal"]
