@@ -53,7 +53,25 @@ def get_client():
     return genai.Client(api_key=settings.GEMINI_API_KEY)
 
 
-def build_config(final=False):
+# Speed #2: thinking by depth. Each Gemini call took 6.5-8 s, mostly the
+# model's thinking; a script test with thinking off halved the median
+# (~20 s -> 8.7 s). Facts and small talk need none, explanations a little;
+# what-ifs and plans keep the model's default.
+THINKING_OFF = types.ThinkingConfig(thinking_budget=0)
+THINKING_LOW = types.ThinkingConfig(thinking_level="low")
+
+
+def _thinking(ctx):
+    """(label, ThinkingConfig or None) for this turn's depth."""
+    depth = getattr(ctx, "depth", None) or 1
+    if ctx.conversational or depth <= 1:
+        return "off", THINKING_OFF
+    if depth == 2:
+        return "low", THINKING_LOW
+    return "default", None
+
+
+def build_config(final=False, thinking=None):
     """Gemini config; on the final round only send_reply may be called, so a
     turn always ends with an answer built from the tools already used (FC-3:
     Gemini kept looking for more data until the rounds ran out)."""
@@ -69,6 +87,7 @@ def build_config(final=False):
         tools=[types.Tool(function_declarations=declarations)],
         tool_config=types.ToolConfig(function_calling_config=calling),
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        thinking_config=thinking,
     )
 
 
@@ -264,6 +283,7 @@ def chat(
                 message, client=client, model=settings.GEMINI_ROUTER_MODEL
             )
 
+    ctx.depth = depth  # speed #2: thinking is set by depth (_thinking)
     contents = _history_contents(customer_id, history)
     contents.append(
         _text(
@@ -298,6 +318,7 @@ def chat(
         "depth": depth,
         "routed": routed,
         "conversational": ctx.conversational,
+        "thinking": _thinking(ctx)[0],
         "tools": ctx.tools_called,
         "rounds": rounds,
         "fallback": bool(reason),
@@ -336,7 +357,9 @@ def _run(client, contents, ctx):
 
     Returns (reply, rounds, fallback reason or None, detail).
     """
-    config, final_config = build_config(), build_config(final=True)
+    thinking = _thinking(ctx)[1]
+    config = build_config(thinking=thinking)
+    final_config = build_config(final=True, thinking=thinking)
     retried = False
     used = 0
     for round_no in range(1, MAX_ROUNDS + 1):
