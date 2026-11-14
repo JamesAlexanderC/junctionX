@@ -8,8 +8,7 @@ Saldo is an AI money coach for S-Bank's "Personal Economic Trainer" challenge
 ```
 backend/inferences/  pure pandas inferences #1-#102 (DataFrame in, dicts out)
 backend/coach/       Django app: models, API, Gemini loop, alert coach, commands
-frontend/            React + Vite phone-frame app (Home, Explore, Chat, Alerts)
-shared/fixtures/     profile_demo.json, the canonical profile shape
+frontend/            React + Vite chat client
 handoff/             work too far out of scope for the implementation branch
 docs/                data vocabulary, calibration notes, platform guides
 ```
@@ -40,34 +39,45 @@ dev --frontend-only
 Open http://localhost:5173. Vite proxies `/api` to Django. API docs are at
 http://localhost:8000/api/docs/.
 
-What you get today:
+Everything runs on the real S-Bank data; there is no demo or mock data.
+Without loaded data the API knows no customers, and without
+`GEMINI_API_KEY` the chat endpoint answers 503.
 
-- With no data loaded, the backend serves the demo customer `demo-aino` from
-  `shared/fixtures/profile_demo.json`.
-- With no `GEMINI_API_KEY`, chat returns canned offline replies built from
-  the profile. Set the key in `.env` for real Gemini answers.
-- If the API is down, the frontend falls back to the fixture and a local mock
-  coach, so the UI always works.
-
-### Real S-Bank data
+### Real S-Bank data (once)
 
 Put the four CSVs in the folder named by `DATA_DIR` in `.env` (default
 `data/dataset/Junction-2026-S-pankki`; `data/` is gitignored). The
-transactions file is Git LFS: check `head -c 200` shows CSV rows. Then, in
-`backend/`:
+transactions file is Git LFS: check `head -c 200` shows CSV rows. Start
+Postgres (`docker compose up -d`), then in `backend/`:
+
+```
+python manage.py migrate
+python manage.py load_data      # all 5,100 customers, 3.6M rows (~3 min, COPY)
+                                # then build_artifacts (~3 min): peer table
+                                # (#36/#37) and mortgage model (#34, AUC ~0.73)
+```
+
+`load_data --replace` reloads; `--customers ID,ID` loads a subset;
+`--skip-artifacts` skips the second step (run `build_artifacts` later).
+
+Profiles are built on demand the first time a customer is asked for (1 to 5
+s), as of `AS_OF_DATE` (default: the date of the last transaction,
+2026-09-30), and cached. They rebuild when the inference code changes or the
+customer's goals or loan details change. To prebuild:
+`python manage.py build_profiles --customers CUST00001,CUST00002` (or `--all`).
+
+Other commands:
 
 ```
 python manage.py explore_data           # data profile -> docs/data_profile.md
-python manage.py rank_demo_customers    # suggests 5 demo customers
-# set DEMO_CUSTOMERS=CUST...,CUST... in .env
-python manage.py load_data              # load those customers into the DB
-python manage.py build_profiles         # run every inference, store profiles
-python manage.py run_evals              # Gemini eval set (needs a key)
+python manage.py rank_demo_customers    # customers with clear stories
+python manage.py run_evals --customer CUST00001   # Gemini eval set (needs a key)
 ```
 
-See `docs/vocabulary.md` for what the real category / transaction_type / MCC
-values mean, and `handoff/real-data-and-demo-customers.md` for the open
-issues.
+Endpoints: `GET /api/customers/?q=`, `GET /api/insights/<id>/` (only the
+insights the data supports), `GET /api/home/<id>/` (full profile),
+`POST /api/chat/`. See `CLAUDE.md` for the contract and `docs/vocabulary.md`
+for what the category / transaction_type / MCC values mean.
 
 ### Checks (before every PR)
 
@@ -76,5 +86,5 @@ check            # black, django check, migrations, pytest, vitest, lint, build
 check --fix      # reformat with black first
 ```
 
-Backend tests run on SQLite with Gemini mocked, so they need neither Postgres
-nor an API key. See `Contributing.md` for branching and style rules.
+Backend tests (via `check`) run on SQLite with Gemini mocked, so they need
+neither Postgres nor an API key. Test-only fixtures live under `*/tests/`. See `Contributing.md` for branching and style rules.

@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from . import insights as insights_mod
 from . import services
 from .gemini import loop
 from .gemini.tools import ToolContext, rate_goal, snooze_alert
@@ -26,7 +27,29 @@ def _not_found(customer_id):
 
 @api_view(["GET"])
 def customers(request):
-    return Response(services.list_customers())
+    try:
+        limit = max(1, min(500, int(request.query_params.get("limit", 50))))
+    except ValueError:
+        limit = 50
+    return Response(
+        services.list_customers(q=request.query_params.get("q"), limit=limit)
+    )
+
+
+@api_view(["GET"])
+def insights(request, customer_id):
+    profile = services.get_profile(customer_id)
+    if profile is None:
+        return _not_found(customer_id)
+    profile = dict(profile)
+    profile["alerts"] = services.active_alerts(customer_id, profile)
+    return Response(
+        {
+            "customer_id": customer_id,
+            "as_of": profile.get("today"),
+            "insights": insights_mod.insights(profile),
+        }
+    )
 
 
 @api_view(["GET"])
@@ -53,6 +76,8 @@ def chat(request):
         )
     except LookupError:
         return _not_found(data["customer_id"])
+    except loop.GeminiNotConfigured as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     return Response(reply)
 
 
