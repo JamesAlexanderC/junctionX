@@ -129,3 +129,25 @@ def test_chat_rejects_a_chart_with_invented_points(client, aino, fake_gemini):
         r for r in _function_results(fake.models.calls[-1]["contents"]) if "error" in r
     ]
     assert "123456" in errors[0]["error"]
+
+
+# --- F2: where the time goes ---------------------------------------------------
+
+
+def test_meta_reports_time_per_step(aino, monkeypatch):
+    from .conftest import FakeClient
+
+    client = FakeClient(
+        response(("get_baskets", {})),
+        response(("send_reply", {"text": "Done.", "depth": 1, "cards": []})),
+    )
+    _, meta = loop.chat(AINO, "How much is in my baskets?", client=client)
+
+    steps = [t["step"] for t in meta["timings"]]
+    assert steps.count("gemini") == 2
+    assert "router" in steps and "tool" in steps and "validate" in steps
+    tool = next(t for t in meta["timings"] if t["step"] == "tool")
+    assert tool["name"] == "get_baskets"
+    totals = meta["time_ms"]
+    assert set(totals) == {"router", "gemini", "tool", "validate"}
+    assert sum(totals.values()) <= meta["latency_ms"] + 1

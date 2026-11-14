@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import time
+from contextlib import contextmanager
 
 from django.conf import settings
 from google.genai import errors as genai_errors
@@ -90,7 +91,8 @@ def _call_within_budget(ctx, name, args, used):
     """Run a tool; past the turn's budget its result is replaced by an error,
     also in ctx.results so its numbers cannot be quoted. Returns (result,
     chars used so far)."""
-    result = call_tool(ctx, name, args)
+    with _timed(ctx, "tool", name=name):
+        result = call_tool(ctx, name, args)
     size = len(json.dumps(result, default=str))
     if used + size > MAX_TURN_RESULT_CHARS:
         result = {"error": BUDGET_ERROR}
@@ -119,6 +121,27 @@ def _history_contents(customer_id, history):
         if text:
             contents.append(_text(role, text))
     return contents
+
+
+TIMED_STEPS = ("router", "gemini", "tool", "validate")
+
+
+@contextmanager
+def _timed(ctx, step, **extra):
+    """F2: record how long one step of the turn took, in ms."""
+    start = time.monotonic()
+    try:
+        yield
+    finally:
+        took = round((time.monotonic() - start) * 1000, 1)
+        ctx.timings.append({"step": step, **extra, "ms": took})
+
+
+def _time_per_step(ctx):
+    totals = dict.fromkeys(TIMED_STEPS, 0.0)
+    for t in ctx.timings:
+        totals[t["step"]] = round(totals[t["step"]] + t["ms"], 1)
+    return totals
 
 
 def _earlier_user_messages(customer_id, history):
@@ -185,7 +208,10 @@ def chat(
 
     routed = depth is None
     if routed:
-        depth = router.route(message, client=client, model=settings.GEMINI_ROUTER_MODEL)
+        with _timed(ctx, "router"):
+            depth = router.route(
+                message, client=client, model=settings.GEMINI_ROUTER_MODEL
+            )
 
     contents = _history_contents(customer_id, history)
     contents.append(
@@ -222,6 +248,8 @@ def chat(
         "fallback": bool(reason),
         "fallback_reason": reason,
         "latency_ms": round((time.monotonic() - started) * 1000),
+        "time_ms": _time_per_step(ctx),
+        "timings": ctx.timings,
     }
     log.info("chat %s", meta)
     return reply, meta
@@ -257,18 +285,20 @@ def _run(client, contents, ctx):
     retried = False
     used = 0
     for round_no in range(1, MAX_ROUNDS + 1):
-        resp = client.models.generate_content(
-            model=settings.GEMINI_MODEL, contents=contents, config=config
-        )
+        with _timed(ctx, "gemini", round=round_no):
+            resp = client.models.generate_content(
+                model=settings.GEMINI_MODEL, contents=contents, config=config
+            )
         contents.append(resp.candidates[0].content)
         parts = []
         for call in resp.function_calls or []:
             args = dict(call.args or {})
             if call.name == "send_reply":
                 try:
-                    reply = validate_reply(
-                        args, ctx.results + ctx.user_numbers, ctx.message
-                    )
+                    with _timed(ctx, "validate"):
+                        reply = validate_reply(
+                            args, ctx.results + ctx.user_numbers, ctx.message
+                        )
                     return reply, round_no, None, None
                 except ReplyError as exc:
                     log.warning("send_reply rejected: %s", exc)
