@@ -30,9 +30,23 @@ TX_COLUMNS = [
 SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
 
 
+def _reference_date_or_now():
+    """P1.1: the reference date is the latest tx_date in the database.
+
+    The S-Bank data ends in the past, so "today" everywhere (goals, chat,
+    snoozes, alerts) is max(tx_date). With no transactions, the real date.
+    """
+    from django.db.models import Max
+
+    from coach.models import Transaction
+
+    latest = Transaction.objects.aggregate(d=Max("tx_date"))["d"]
+    return latest or timezone.localdate()
+
+
 def today():
-    """Today's date; patched in tests."""
-    return timezone.localdate()
+    """The reference date (max tx_date); patched in tests."""
+    return _reference_date_or_now()
 
 
 def profile_today(profile):

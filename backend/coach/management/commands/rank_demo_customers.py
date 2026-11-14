@@ -1,8 +1,12 @@
 """P1.2: rank customers for demo stories and suggest 5.
 
 Stories: payday splurger (#14), secret saver (#75), nearly mortgage-ready
-(#30 buffer 1-3 months, applied for a mortgage), multi-account (#41-#43).
+(#30 buffer 1-3 months, applied for a mortgage), multi-bank (#41-#43).
 The scan is chunked and keeps only per-customer daily totals.
+
+Coverage = salary_sweep / salary (P1.1). Story picks prefer coverage below
+0.3 (we see most of their money); the multi-bank pick is the customer with the
+highest coverage, whose money mostly sits at another bank.
 """
 
 from pathlib import Path
@@ -11,14 +15,13 @@ from django.core.management.base import BaseCommand
 
 from coach.management import csvdata
 
-
-def _own_types():
-    try:
-        from inferences.thresholds import OWN_TRANSFER_TYPES
-
-        return {t.lower() for t in OWN_TRANSFER_TYPES}
-    except ImportError:
-        return {"own_transfer", "savings_transfer"}
+FULL_VIEW_MAX_COVERAGE = 0.3
+SHORTLIST_ROWS = 10
+STORIES = (
+    ("payday splurger", "payday_ratio"),
+    ("secret saver", "saver_share"),
+    ("nearly mortgage-ready", "mortgage_score"),
+)
 
 
 class Command(BaseCommand):
@@ -32,15 +35,19 @@ class Command(BaseCommand):
         import pandas as pd
 
         data_dir = Path(opts["data_dir"]) if opts["data_dir"] else None
-        own = _own_types()
+        from inferences import thresholds as th
+
         daily_parts, accounts = [], {}
         for chunk in csvdata.iter_transactions(data_dir):
             amt = chunk["tx_amount_eur"]
-            is_own = chunk["transaction_type"].str.lower().isin(own)
+            ttype = chunk["transaction_type"].str.lower()
+            is_own = ttype.isin(th.OWN_TRANSFER_TYPES)
             chunk = chunk.assign(
                 inflow=amt.where((amt > 0) & ~is_own, 0.0),
                 spend=(-amt).where((amt < 0) & ~is_own, 0.0),
-                saved=(-amt).where((amt < 0) & is_own, 0.0),
+                saved=(-amt).where(ttype.isin(th.SAVER_TYPES), 0.0),
+                salary=amt.where(ttype.isin(th.SALARY_TYPES), 0.0),
+                sweep=(-amt).where(ttype.isin(th.NEUTRAL_TRANSFER_TYPES), 0.0),
                 day=chunk["tx_date"].dt.normalize(),
             )
             daily_parts.append(
@@ -48,6 +55,8 @@ class Command(BaseCommand):
                     inflow=("inflow", "sum"),
                     spend=("spend", "sum"),
                     saved=("saved", "sum"),
+                    salary=("salary", "sum"),
+                    sweep=("sweep", "sum"),
                     balance=("balance_after_eur", "last"),
                 )
             )
@@ -56,7 +65,16 @@ class Command(BaseCommand):
         daily = (
             pd.concat(daily_parts)
             .groupby(level=[0, 1])
-            .agg({"inflow": "sum", "spend": "sum", "saved": "sum", "balance": "last"})
+            .agg(
+                {
+                    "inflow": "sum",
+                    "spend": "sum",
+                    "saved": "sum",
+                    "salary": "sum",
+                    "sweep": "sum",
+                    "balance": "last",
+                }
+            )
         )
         try:
             link = csvdata.read_small(csvdata.MTG_LINK_FILE, data_dir)
@@ -69,21 +87,23 @@ class Command(BaseCommand):
             d = d.droplevel(0)
             rows.append(self._score(cid, d, accounts.get(cid, set()), applicants))
         scores = pd.DataFrame(rows).set_index("customer_id")
+        full = scores[scores["coverage"] < FULL_VIEW_MAX_COVERAGE]
+        self.stdout.write(
+            f"{len(full)} of {len(scores)} customers have coverage < "
+            f"{FULL_VIEW_MAX_COVERAGE}"
+        )
         picks = []
-        for story, col, asc in (
-            ("payday splurger", "payday_ratio", False),
-            ("secret saver", "saver_share", False),
-            ("nearly mortgage-ready", "mortgage_score", False),
-            ("multi-account", "accounts", False),
-        ):
-            top = scores.sort_values(col, ascending=asc).head(10)
+        shortlists = [(s, c, full) for s, c in STORIES]
+        shortlists.append(("multi-bank (high sweep)", "coverage", scores))
+        for story, col, pool in shortlists:
+            top = pool.sort_values(col, ascending=False).head(SHORTLIST_ROWS)
             self.stdout.write(f"\n== {story} ({col}) ==")
             self.stdout.write(top.round(3).to_string())
             for cid in top.index:
                 if cid not in [p[0] for p in picks]:
                     picks.append((cid, story))
                     break
-        for cid in scores.sort_values("payday_ratio", ascending=False).index:
+        for cid in full.sort_values("payday_ratio", ascending=False).index:
             if len(picks) >= opts["top"]:
                 break
             if cid not in [p[0] for p in picks]:
@@ -108,6 +128,8 @@ class Command(BaseCommand):
             rest = d["spend"][offset > 3].mean()
             ratio = float(near / rest) if rest else 1.0
         saver = float(d["saved"].sum() / income.sum()) if income.sum() else 0.0
+        salary = float(d["salary"].sum())
+        coverage = float(d["sweep"].sum() / salary) if salary else 0.0
         last30 = d["balance"].iloc[-30:].min()
         mean_spend = float(spend_m.mean()) if len(spend_m) else 0.0
         buffer = float(last30 / mean_spend) if mean_spend else 0.0
@@ -121,4 +143,5 @@ class Command(BaseCommand):
             "buffer_months": buffer,
             "mortgage_score": mortgage + min(saver, 0.3),
             "accounts": len(accs),
+            "coverage": coverage,
         }

@@ -5,6 +5,8 @@ MCC sets come from inferences/thresholds.py, profiled on the real data
 (docs/vocabulary.md).
 """
 
+from inferences import thresholds as _th
+
 # Priority weights: priority = weight / max(1, days until impact).
 SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
 
@@ -18,8 +20,9 @@ from inferences.thresholds import (  # noqa: F401  shared with the inferences
     LOAN_CATEGORIES,
     LOAN_MCCS,
     OWN_TRANSFER_TYPES,
+    SAVER_DEPOSIT_TYPES,
     SAVER_TYPES,
-    SAVER_WITHDRAW_TYPES,
+    SAVER_WITHDRAWAL_TYPES,
     ROBUST_Z_CONST,
     ROBUST_Z_FLAG,
     STRESS_MONTHS,
@@ -32,10 +35,10 @@ from inferences.thresholds import (  # noqa: F401  shared with the inferences
     UNUSUAL_MIN_MULT,
 )
 
-# Buffer: max(EUR 50, 10% of monthly essentials) (#17, #99, #102) and the
-# own-transfer / loan sets live in inferences/thresholds.py.
-
-# Fee, ATM and gambling sets also live in thresholds.py (docs/vocabulary.md).
+# Buffer, own-transfer / Saver types and the loan, fee, ATM and gambling sets
+# all live in inferences/thresholds.py (single source). Loan, fee, ATM and
+# gambling values match no real S-Bank rows: those alerts stay silent and the
+# profile reports them unavailable (inferences/availability.py).
 GAMBLING_SUPPORT_URL = "https://www.peluuri.fi/en"
 
 # #38 unusual charge

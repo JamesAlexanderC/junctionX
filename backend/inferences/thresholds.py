@@ -1,29 +1,29 @@
 """Every threshold and constant used by the inferences (context.md #1 to #102).
 
 All values are starting points from context.md: tune them on the demo customers.
-The data vocabulary below comes from profiling the real S-Bank data
-(docs/vocabulary.md). Values marked "unconfirmed: ask S-Bank mentor" have no
-evidence in the data and are kept as sensible defaults; categories are
-lower-case because common.prepare() lower-cases them.
+The data vocabulary below is mapped from the real S-Bank values profiled in
+docs/data_profile.md and docs/vocabulary.md (P1.1). Categories are compared
+lower-cased (common.prepare() lower-cases them). Values marked "unconfirmed:
+ask S-Bank mentor" have no evidence in the data.
 """
 
-# --- Data vocabulary (docs/vocabulary.md) -------------------------------------
+# --- Data vocabulary (real S-Bank values, docs/data_profile.md) ----------------
 
-# Outflows to the customer's own savings / investment account: Saver (#75).
-# Evidence: 35,668 "investment_deposit" rows, 1,500 customers, one a month
-# right after payday.
-SAVER_TYPES = frozenset({"investment_deposit"})
-# Money taken back out of savings (#94). Evidence: 532 "investment_withdrawal"
-# inflows. Not income.
-SAVER_WITHDRAW_TYPES = frozenset({"investment_withdrawal"})
-# Salary moved on to another account the day after payday (~85-90% of it).
-# Evidence: 6,189 "salary_sweep" rows, 264 customers, no matching inflow.
-# Treated as an own-account transfer: excluded from spend and from baskets.
+# ~85-90% of salary leaves the day after payday to an account outside the data
+# (6,189 rows, 264 customers). It is neutral: neither spending nor Saver.
 # unconfirmed: ask S-Bank mentor whether the target account is the customer's.
-SWEEP_TYPES = frozenset({"salary_sweep"})
-# Every transaction_type that moves money between the customer's own accounts:
-# excluded from income (#2) and spend.
-OWN_TRANSFER_TYPES = SAVER_TYPES | SAVER_WITHDRAW_TYPES | SWEEP_TYPES
+NEUTRAL_TRANSFER_TYPES = frozenset({"salary_sweep"})
+SALARY_TYPES = frozenset({"salary"})
+
+# Saver (#75): deposits count positive, withdrawals negative (#94).
+# Evidence: 35,668 "investment_deposit" rows (1,500 customers, monthly, right
+# after payday) and 532 "investment_withdrawal" inflows (not income).
+SAVER_DEPOSIT_TYPES = frozenset({"investment_deposit"})
+SAVER_WITHDRAWAL_TYPES = frozenset({"investment_withdrawal"})
+SAVER_TYPES = SAVER_DEPOSIT_TYPES | SAVER_WITHDRAWAL_TYPES
+
+# Own-account transfers: never spending and never income (#2, #41).
+OWN_TRANSFER_TYPES = NEUTRAL_TRANSFER_TYPES | SAVER_TYPES
 
 # transaction_type values without a merchant_id that recur on their own. They
 # get a pseudo merchant "type:<transaction_type>" in common.prepare(), so
@@ -41,33 +41,34 @@ PSEUDO_MERCHANT_NAMES = {
 }
 # Only these types get a pseudo merchant; purchases keep an empty merchant_id.
 
-# Categories counted as Essentials (#7). Evidence: Housing, Utilities,
+# Categories that are always Essentials (#7). Evidence: Housing, Utilities,
 # Groceries and Health rows; Housing is one payment a month (CV ~0.03).
-ESSENTIAL_CATEGORIES = frozenset(
-    {
-        "housing",
-        "utilities",
-        "groceries",
-        "health",
-        # Not in the S-Bank data. Kept because car repair is the doc's own
-        # Surprise example (Test Aino); real car costs sit in transportation.
-        "vehicle",
-    }
-)
-# Transportation is split by MCC (#7): public transport (4111), fuel (5541,
-# 5542) and parking (7523) are essential, taxis (4121) and rows without an
-# MCC are everyday spending. unconfirmed: ask S-Bank mentor about fuel/parking.
-ESSENTIAL_MCCS = frozenset({"4111", "5541", "5542", "7523"})
+ESSENTIAL_CATEGORIES = frozenset({"groceries", "housing", "utilities", "health"})
+
+# Categories split by MCC: only these MCCs are essential. A blank MCC counts
+# as essential. Transportation: public transport 4111/4112/4131, fuel
+# 5541/5542, parking 7523; taxis and ride-hailing (4121) are other spending.
+# unconfirmed: ask S-Bank mentor about fuel/parking and blank-MCC rows.
+ESSENTIAL_MCCS_BY_CATEGORY = {
+    "transportation": frozenset({"", "4111", "4112", "4131", "5541", "5542", "7523"}),
+}
 
 # MCCs counted as Saver (#75) when they appear on a purchase. MCC 6211
 # (security brokers) never occurs in the data; investments arrive as
 # SAVER_TYPES instead. unconfirmed: ask S-Bank mentor.
 INVESTMENT_MCCS = frozenset({"6211"})
 
-# Loan / credit categories and MCCs (#42, #76-#84). The data has NO loan,
-# mortgage or credit-card payments (no such category, type or MCC), so loan
-# alerts stay silent unless the user adds loan details. These are standard
-# names / MCCs kept for other banks (#42). unconfirmed: ask S-Bank mentor.
+# #58 possible travel goal: category == travel (docs/data_profile.md).
+TRAVEL_CATEGORY = "travel"
+TRAVEL_GOAL_MIN_EUR = 300.0
+TRAVEL_LOOKBACK_MONTHS = 12
+
+# Loan / credit categories and MCCs (#42, #76-#84). No real rows use these
+# values (no loan, mortgage or credit-card category, type or MCC), so the loan
+# alerts match nothing in the S-Bank data and the profile reports them
+# unavailable (inferences/availability.py) unless the user adds loan details.
+# Standard names / MCCs kept for other banks' data (#42).
+# unconfirmed: ask S-Bank mentor.
 LOAN_CATEGORIES = frozenset(
     {
         "loan",
@@ -83,12 +84,17 @@ LOAN_CATEGORIES = frozenset(
 LOAN_MCCS = frozenset({"6012", "6051", "6141"})
 
 # Fees (#86), cash (#96) and gambling (#98). None of these occur in the data
-# (no fee category, MCC 7322, 6011 or 7995). Standard values, kept so the
-# rules work on other banks' data. unconfirmed: ask S-Bank mentor.
+# (no fee category, MCC 7322, 6011 or 7995): the rules match no real rows and
+# are reported unavailable. Standard values kept for other banks' data.
+# unconfirmed: ask S-Bank mentor.
 FEE_CATEGORIES = frozenset({"fee", "fees", "bank_fee", "late_fee", "collection"})
 FEE_MCCS = frozenset({"7322"})  # collection agencies
 ATM_MCC = "6011"
 GAMBLING_MCC = "7995"
+
+# Coverage = salary_sweep / salary. Above this, most money lives at another
+# bank: the profile is a "partial view" and is excluded from peer benchmarks.
+PARTIAL_VIEW_COVERAGE = 0.5
 
 # --- Shared definitions --------------------------------------------------------
 
@@ -228,18 +234,7 @@ DETECT_SAVER_MIN_TRANSFERS = 2  # #56
 DETECT_SAVER_CV_MAX = 0.3
 DETECT_SAVER_DAYS = 90
 DETECT_CATEGORY_DROP = 0.20  # #57
-# #58: the doc's airline/hotel ranges (3000-3350, 3501-3999) never occur in
-# the data; its travel MCCs are 4511 airlines, 4722 agencies, 7011 hotels
-# and 7512 car rental.
-TRAVEL_MCC_RANGES = (
-    (3000, 3350),
-    (3501, 3999),
-    (4511, 4511),
-    (4722, 4722),
-    (7011, 7011),
-    (7512, 7512),
-)
-TRAVEL_MIN_EUR = 300.0
+# #58 travel: TRAVEL_CATEGORY / TRAVEL_GOAL_MIN_EUR above (category == travel).
 HOME_AGE_MIN, HOME_AGE_MAX = 25, 40  # #59
 HOME_READINESS_MIN = 0.4
 HOME_DEPOSIT_SHARE = 0.10

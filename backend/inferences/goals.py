@@ -19,6 +19,7 @@ import pandas as pd
 
 from . import models
 from . import thresholds as th
+from .detected_goals import detect_travel_goal
 from .common import (
     add_months,
     full_months,
@@ -394,32 +395,21 @@ def _detect_purchase(df, cls, today):
     return None
 
 
-def _is_travel_mcc(mcc) -> bool:
-    try:
-        code = int(str(mcc))
-    except ValueError:
-        return False
-    return any(lo <= code <= hi for lo, hi in th.TRAVEL_MCC_RANGES)
+def _detect_travel(df, today):
+    """#58 holiday pot, as a detected-goal suggestion.
 
-
-def _detect_travel(s, today):
-    """#58: last year's travel spend > EUR 300 -> holiday pot = that amount /
-    months until the same season (the month with most travel spend)."""
-    start = pd.Timestamp(today) - pd.DateOffset(months=12)
-    travel = s[(s["tx_date"] > start) & s["mcc_code"].map(_is_travel_mcc)]
-    total = float(travel["amount"].sum()) if len(travel) else 0.0
-    if total <= th.TRAVEL_MIN_EUR:
+    The maths lives once in detected_goals.detect_travel_goal (category ==
+    travel, docs/data_profile.md); this only adds the suggestion fields.
+    """
+    goal = detect_travel_goal(df, today)
+    if goal is None:
         return None
-    peak = travel.groupby(travel["tx_date"].dt.month)["amount"].sum().idxmax()
-    months_until = (int(peak) - to_date(today).month) % 12 or 12
     return {
         "id": "det-58",
-        "inference": 58,
         "type": "travel",
         "text": "Holiday coming up again? Start a travel pot.",
-        "target": r2(total),
-        "monthly_amount": r2(total / months_until),
-        "months_until": months_until,
+        "monthly_amount": goal["monthly_needed"],
+        **goal,
     }
 
 
@@ -550,7 +540,7 @@ def detected_goals(
     found = [
         _detect_saving(cls, today),
         _detect_purchase(df, cls, today),
-        _detect_travel(s, today),
+        _detect_travel(df, today),
         _detect_home(income, customer, mortgage),
         _detect_debt(income, loans),
         _detect_seasonal(s, today),
@@ -573,7 +563,8 @@ def smart_default_amount(df, today, name: str) -> float | None:
     s = spend(df)
     s = s[s["tx_date"] > pd.Timestamp(today) - pd.DateOffset(months=12)]
     if kind == "travel":
-        total = s[s["mcc_code"].map(_is_travel_mcc)]["amount"].sum() if len(s) else 0
+        travel = s[s["category"] == th.TRAVEL_CATEGORY]
+        total = travel["amount"].sum() if len(s) else 0
     else:  # christmas: December spend above the mean month
         by_month = s.groupby(s["tx_date"].dt.month)["amount"].sum()
         total = max(0.0, float(by_month.get(12, 0.0)) - float(by_month.mean() or 0))

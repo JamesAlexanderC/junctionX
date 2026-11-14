@@ -43,9 +43,9 @@ def make_df(rows, start_balance=1000.0, customer="C-AINO"):
                 "bank_account_id": r.get("account", "A1"),
                 "tx_date": stamp.normalize(),
                 "tx_timestamp": stamp,
-                "category": r.get("category", "shopping"),
+                "category": r.get("category", "lifestyle"),
                 "tx_amount_eur": float(r["amount"]),
-                "transaction_type": r.get("ttype", "card_payment"),
+                "transaction_type": r.get("ttype", "purchase"),
                 "merchant_id": r.get("merchant", "M_SHOP"),
                 "merchant_name": r.get("name", r.get("merchant", "M_SHOP")),
                 "mcc_code": str(r.get("mcc", "5999")),
@@ -74,9 +74,9 @@ def aino_rows():
                 amount=2000,
                 merchant="M_EMPLOYER",
                 name="Employer Oy",
-                category="income",
+                category="salary",
                 mcc="",
-                ttype="incoming_transfer",
+                ttype="salary",
             )
         )
         rows.append(
@@ -86,8 +86,8 @@ def aino_rows():
                 merchant="M_RENT",
                 name="Rent",
                 category="housing",
-                mcc="6513",
-                ttype="direct_debit",
+                mcc="",
+                ttype="housing_payment",
             )
         )
         rows.append(
@@ -98,7 +98,7 @@ def aino_rows():
                 name="Netflix",
                 category="entertainment",
                 mcc="4899",
-                ttype="direct_debit",
+                ttype="purchase",
             )
         )
         for day in (3, 10, 17, 24):
@@ -140,7 +140,7 @@ def aino_rows():
                 amount=-150,
                 merchant="OWN_SAVINGS",
                 name="Own savings",
-                category="transfer",
+                category="invest deposit",
                 mcc="",
                 ttype="investment_deposit",  # real S-Bank savings type
             )
@@ -149,10 +149,10 @@ def aino_rows():
         dict(
             ts="2026-09-12 14:00",
             amount=-400,
-            merchant="M_GARAGE",
-            name="Garage",
-            category="vehicle",
-            mcc="7538",
+            merchant="M_DENTIST",
+            name="Dentist",
+            category="health",
+            mcc="8021",
         )
     )
     return rows
