@@ -4,7 +4,7 @@
 //   GET  /api/insights/<customer_id>/  -> [{key, inference, title, value,
 //                                          unit, text, section, severity?}]
 //   GET  /api/goals/?customer_id=<id> -> {active, completed, clash}
-//   GET  /api/baskets/?customer_id=<id> -> {month, total, buckets, ...}
+//   GET  /api/spending/?customer_id=<id> -> {month, total, categories, savings}
 //   POST /api/chat/ {customer_id, message, history, depth?} -> send_reply
 //   POST /api/auth/login/ {username, password} -> {token, user}
 //   POST /api/auth/logout/                      -> 204
@@ -116,20 +116,21 @@ export async function getGoals(customerId, { signal } = {}) {
   }
 }
 
-// Backend shape: {customer_id, as_of, month, total, buckets: [{key, name,
-// total, share, trend, categories: [{category, total}]}], monthly_essentials,
-// monthly_saving}.
-export async function getBaskets(customerId, { signal } = {}) {
+// Backend shape: {customer_id, as_of, month, is_current, total, categories:
+// [{category, total, share, count, usual, vs_usual}], savings: [{category,
+// total, count}], savings_total}. Savings are not part of total.
+export async function getSpending(customerId, { signal } = {}) {
   const body = await request(
-    `/api/baskets/?customer_id=${encodeURIComponent(customerId)}`,
+    `/api/spending/?customer_id=${encodeURIComponent(customerId)}`,
     { signal },
   )
   return {
     month: body?.month ?? null,
+    is_current: Boolean(body?.is_current),
     total: body?.total ?? 0,
-    buckets: Array.isArray(body?.buckets) ? body.buckets : [],
-    monthly_essentials: body?.monthly_essentials ?? null,
-    monthly_saving: body?.monthly_saving ?? null,
+    categories: Array.isArray(body?.categories) ? body.categories : [],
+    savings: Array.isArray(body?.savings) ? body.savings : [],
+    savings_total: body?.savings_total ?? 0,
   }
 }
 

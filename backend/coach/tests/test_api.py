@@ -294,27 +294,22 @@ def test_goal_list_returns_profile_numbers(client, aino):
     assert body["active"][0]["paused"] is True
 
 
-def test_basket_list_needs_auth_and_customer(anon_client, client, aino):
-    assert anon_client.get(f"/api/baskets/?customer_id={AINO}").status_code == 401
-    assert client.get("/api/baskets/").status_code == 400
-    assert client.get("/api/baskets/?customer_id=nobody").status_code == 404
+def test_spending_list_needs_auth_and_customer(anon_client, client, aino):
+    assert anon_client.get(f"/api/spending/?customer_id={AINO}").status_code == 401
+    assert client.get("/api/spending/").status_code == 400
+    assert client.get("/api/spending/?customer_id=nobody").status_code == 404
 
 
-def test_basket_list_returns_profile_numbers(client, aino):
+def test_spending_list_returns_profile_numbers(client, aino):
     profile = client.get(f"/api/home/{AINO}/").json()
-    res = client.get(f"/api/baskets/?customer_id={AINO}")
-    assert res.status_code == 200
-    body = res.json()
+    body = client.get(f"/api/spending/?customer_id={AINO}").json()
     assert body["customer_id"] == AINO and body["as_of"] == "2026-10-18"
-    assert body["buckets"]
-    src = profile["baskets"]
-    entry = src if body["month"] == src["month"] else src["history"][-1]
-    for row in body["buckets"]:
-        assert row["total"] == entry["totals"][row["key"]]
-        assert row["categories"] == entry["categories"][row["key"]]
-        cats = round(sum(c["total"] for c in row["categories"]), 2)
-        assert cats == row["total"]
-    assert body["total"] == round(sum(r["total"] for r in body["buckets"]), 2)
+    assert body["categories"] == profile["spending"]["categories"]
+    assert body["savings"] == profile["spending"]["savings"]
+    saved = {r["category"] for r in body["savings"]}
+    assert not saved & {c["category"] for c in body["categories"]}
+    assert body["month"] == profile["spending"]["month"]
+    assert body["total"] == round(sum(c["total"] for c in body["categories"]), 2)
 
 
 def test_rate_goal_weight(client, aino):

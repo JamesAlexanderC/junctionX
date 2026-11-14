@@ -3,14 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
 import { ReplyCard } from '../components/Cards.jsx'
 import Chat from '../components/Chat.jsx'
-import Baskets from '../components/Baskets.jsx'
 import Goals from '../components/Goals.jsx'
 import Insights from '../components/Insights.jsx'
+import Spending from '../components/Spending.jsx'
 import { niceTicks, shortLabel } from '../lib/chart.js'
 import { SUGGESTIONS } from '../lib/suggestions.js'
 
 const NO_GOALS = { customer_id: 'CUST00001', active: [], completed: [], clash: null }
-const NO_BASKETS = { customer_id: 'CUST00001', month: null, total: 0, buckets: [] }
+const NO_SPENDING = { customer_id: 'CUST00001', month: null, total: 0, categories: [] }
 
 // Test-only shape of GET /api/customers/demo/.
 const LEVEL_NAMES = ['Not started', 'Getting started', 'In control', 'Safety net']
@@ -191,7 +191,7 @@ describe('goals panel', () => {
     let created = false
     const fetch = vi.fn(async (url) => {
       if (url.startsWith('/api/insights/')) return new Response('[]')
-      if (url.startsWith('/api/baskets/')) return new Response(JSON.stringify(NO_BASKETS))
+      if (url.startsWith('/api/spending/')) return new Response(JSON.stringify(NO_SPENDING))
       if (url.startsWith('/api/goals/')) {
         return new Response(JSON.stringify(goals(created ? [bike] : [])))
       }
@@ -227,56 +227,78 @@ describe('goals panel', () => {
   })
 })
 
-describe('baskets panel', () => {
-  const leaky = {
-    key: 'leaky',
-    name: 'Leaky',
-    total: 172.99,
-    share: 14.3,
-    trend: 1.3,
-    categories: [
-      { category: 'takeaway', total: 90 },
-      { category: 'coffee', total: 50 },
-      { category: 'snacks', total: 20 },
-      { category: 'kiosk', total: 12.99 },
-    ],
+describe('spending panel', () => {
+  const housing = {
+    category: 'Housing',
+    total: 650,
+    share: 61.2,
+    count: 1,
+    usual: 650,
+    vs_usual: 0,
   }
-  const essential = {
-    key: 'essential',
-    name: 'Essentials',
-    total: 890,
-    share: 73.4,
-    trend: null,
-    categories: [{ category: 'rent', total: 650 }, { category: 'groceries', total: 240 }],
+  const groceries = {
+    category: 'Home & Tech',
+    total: 412.5,
+    share: 38.8,
+    count: 3,
+    usual: 380,
+    vs_usual: 32.5,
   }
-  const baskets = (buckets) => ({ ...NO_BASKETS, month: '2026-10', total: 1062.99, buckets })
+  const spending = (categories) => ({
+    ...NO_SPENDING,
+    month: '2026-10',
+    total: 1062.5,
+    categories,
+  })
 
-  it('shows each bucket with its share, total and categories', () => {
-    render(<Baskets baskets={baskets([essential, leaky])} onAsk={() => {}} />)
-    expect(screen.getByText('Where your money went (2026-10)')).toBeTruthy()
-    expect(screen.getByText('73%')).toBeTruthy()
-    expect(screen.getByText('rent €650 · groceries €240')).toBeTruthy()
-    expect(screen.getByText(/· \+1 pts vs usual/)).toBeTruthy()
-    expect(screen.getByText(/takeaway €90 · coffee €50 · snacks €20 · \+1 more/))
-      .toBeTruthy()
-    expect(screen.getByText('All 4 categories')).toBeTruthy()
+  it('shows each data category with its share and total', () => {
+    render(<Spending spending={spending([housing, groceries])} onAsk={() => {}} />)
+    expect(screen.getByText('Spending by category (2026-10)')).toBeTruthy()
+    expect(screen.getByText('Housing')).toBeTruthy()
+    expect(screen.getByText('Home & Tech')).toBeTruthy()
+    expect(screen.getByText('61%')).toBeTruthy()
+    expect(screen.getByText(/€650 · 1 payment$/)).toBeTruthy()
+    expect(screen.getByText(/· 3 payments$/)).toBeTruthy()
+  })
+
+  it('shows each category against its usual month', () => {
+    const fresh = { category: 'Travel', total: 90, share: 10, count: 1, usual: null }
+    const s = { ...spending([housing, groceries, fresh]), is_current: true }
+    render(<Spending spending={s} onAsk={() => {}} />)
+    expect(screen.getByText('Usually €650 a month · about the same')).toBeTruthy()
+    expect(screen.getByText('Usually €380 a month · €32.50 more so far')).toBeTruthy()
+    expect(screen.getAllByText(/^Usually/)).toHaveLength(2) // none for Travel
+  })
+
+  it('lists savings apart, labelled and outside the total', () => {
+    const s = {
+      ...spending([housing]),
+      savings: [{ category: 'Invest Deposit', total: 235.72, count: 1 }],
+      savings_total: 235.72,
+    }
+    render(<Spending spending={s} onAsk={() => {}} />)
+    const saved = screen.getByRole('list', { name: 'Savings' })
+    expect(saved.textContent).toContain('Invest Deposit')
+    expect(saved.textContent).toContain('Savings')
+    expect(screen.getByText(/not counted as spending/)).toBeTruthy()
+    expect(screen.getByText('Total spent: €1,062.50')).toBeTruthy()
   })
 
   it('empty state and tapping ask the coach', () => {
     const onAsk = vi.fn()
-    const { rerender } = render(<Baskets baskets={baskets([])} onAsk={onAsk} />)
+    const { rerender } = render(<Spending spending={spending([])} onAsk={onAsk} />)
     expect(screen.getByText('No spending this month yet')).toBeTruthy()
-    rerender(<Baskets baskets={baskets([leaky])} onAsk={onAsk} />)
-    fireEvent.click(screen.getByText('Leaky'))
-    expect(onAsk).toHaveBeenCalledWith("What's in my Leaky spending?", 2)
+    rerender(<Spending spending={spending([housing])} onAsk={onAsk} />)
+    fireEvent.click(screen.getByText('Housing'))
+    expect(onAsk).toHaveBeenCalledWith('Tell me about my Housing spending', 2)
   })
 
-  it('loads buckets in the customer view', async () => {
+  it('loads categories in the customer view', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url) => {
-        if (url.startsWith('/api/baskets/')) {
-          return new Response(JSON.stringify(baskets([essential])))
+        if (url.startsWith('/api/spending/')) {
+          return new Response(JSON.stringify(spending([housing])))
         }
         if (url.startsWith('/api/goals/')) return new Response(JSON.stringify(NO_GOALS))
         return new Response('[]')
@@ -284,7 +306,7 @@ describe('baskets panel', () => {
     )
     window.location.hash = '#/c/CUST00001'
     render(<App />)
-    expect(await screen.findByText('Essentials')).toBeTruthy()
+    expect(await screen.findByText('Housing')).toBeTruthy()
   })
 })
 
@@ -307,8 +329,8 @@ describe('no fallbacks', () => {
       if (url.startsWith('/api/goals/')) {
         return new Response(JSON.stringify(NO_GOALS), { status: 200 })
       }
-      if (url.startsWith('/api/baskets/')) {
-        return new Response(JSON.stringify(NO_BASKETS), { status: 200 })
+      if (url.startsWith('/api/spending/')) {
+        return new Response(JSON.stringify(NO_SPENDING), { status: 200 })
       }
       return new Response(JSON.stringify({ error: 'Gemini is not configured' }), {
         status: 503,
