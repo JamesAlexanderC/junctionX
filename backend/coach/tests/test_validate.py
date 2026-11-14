@@ -12,6 +12,32 @@ def test_numbers_in_text_formats():
     ]
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "1 428.40 €",  # plain space
+        "1 428.40 €",  # no-break space
+        "1 428,40 €",  # narrow no-break space, decimal comma
+        "1.428,40 €",  # dot thousands, decimal comma
+    ],
+)
+def test_numbers_in_text_reads_european_thousands(text):
+    # Fix 1 (live, CUST00033): "1 428.40" was read as 1 and 428.4, so a
+    # correct safe-to-spend reply was rejected and ran out of rounds.
+    assert numbers_in_text(text) == [1428.40]
+
+
+def test_space_between_unrelated_numbers_is_not_a_thousands_group():
+    assert numbers_in_text("on 15 October, 2 bills") == [15, 2]
+    assert numbers_in_text("pay 15 1234") == [15, 1234]
+
+
+def test_european_amount_matches_tool_result():
+    results = [{"safe_to_spend_week": 1428.4, "bill": 1355.57}]
+    reply = {"text": "You can spend 1 428.40 € after 1 355,57 € rent.", "depth": 1}
+    assert validate_reply(reply, results)["text"]
+
+
 def test_numbers_must_come_from_tools():
     results = [{"safe_to_spend_week": 64.0, "next_payday": "2026-10-23"}]
     ok = validate_reply({"text": "EUR 64 until 23 Oct", "depth": 1}, results)

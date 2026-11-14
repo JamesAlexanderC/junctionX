@@ -23,7 +23,15 @@ MAX_CHIPS = 3
 # Small counts ("2 easy steps", "3 months") are allowed without a tool source.
 FREE_INTEGERS = set(range(0, 11))
 
-NUMBER_RE = re.compile(r"(?<![\w.])\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:[.,]\d+)?")
+# Thousands may be grouped by a space, a no-break space or a narrow no-break
+# space ("1 428.40 €"), or by dots with a decimal comma ("1.428,40 €").
+THOUSANDS_SPACES = "   "
+SPACE_GROUPED = rf"\d{{1,3}}(?:[{THOUSANDS_SPACES}]\d{{3}})+(?:[.,]\d+)?(?!\d)"
+DOT_GROUPED = r"\d{1,3}(?:\.\d{3})+,\d+"
+COMMA_GROUPED = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?"
+NUMBER_RE = re.compile(
+    rf"(?<![\w.])(?:{SPACE_GROUPED}|{DOT_GROUPED}|{COMMA_GROUPED})|\d+(?:[.,]\d+)?"
+)
 
 
 class ReplyError(ValueError):
@@ -46,8 +54,11 @@ class SendReply(BaseModel):
 
 
 def parse_number(token):
-    if re.fullmatch(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?", token):
+    token = re.sub(f"[{THOUSANDS_SPACES}]", "", token)
+    if re.fullmatch(COMMA_GROUPED, token):
         return float(token.replace(",", ""))
+    if re.fullmatch(DOT_GROUPED, token):
+        return float(token.replace(".", "").replace(",", "."))
     return float(token.replace(",", "."))
 
 
