@@ -223,8 +223,22 @@ describe('goals panel', () => {
 })
 
 describe('spending panel', () => {
-  const housing = { category: 'Housing', total: 650, share: 61.2, count: 1 }
-  const groceries = { category: 'Home & Tech', total: 412.5, share: 38.8, count: 3 }
+  const housing = {
+    category: 'Housing',
+    total: 650,
+    share: 61.2,
+    count: 1,
+    usual: 650,
+    vs_usual: 0,
+  }
+  const groceries = {
+    category: 'Home & Tech',
+    total: 412.5,
+    share: 38.8,
+    count: 3,
+    usual: 380,
+    vs_usual: 32.5,
+  }
   const spending = (categories) => ({
     ...NO_SPENDING,
     month: '2026-10',
@@ -240,6 +254,29 @@ describe('spending panel', () => {
     expect(screen.getByText('61%')).toBeTruthy()
     expect(screen.getByText(/€650 · 1 payment$/)).toBeTruthy()
     expect(screen.getByText(/· 3 payments$/)).toBeTruthy()
+  })
+
+  it('shows each category against its usual month', () => {
+    const fresh = { category: 'Travel', total: 90, share: 10, count: 1, usual: null }
+    const s = { ...spending([housing, groceries, fresh]), is_current: true }
+    render(<Spending spending={s} onAsk={() => {}} />)
+    expect(screen.getByText('Usually €650 a month · about the same')).toBeTruthy()
+    expect(screen.getByText('Usually €380 a month · €32.50 more so far')).toBeTruthy()
+    expect(screen.getAllByText(/^Usually/)).toHaveLength(2) // none for Travel
+  })
+
+  it('lists savings apart, labelled and outside the total', () => {
+    const s = {
+      ...spending([housing]),
+      savings: [{ category: 'Invest Deposit', total: 235.72, count: 1 }],
+      savings_total: 235.72,
+    }
+    render(<Spending spending={s} onAsk={() => {}} />)
+    const saved = screen.getByRole('list', { name: 'Savings' })
+    expect(saved.textContent).toContain('Invest Deposit')
+    expect(saved.textContent).toContain('Savings')
+    expect(screen.getByText(/not counted as spending/)).toBeTruthy()
+    expect(screen.getByText('Total spent: €1,062.50')).toBeTruthy()
   })
 
   it('empty state and tapping ask the coach', () => {

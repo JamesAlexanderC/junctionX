@@ -136,7 +136,7 @@ def build_profile(
         "balance": r2(latest_balance(prepared)) if len(prepared) else None,
         "income": income,
         "baskets": baskets,
-        "spending": compute_spending(df, today),
+        "spending": compute_spending(df, today, whatif.get("category_means")),
         "habits": habits,
         "forecast": forecast,
         "whatif": whatif,

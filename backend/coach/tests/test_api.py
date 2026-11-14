@@ -305,6 +305,9 @@ def test_spending_list_returns_profile_numbers(client, aino):
     body = client.get(f"/api/spending/?customer_id={AINO}").json()
     assert body["customer_id"] == AINO and body["as_of"] == "2026-10-18"
     assert body["categories"] == profile["spending"]["categories"]
+    assert body["savings"] == profile["spending"]["savings"]
+    saved = {r["category"] for r in body["savings"]}
+    assert not saved & {c["category"] for c in body["categories"]}
     assert body["month"] == profile["spending"]["month"]
     assert body["total"] == round(sum(c["total"] for c in body["categories"]), 2)
 

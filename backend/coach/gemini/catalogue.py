@@ -145,7 +145,13 @@ _ENTRIES = [
     Entry(
         "spending.categories",
         "Spending per transaction category for spending.month, in EUR, with "
-        "each category's share of the month's spending.",
+        "each category's share, its usual monthly spend over the last 3 full "
+        "months (usual) and the difference (vs_usual).",
+    ),
+    Entry(
+        "spending.savings",
+        "Money moved into savings or investments in spending.month, per "
+        "category. Not spending and not part of spending.total.",
     ),
     # --- habits (#11 to #16) ---
     Entry("habits.weekend", "Weekend share of spending.", gate="habits.weekend"),
