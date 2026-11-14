@@ -10,6 +10,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from inferences.alert_thresholds import MAX_SHOWN_ALERTS
+
 from . import insights as insights_mod
 from . import services
 from .gemini import loop
@@ -57,7 +59,9 @@ def insights(request, customer_id):
     if profile is None:
         return _not_found(customer_id)
     profile = dict(profile)
-    profile["alerts"] = services.active_alerts(customer_id, profile)
+    profile["alerts"] = services.active_alerts(
+        customer_id, profile, limit=MAX_SHOWN_ALERTS
+    )
     return Response(
         {
             "customer_id": customer_id,
@@ -73,7 +77,9 @@ def home(request, customer_id):
     if profile is None:
         return _not_found(customer_id)
     profile = dict(profile)
-    profile["alerts"] = services.active_alerts(customer_id, profile)
+    profile["alerts"] = services.active_alerts(
+        customer_id, profile, limit=MAX_SHOWN_ALERTS
+    )
     return Response(profile)
 
 
@@ -259,7 +265,9 @@ def alerts(request, customer_id):
     profile = services.get_profile(customer_id)
     if profile is None:
         return _not_found(customer_id)
-    return Response({"alerts": services.active_alerts(customer_id, profile)})
+    return Response(
+        {"alerts": services.active_alerts(customer_id, profile, limit=MAX_SHOWN_ALERTS)}
+    )
 
 
 @api_view(["POST"])

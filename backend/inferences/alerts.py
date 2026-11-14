@@ -74,8 +74,14 @@ import numpy as np
 import pandas as pd
 
 from inferences import alert_thresholds as thresholds
+from inferences.thresholds import NO_PAYDAY_HORIZON_DAYS
 from inferences import models
-from inferences.common import buffer_amount, fill_pseudo_merchants, merchant_name
+from inferences.common import (
+    buffer_amount,
+    fill_pseudo_merchants,
+    merchant_name,
+    month_name,
+)
 
 T = thresholds
 
@@ -221,6 +227,11 @@ def _label(merchant):
     return merchant_name(pd.DataFrame(), merchant)
 
 
+def _capitalised(text):
+    """'a lifestyle shop' -> 'A lifestyle shop' at the start of a sentence."""
+    return text[:1].upper() + text[1:]
+
+
 def _ids(frame, limit=5):
     return [str(i) for i in frame["tx_id"].tolist()[-limit:]]
 
@@ -353,11 +364,15 @@ def rule_20_danger_days(df, profile, today, **ctx):
     if not dates:
         return None
     first = dates[0]
+    # FC-4: without a detected payday the forecast covers the next 30 days
+    # (NO_PAYDAY_HORIZON_DAYS), so do not mention a payday that is not there.
+    found = _get(profile, "income.payday.found") is True
+    when = "before payday" if found else f"in the next {NO_PAYDAY_HORIZON_DAYS} days"
     return _alert(
         20,
         "amber",
         "Tight days ahead",
-        f"Your balance could drop below EUR 50 around {first:%d %b}, before payday.",
+        f"Your balance could drop below EUR 50 around {first:%d %b}, {when}.",
         today,
         first,
         {"danger_days": [d.isoformat() for d in dates], "first": first.isoformat()},
@@ -374,7 +389,7 @@ def rule_23_seasonal(df, profile, today, **ctx):
         23,
         "amber",
         "Pricier month coming",
-        f"Last year {month[5:]}/{month[:4][2:]} cost more than usual. A pot of "
+        f"Last {month_name(month)} cost more than usual. A pot of "
         f"{_eur(seasonal.get('pot', 0))} would cover it.",
         today,
         impact,
@@ -961,7 +976,7 @@ def rule_83_new_credit(df, profile, today, **ctx):
                 83,
                 "amber",
                 "New credit",
-                f"A new loan or credit payment to {m['merchant_id']} "
+                f"A new loan or credit payment to {_label(m['merchant_id'])} "
                 f"({_eur(m['payment'])}) started recently.",
                 today,
                 m["next_date"],
@@ -1079,12 +1094,21 @@ def rule_88_spending_pace(df, profile, today, **ctx):
     if income <= 0 or projected <= income:
         return None
     end = date(today.year, today.month, days_in_month)
+    # Live test (CUST00009): 93% of the salary moves out the next day, so the
+    # income compared is what stays here; say so instead of "your income".
+    if _get(profile, "income.partial_view") is True:
+        compared = (
+            f"the {_eur(income)} of your income that stays in this account (most "
+            "of your salary moves to another account)"
+        )
+    else:
+        compared = f"your {_eur(income)} income"
     return _alert(
         88,
         "amber",
         "Spending pace",
         f"At this pace you'll spend about {_eur(projected)} this month, more than "
-        f"your {_eur(income)} income.",
+        f"{compared}.",
         today,
         end,
         {"spent": round(spent, 2), "projected": round(projected, 2), "income": income},
@@ -1140,7 +1164,7 @@ def rule_91_free_trial(df, profile, today, **ctx):
                 91,
                 "blue",
                 "Free trial now paid",
-                f"{_label(trial['merchant_id'])} started charging "
+                f"{_capitalised(_label(trial['merchant_id']))} started charging "
                 f"{_eur(abs(first['tx_amount_eur']))} after a free trial. Keep it?",
                 today,
                 today + timedelta(days=30),
@@ -1160,6 +1184,9 @@ def rule_93_annual_bill(df, profile, today, **ctx):
     for merchant, rows in _outflows(df).groupby("merchant_id"):
         if len(rows) < 2:
             continue
+        # A shop visited about once a year is not a bill (live test, #93).
+        if str(rows["category"].mode().iloc[0]).lower() in T.NOT_BILL_CATEGORIES:
+            continue
         gaps = rows["tx_date"].diff().dt.days.dropna()
         gap = gaps.iloc[-1]
         if not T.ANNUAL_GAP_MIN <= gap <= T.ANNUAL_GAP_MAX:
@@ -1175,7 +1202,8 @@ def rule_93_annual_bill(df, profile, today, **ctx):
                 93,
                 "amber",
                 "Yearly bill coming",
-                f"{_label(merchant)} charges about {_eur(amount)} once a year; "
+                f"{_capitalised(_label(merchant))} charges about {_eur(amount)} "
+                "once a year; "
                 f"next around {next_date:%d %b}.",
                 today,
                 next_date,
@@ -1336,7 +1364,11 @@ def rule_101_bill_went_up(df, profile, today, **ctx):
     ids |= {
         s.get("merchant_id") for s in _get(profile, "income.subscriptions", []) or []
     }
-    ids |= {m for m, _ in _recurring_groups(out, min_count=4)}
+    ids |= {
+        m
+        for m, rows in _recurring_groups(out, min_count=4)
+        if str(rows["category"].mode().iloc[0]).lower() not in T.NOT_BILL_CATEGORIES
+    }
     found = []
     recent = pd.Timestamp(today - timedelta(days=T.RECUR_GAP_MAX))
     for merchant in sorted(i for i in ids if i):
@@ -1357,7 +1389,8 @@ def rule_101_bill_went_up(df, profile, today, **ctx):
                 101,
                 "amber",
                 "Bill went up",
-                f"{_label(merchant)} went from {_eur(base)} to {_eur(amounts[-1])}.",
+                f"Your payments to {_label(merchant)} went from {_eur(base)} to "
+                f"{_eur(amounts[-1])}.",
                 today,
                 today + timedelta(days=7),
                 {

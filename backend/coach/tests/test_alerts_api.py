@@ -7,6 +7,7 @@ import pytest
 from coach import services
 from coach.gemini.system_prompt import FALLBACK_REPLY
 from coach.models import Goal
+from inferences.alert_thresholds import MAX_SHOWN_ALERTS
 
 from .conftest import AINO, TODAY, load_customer, response
 
@@ -263,3 +264,110 @@ def test_unclearable_alert_is_explained_not_failed(
     assert plan["steps"] == []
     assert body["text"] == plan["unclearable"][0]["why"]
     assert Goal.objects.count() == 0
+
+
+# --- "Fix this" only where a plan can fix the alert (no loop) ------------------------
+
+
+def _alerts(customer):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    return call_tool(ToolContext(customer), "get_alerts", {})["alerts"]
+
+
+def _fix_only(monkeypatch, fixable_ids):
+    """Make the planner clear exactly ``fixable_ids``."""
+    from coach import planner
+
+    def plan(profile, alerts, **kw):
+        step = {"action": {}, "text": "x", "monthly_impact": 1.0, "effort": 1}
+        return {"steps": [{**step, "clears": sorted(fixable_ids)}]}
+
+    monkeypatch.setattr(planner, "suggest_fixes", plan)
+
+
+def test_get_alerts_says_which_alerts_a_plan_can_fix(broke, monkeypatch):
+    first = _alerts(BROKE)[0]["id"]
+    _fix_only(monkeypatch, {first})
+    flags = {a["id"]: a["fixable"] for a in _alerts(BROKE)}
+    assert flags[first] is True
+    assert all(v is False for k, v in flags.items() if k != first)
+
+
+def test_alert_card_fixable_is_set_by_python_not_gemini(
+    client, broke, fake_gemini, monkeypatch
+):
+    alert = _alerts(BROKE)[0]
+    _fix_only(monkeypatch, set())  # nothing can fix it
+    card = {
+        "type": "alert",
+        "id": alert["id"],
+        "severity": alert["severity"],
+        "title": alert["title"],
+        "text": alert["text"],
+        "fixable": True,  # Gemini's claim is ignored
+    }
+    fake_gemini(
+        response(("get_alerts", {})),
+        response(("send_reply", {"text": "Here.", "depth": 2, "cards": [card]})),
+    )
+    body = client.post(
+        "/api/chat/",
+        {"customer_id": BROKE, "message": "What alerts do I have?", "depth": 2},
+        content_type="application/json",
+    ).json()
+    assert body["cards"][0]["fixable"] is False
+
+
+# --- Fix 3: at most MAX_SHOWN_ALERTS on screen, every alert in chat -----------
+
+
+def many_alerts_profile(n=8):
+    """The broke customer's profile with n made-up alerts, priority n..1."""
+    profile = dict(services.get_profile(BROKE))
+    profile["alerts"] = [
+        {
+            "id": f"a-test-{i}",
+            "inference": 23,
+            "severity": "amber",
+            "title": f"Alert {i}",
+            "text": f"Alert {i}",
+            "impact_date": "2026-10-25",
+            "priority": float(i),
+        }
+        for i in range(n, 0, -1)
+    ]
+    return profile
+
+
+@pytest.fixture
+def eight_alerts(broke, monkeypatch):
+    profile = many_alerts_profile(8)
+    monkeypatch.setattr(services, "get_profile", lambda cid: profile)
+    return profile
+
+
+def test_active_alerts_limit_keeps_highest_priority(eight_alerts):
+    shown = services.active_alerts(BROKE, eight_alerts, limit=5)
+    assert [a["priority"] for a in shown] == [8.0, 7.0, 6.0, 5.0, 4.0]
+    assert len(services.active_alerts(BROKE, eight_alerts)) == 8
+
+
+@pytest.mark.parametrize("path", ["home", "alerts"])
+def test_screens_show_at_most_five_alerts(client, eight_alerts, path):
+    alerts = client.get(f"/api/{path}/{BROKE}/").json()["alerts"]
+    assert len(alerts) == MAX_SHOWN_ALERTS
+    assert alerts[0]["id"] == "a-test-8"
+
+
+def test_insights_show_at_most_five_alerts(client, eight_alerts):
+    items = client.get(f"/api/insights/{BROKE}/").json()["insights"]
+    ids = [i["key"] for i in items if str(i["key"]).startswith("a-test-")]
+    assert len(ids) == MAX_SHOWN_ALERTS
+
+
+def test_chat_tool_still_sees_every_alert(eight_alerts):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    alerts = call_tool(ToolContext(BROKE), "get_alerts", {})["alerts"]
+    assert len(alerts) == 8

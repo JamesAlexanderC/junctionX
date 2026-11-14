@@ -306,10 +306,12 @@ def explain_unclearable(profile, alert, candidates):
     """Why none of the candidate actions clears ``alert``, from the data,
     with what the user can do instead (never the fallback; F4)."""
     if candidates:
+        # #24: plain words; no planner internals like "none of the 9 changes".
         biggest = max(c["monthly_impact"] for c in candidates)
         why = (
-            f"None of the {len(candidates)} changes the coach can suggest clears "
-            f"it; the biggest saves EUR {biggest:,.2f} a month."
+            "Nothing the coach can suggest (cutting everyday spending, dropping a "
+            "subscription, pausing a goal or moving savings) clears this; the "
+            f"most any of them saves is EUR {biggest:,.2f} a month."
         )
     else:
         why = NOTHING_TO_CHANGE

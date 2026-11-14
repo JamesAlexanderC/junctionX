@@ -91,6 +91,33 @@ def scheduled_flows(income: dict, bills: list[dict], today, end):
     return flows
 
 
+def safe_to_spend_week(
+    balance, bills_before_payday, monthly_saving, buffer, days_to_payday, cycle_days
+):
+    """#17 Safe to spend this week (context.md "Forecasts").
+
+    Available = B - bills due before payday - monthly saving x share of the
+    pay cycle left - buffer; safe this week = Available x min(7, D) / D,
+    floored at 0. Only the saving still due this cycle is held back (not the
+    whole month's), as context.md specifies and Will confirmed (FC-5).
+    """
+    days = max(1, days_to_payday)
+    cycle_left = min(1.0, days / max(1, cycle_days))
+    available = balance - bills_before_payday - monthly_saving * cycle_left - buffer
+    return max(0.0, available * min(7, days) / days)
+
+
+def month_end_target(today):
+    """#19 target date: this month's last day, or next month's when fewer
+    than MONTH_END_ROLLOVER_DAYS are left (FC-1: on the data's as-of date,
+    30 Sep, the old horizon was 0 days and the band collapsed)."""
+    month = month_key(today)
+    end = to_date(pd.Period(month, freq="M").end_time)
+    if (end - today).days < th.MONTH_END_ROLLOVER_DAYS:
+        end = to_date(pd.Period(add_months(month, 1), freq="M").end_time)
+    return end
+
+
 def compute_forecast(df: pd.DataFrame, today, income: dict, baskets: dict) -> dict:
     """profile["forecast"] (#17 to #23)."""
     df = prepare(df, today)
@@ -104,8 +131,7 @@ def compute_forecast(df: pd.DataFrame, today, income: dict, baskets: dict) -> di
     days_to_payday = max(1, payday["days_to_payday"]) if found else None
 
     # #19 End-of-month balance with an 80% band.
-    month = month_key(today)
-    month_end = to_date(pd.Period(month, freq="M").end_time)
+    month_end = month_end_target(today)
     horizon_days = max(
         (month_end - today).days,
         days_to_payday or th.NO_PAYDAY_HORIZON_DAYS,
@@ -117,12 +143,18 @@ def compute_forecast(df: pd.DataFrame, today, income: dict, baskets: dict) -> di
     if days_left > 0:
         eom = path[days_left - 1]
         end_of_month = {
+            "date": iso(month_end),
             "expected": r2(eom["expected"]),
             "low": r2(eom["low"]),
             "high": r2(eom["high"]),
         }
     else:
-        end_of_month = {"expected": r2(b0), "low": r2(b0), "high": r2(b0)}
+        end_of_month = {
+            "date": iso(month_end),
+            "expected": r2(b0),
+            "low": r2(b0),
+            "high": r2(b0),
+        }
 
     # #20 Danger days: days before the next payday whose low bound < EUR 50.
     to_payday = days_to_payday or th.NO_PAYDAY_HORIZON_DAYS
@@ -140,10 +172,14 @@ def compute_forecast(df: pd.DataFrame, today, income: dict, baskets: dict) -> di
         cycle_days = (
             (payday_date - to_date(last)).days if last else th.DEFAULT_CYCLE_DAYS
         )
-        cycle_left = min(1.0, days_to_payday / max(1, cycle_days))
-        planned_saving = (baskets.get("monthly_saving") or 0.0) * cycle_left
-        available = b0 - due - planned_saving - buf
-        safe_week = max(0.0, available * min(7, days_to_payday) / days_to_payday)
+        safe_week = safe_to_spend_week(
+            b0,
+            due,
+            baskets.get("monthly_saving") or 0.0,
+            buf,
+            days_to_payday,
+            cycle_days,
+        )
     else:
         # No payday found: fall back to balance - buffer (edge-case test).
         safe_week = max(0.0, b0 - buf)

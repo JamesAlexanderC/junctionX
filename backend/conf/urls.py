@@ -39,3 +39,7 @@ urlpatterns = [
         name="redoc",
     ),
 ]
+
+# JSON instead of Django's HTML pages when DEBUG is off (conf/errors.py).
+handler404 = "conf.errors.not_found"
+handler500 = "conf.errors.server_error"

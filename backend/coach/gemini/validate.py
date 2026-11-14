@@ -5,8 +5,14 @@ tool result of this turn or the user's message. Each known card must match
 its payload (cards.py); unknown card types are dropped.
 """
 
+import json
 import re
 from typing import Any
+
+import pandas as pd
+
+from inferences.common import merchant_name
+from inferences.thresholds import MERCHANT_ID_RE
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
@@ -17,9 +23,15 @@ MAX_CHIPS = 3
 # Small counts ("2 easy steps", "3 months") are allowed without a tool source.
 FREE_INTEGERS = set(range(0, 11))
 
-NUMBER_RE = re.compile(
-    r"(?<![\w.])[+-]?(?:\d{1,3}(?:[,\s]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"
-)
+# Thousands may be grouped by a space, a no-break space or a narrow no-break
+# space ("1 428.40 €"), or by dots with a decimal comma ("1.428,40 €").
+THOUSANDS_SPACES = "\u0020\u00a0\u202f"
+SPACE_GROUPED = rf"\d{{1,3}}(?:[{THOUSANDS_SPACES}]\d{{3}})+(?:[.,]\d+)?(?!\d)"
+DOT_GROUPED = r"\d{1,3}(?:\.\d{3})+,\d+"
+COMMA_GROUPED = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?"
+# An optional sign is kept, so "-20" never matches a source value of 20.
+GROUPED = f"{SPACE_GROUPED}|{DOT_GROUPED}|{COMMA_GROUPED}"
+NUMBER_RE = re.compile(rf"(?<![\w.])[+-]?(?:{GROUPED}|\d+(?:[.,]\d+)?)")
 
 
 class ReplyError(ValueError):
@@ -42,9 +54,11 @@ class SendReply(BaseModel):
 
 
 def parse_number(token):
-    token = re.sub(r"\s", "", token)
-    if re.fullmatch(r"[+-]?\d{1,3}(?:,\d{3})+(?:\.\d+)?", token):
+    token = re.sub(f"[{THOUSANDS_SPACES}]", "", token)
+    if re.fullmatch(rf"[+-]?{COMMA_GROUPED}", token):
         return float(token.replace(",", ""))
+    if re.fullmatch(rf"[+-]?{DOT_GROUPED}", token):
+        return float(token.replace(".", "").replace(",", "."))
     return float(token.replace(",", "."))
 
 
@@ -263,12 +277,28 @@ def _check_card_numbers(cards, sources):
             )
 
 
+MERCHANT_RE = re.compile(MERCHANT_ID_RE)
+
+
+def _check_merchant_ids(text, cards):
+    """#24: users never see raw merchant ids; name the friendly version."""
+    found = MERCHANT_RE.search(f"{text} {json.dumps(cards)}")
+    if found:
+        raw = found.group(0)
+        friendly = merchant_name(pd.DataFrame(), raw)
+        raise ReplyError(
+            f"Do not show raw merchant ids like {raw}; say '{friendly}' instead."
+        )
+
+
 def validate_reply(args, tool_results, message=""):
     """Return a clean reply dict or raise ReplyError with a reason for Gemini."""
     try:
         reply = SendReply.model_validate(dict(args or {}))
     except ValidationError as exc:
         raise ReplyError(f"send_reply schema error: {exc.errors()}") from exc
+    # First: its digits ("0016") would otherwise fail as an unknown number.
+    _check_merchant_ids(reply.text, reply.cards)
     bad = unmatched_numbers(reply.text, tool_results, message)
     if bad:
         raise ReplyError(

@@ -2,7 +2,6 @@
 
 import re
 from copy import deepcopy
-from datetime import timedelta
 
 from ... import services
 from ...models import ChatTurn
@@ -40,6 +39,8 @@ class ToolContext:
         self.validation_errors = []  # rejected send_reply reasons (F3)
         self.user_numbers = []  # earlier user messages and proposal (F1)
         self.timings = []  # [{step, ms, ...}] for router, gemini, tool (F2)
+        self.conversational = False  # small talk: one round, send_reply only
+        self.fixable = None  # alert ids a "Fix this" plan clears (per turn)
         self.alert_runner = None
         self._profile = None
 
@@ -111,11 +112,6 @@ def form_errors(errors):
 
 
 # --- helpers ---------------------------------------------------------------
-
-
-def _last_full_month(on):
-    first = on.replace(day=1)
-    return (first - timedelta(days=1)).strftime("%Y-%m")
 
 
 def _norm(text):

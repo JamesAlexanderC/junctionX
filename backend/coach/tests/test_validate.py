@@ -12,6 +12,32 @@ def test_numbers_in_text_formats():
     ]
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "1 428.40 €",  # plain space
+        "1 428.40 €",  # no-break space
+        "1 428,40 €",  # narrow no-break space, decimal comma
+        "1.428,40 €",  # dot thousands, decimal comma
+    ],
+)
+def test_numbers_in_text_reads_european_thousands(text):
+    # Fix 1 (live, CUST00033): "1 428.40" was read as 1 and 428.4, so a
+    # correct safe-to-spend reply was rejected and ran out of rounds.
+    assert numbers_in_text(text) == [1428.40]
+
+
+def test_space_between_unrelated_numbers_is_not_a_thousands_group():
+    assert numbers_in_text("on 15 October, 2 bills") == [15, 2]
+    assert numbers_in_text("pay 15 1234") == [15, 1234]
+
+
+def test_european_amount_matches_tool_result():
+    results = [{"safe_to_spend_week": 1428.4, "bill": 1355.57}]
+    reply = {"text": "You can spend 1 428.40 € after 1 355,57 € rent.", "depth": 1}
+    assert validate_reply(reply, results)["text"]
+
+
 def test_numbers_must_come_from_tools():
     results = [{"safe_to_spend_week": 64.0, "next_payday": "2026-10-23"}]
     ok = validate_reply({"text": "EUR 64 until 23 Oct", "depth": 1}, results)
@@ -158,7 +184,7 @@ def test_numbers_inside_card_strings_are_checked():
             "title": "x",
             "data": [{"label": "a", "value": 820.0}],
         },
-        {"type": "number", "value": 820.0},  # no label
+        {"type": "number", "label": "Leaky"},  # no value
         {"type": "alert", "id": "a1", "severity": "purple", "title": "t", "text": "t"},
         {"type": "question", "question": "Which?", "options": ["only one"]},
     ],
@@ -273,3 +299,15 @@ def test_slider_pct_is_shown_in_percent(given, shown):
         {"text": "Try it.", "depth": 3, "cards": [card]}, [{"spend": 370.95}], ""
     )
     assert reply["cards"][0]["pct"] == shown
+
+
+def test_raw_merchant_ids_are_rejected_with_the_friendly_name():
+    with pytest.raises(ReplyError, match="a grocery shop"):
+        validate_reply({"text": "MRC-GRO-0016 went up.", "depth": 1}, [])
+
+
+def test_number_card_without_a_label_is_accepted():
+    """Item 5: Gemini often omits the label; a retry costs 6-16 s per reply."""
+    card = {"type": "number", "value": 820.0}
+    out = validate_reply(_reply(card), BASKETS)
+    assert out["cards"][0]["value"] == 820.0

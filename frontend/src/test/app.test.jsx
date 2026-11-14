@@ -658,6 +658,49 @@ describe('chart card', () => {
     expect(screen.getAllByRole('row')).toHaveLength(2)
   })
 
+  // FC-2: the forecast chart carries an 80% band and flagged days.
+  const forecast = {
+    type: 'chart',
+    kind: 'line',
+    title: 'Expected balance (likely range)',
+    unit: 'EUR',
+    data: [
+      { label: '2026-10-01', value: 900, low: 850, high: 950 },
+      { label: '2026-10-02', value: 170, low: 60, high: 280, flag: 'bill' },
+      { label: '2026-10-08', value: 90, low: 20, high: 160, flag: 'danger' },
+      { label: '2026-10-15', value: 2000, low: 1880, high: 2120, flag: 'payday' },
+    ],
+  }
+
+  it('draws the likely range as a band under the line', () => {
+    const { container } = render(<ReplyCard card={forecast} onSend={() => {}} />)
+    expect(container.querySelector('path.band')).toBeTruthy()
+    expect(container.querySelector('path.line')).toBeTruthy()
+    expect(container.querySelector('text.band-label').textContent).toBe('likely range')
+  })
+
+  it('a plain line has no band', () => {
+    const plain = { ...forecast, data: forecast.data.map(({ label, value }) => ({ label, value })) }
+    const { container } = render(<ReplyCard card={plain} onSend={() => {}} />)
+    expect(container.querySelector('path.band')).toBeNull()
+  })
+
+  it('marks danger, bill and payday days', () => {
+    const { container } = render(<ReplyCard card={forecast} onSend={() => {}} />)
+    expect(container.querySelectorAll('circle.marker.danger')).toHaveLength(1)
+    expect(container.querySelectorAll('circle.marker.bill')).toHaveLength(1)
+    expect(container.querySelectorAll('circle.marker.payday')).toHaveLength(1)
+  })
+
+  it('tapping a point shows its likely range and what the day is', () => {
+    render(<ReplyCard card={forecast} onSend={() => {}} />)
+    fireEvent.click(screen.getAllByTestId('chart-hit')[2])
+    const readout = screen.getByTestId('chart-readout').textContent
+    expect(readout).toContain('€90')
+    expect(readout).toContain('likely €20 to €160')
+    expect(readout).toContain('Tight day')
+  })
+
   it('every value is in the screen-reader table', () => {
     render(<ReplyCard card={bars} onSend={() => {}} />)
     expect(screen.getAllByRole('row')).toHaveLength(3)
@@ -860,5 +903,40 @@ describe('help page', () => {
     window.location.hash = '#/c/CUST00001/help'
     render(<App />)
     expect(screen.getByLabelText('Username')).toBeTruthy()
+  })
+})
+
+describe('level card (FC-7)', () => {
+  it('shows the current level and the next one', () => {
+    const card = {
+      type: 'level_progress',
+      level: 3,
+      name: 'Safety net',
+      current_level: 2,
+      current_name: 'In control',
+      progress: 0,
+    }
+    render(<ReplyCard card={card} onSend={() => {}} />)
+    expect(screen.getByText('Level 2: In control')).toBeTruthy()
+    expect(screen.getByText('Next: Level 3 Safety net')).toBeTruthy()
+  })
+})
+
+describe('alert card button', () => {
+  const alert = { type: 'alert', id: 'a-101', severity: 'amber', title: 'Bill went up', text: 'x' }
+
+  it('a fixable alert offers Fix this', () => {
+    const onSend = vi.fn()
+    render(<ReplyCard card={{ ...alert, fixable: true }} onSend={onSend} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Fix this' }))
+    expect(onSend).toHaveBeenCalledWith('Help me fix the "Bill went up" alert', 4)
+  })
+
+  it('an alert no plan can fix offers Why? instead, so it cannot loop', () => {
+    const onSend = vi.fn()
+    render(<ReplyCard card={{ ...alert, fixable: false }} onSend={onSend} />)
+    expect(screen.queryByRole('button', { name: 'Fix this' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Why?' }))
+    expect(onSend).toHaveBeenCalledWith('Why did I get the "Bill went up" alert?', 2)
   })
 })

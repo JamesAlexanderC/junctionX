@@ -120,9 +120,16 @@ def test_get_inference_series_has_chart_data(aino):
     out = _call(aino, "get_inference", item="forecast.daily_path")
     path = profile["forecast"]["daily_path"]
     assert out["chart"] == {"kind": "line"}
-    assert out["chart_data"] == [
-        {"label": p["date"], "value": p["expected"]} for p in path
-    ]
+    # FC-2: forecast points also carry the band and, on marked days, a flag.
+    assert [
+        (d["label"], d["value"], d["low"], d["high"]) for d in out["chart_data"]
+    ] == [(p["date"], p["expected"], p["low"], p["high"]) for p in path]
+    assert {d.get("flag") for d in out["chart_data"]} <= {
+        None,
+        "danger",
+        "bill",
+        "payday",
+    }
 
 
 def test_get_inference_dict_has_chart_data(aino):
@@ -187,3 +194,15 @@ def test_trim_replaces_id_lists_with_counts_without_mutating():
 )
 def test_chart_data_skips_missing_values(item, value, expected):
     assert chart_data(CATALOGUE[item], value) == expected
+
+
+# --- F8: "last month" in chat = the latest complete month --------------------------
+
+
+def test_category_spend_defaults_to_the_latest_complete_month(aino, settings):
+    from coach import services
+
+    settings.AS_OF_DATE = "2026-09-30"  # the real data's as-of date
+    services.reset_as_of_cache()
+    out = _call(aino, "get_category_spend", category="groceries")
+    assert out["month"] == "2026-09"

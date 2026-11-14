@@ -187,11 +187,11 @@ Safe to save = max(0, lowest forecast balance before next payday (#20, low bound
 19
 End-of-month balance
 B, #1, #4, daily spend
-d = median daily discretionary spend (last 60 days), σ = its standard deviation. Expected = B + income due − bills due − d × days left. Range = expected ± 1.28 × σ × √(days left) (an 80% band).
+d = mean daily discretionary spend (last 60 days, days without spend count as 0), σ = its standard deviation. Mean, not median: on the real data most days have no spend, so the median was EUR 0 and the balance never moved (docs/calibration.md #4). Expected = B + income due − bills due − d × days left. Range = expected ± 1.28 × σ × √(days left) (an 80% band). Month end = this month's last day, or next month's when fewer than 3 days are left, so the forecast always looks ahead (FC-1).
 20
 Danger days
 #19 day by day
-Simulate each day to payday: balance(t) = balance(t−1) − d + scheduled income − scheduled bills, with the low bound = balance(t) − 1.28 × σ × √t. Danger days = days where the low bound < EUR 50.
+Simulate each day to payday: balance(t) = balance(t−1) − d + scheduled income − scheduled bills, with the low bound = balance(t) − 1.28 × σ × √t. Danger days = days where the low bound < EUR 50. Without a detected payday, simulate the next 30 days and word the alert "in the next 30 days" (FC-4).
 21
 Upcoming bills
 #4

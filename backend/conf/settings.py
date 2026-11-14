@@ -43,8 +43,17 @@ SECRET_KEY = os.environ.get(
     "django-insecure-0(6hz1jb!#d&nasyvdnd+$t^f@m6h4q^fbdn_4$xmw-vvlg1+c",
 )
 
+TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def env_flag(name):
+    """True when the variable is set to 1 / true / yes / on; off by default."""
+    return os.environ.get(name, "").strip().lower() in TRUE_VALUES
+
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+# Off unless DJANGO_DEBUG=1 (.env): with it on, 404 pages list every route.
+DEBUG = env_flag("DJANGO_DEBUG")
 
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
@@ -222,8 +231,9 @@ AS_OF_DATE = os.environ.get("AS_OF_DATE", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_ROUTER_MODEL = os.environ.get("GEMINI_ROUTER_MODEL", "gemini-3.5-flash-lite")
-# "low" or "high"; empty = the model's default (dynamic thinking, slower).
-GEMINI_THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "low")
+# Thinking for depth 3-4 (what-ifs, plans): "low" or "high"; empty = the
+# model's default (dynamic, slower). Depth 1 never thinks, depth 2 thinks low.
+GEMINI_THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "")
 # Ask Gemini for thought summaries; the chat shows their headings while it
 # waits (coach/gemini/progress.py). "0" turns them off.
 GEMINI_SHOW_THOUGHTS = os.environ.get("GEMINI_SHOW_THOUGHTS", "1") == "1"

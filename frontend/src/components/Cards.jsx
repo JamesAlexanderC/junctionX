@@ -172,9 +172,17 @@ function LevelProgressCard({ card }) {
   return (
     <div className="card">
       {card.ladder?.length > 0 && <Ladder ladder={card.ladder} target={card.level} />}
-      <strong>
-        Level {card.level}: {card.name}
-      </strong>
+      {/* FC-7: lead with where the user is; the bar is progress to the next. */}
+      {card.current_level != null && card.current_level !== card.level ? (
+        <>
+          <strong>{`Level ${card.current_level}: ${card.current_name}`}</strong>
+          <small className="muted">{`Next: Level ${card.level} ${card.name}`}</small>
+        </>
+      ) : (
+        <strong>
+          Level {card.level}: {card.name}
+        </strong>
+      )}
       <Bar value={card.progress} />
       <small>
         {card.euros_to_go != null && `${eur(card.euros_to_go)} to go`}
@@ -223,14 +231,26 @@ function AlertCard({ card, onSend }) {
         <i className={`dot sev-${card.severity}`} /> {card.title}
       </strong>
       <p>{card.text}</p>
-      <button
-        type="button"
-        className="btn-primary"
-        onClick={() => onSend(`Help me fix the "${card.title}" alert`, 4)}
-      >
-        <Icon name="fix" size={16} />
-        Fix this
-      </button>
+      {/* Only a plan-fixable alert gets "Fix this"; the backend sets fixable.
+          Otherwise "Why?" asks for the evidence instead of looping. */}
+      {card.fixable === false ? (
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => onSend(`Why did I get the "${card.title}" alert?`, 2)}
+        >
+          Why?
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => onSend(`Help me fix the "${card.title}" alert`, 4)}
+        >
+          <Icon name="fix" size={16} />
+          Fix this
+        </button>
+      )}
     </div>
   )
 }

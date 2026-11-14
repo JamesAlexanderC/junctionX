@@ -54,7 +54,7 @@ Own-account transfers: `transaction_type` in `OWN_TRANSFER_TYPES`
   `?stream=1` answers NDJSON instead: `{type: "step"|"thought", text}` lines
   while it works (`coach/gemini/progress.py`), then `{type: "reply", reply}`
   or `{type: "error", error}`; 404 / 503 stay plain JSON. Thought headings
-  only appear when Gemini thinks (`GEMINI_THINKING_LEVEL=high`).
+  only appear when Gemini thinks (depth 2 and up; depth 1 never thinks).
 - `GET /api/goals/?customer_id=` -> `{customer_id, as_of, active: [{id, name,
   emoji, type, priority, paused, target, saved, progress_pct, expected_pct,
   on_track, target_date, projected_date, months_needed, difficulty,
@@ -104,7 +104,8 @@ question, alert, plan, before_after. Max 3 chips. Depth 1 Quick, 2 Explain,
 
 Card payloads:
 - number `{label, value, unit?: "EUR"}`
-- chart `{kind: "bar"|"line", title, unit?, data: [{label, value}]}`
+- chart `{kind: "bar"|"line", title, unit?, data: [{label, value, low?, high?,
+  flag?: "danger"|"bill"|"payday"}]}` (low/high = 80% band; forecast chart only)
 - basket_bar `{essential, surprise, leaky, saver}`
 - slider `{category, monthly_spend, min_pct: 0, max_pct: 50, pct, goal?: {target,
   saved, monthly_rate}, as_of}` (server sets as_of from the profile; frontend

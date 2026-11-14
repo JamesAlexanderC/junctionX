@@ -14,9 +14,10 @@ from google.genai import types
 from .. import services
 from ..models import ChatTurn, DemoCache
 from . import progress, router
-from .cards import reference_dates
+from .cards import card_summary, reference_dates
 from .system_prompt import FALLBACK_REPLY, SYSTEM_PROMPT
 from .tools import ToolContext, call_tool, tool_declarations
+from .tools.alerts import mark_alert_cards
 from .tools.inference import list_inferences
 from .validate import ReplyError, validate_reply
 
@@ -25,8 +26,18 @@ log = logging.getLogger("coach.gemini")
 # The spec's 5 rounds (F2: speed); call tools together to fit deeper answers.
 MAX_ROUNDS = 5
 HISTORY_TURNS = 6
+SUMMARY_ALERTS = 5  # open alerts named in the profile summary (conversation A)
+CONVERSATION_NOTE = (
+    "This message is conversation, not a data question. Reply warmly and "
+    "briefly with send_reply. Use the earlier turns and what was shown if they "
+    "help; offer one follow-up chip if useful."
+)
 # Total size of tool results per turn, so the context stays small (~15k tokens).
 MAX_TURN_RESULT_CHARS = 60_000
+LAST_ROUND_NOTE = (
+    "Last step: answer now with send_reply, using only the tool results you "
+    "already have. If they do not cover everything, say what you can and why."
+)
 BUDGET_ERROR = (
     "The tool result budget for this turn is used up. Answer with the results "
     "you already have and call send_reply."
@@ -42,29 +53,56 @@ def get_client():
     return genai.Client(api_key=settings.GEMINI_API_KEY)
 
 
-def build_config():
+# Speed #2: thinking by depth. Each Gemini call took 6.5-8 s, mostly the
+# model's thinking; a script test with thinking off halved the median
+# (~20 s -> 8.7 s). Facts and small talk need none, explanations a little;
+# what-ifs and plans use GEMINI_THINKING_LEVEL.
+THINKING_OFF = types.ThinkingConfig(thinking_budget=0)
+THINKING_LOW = types.ThinkingConfig(thinking_level="low")
+
+
+def _thinking(ctx):
+    """(label, ThinkingConfig or None) for this turn's depth. Depth 3 and 4
+    use GEMINI_THINKING_LEVEL; empty = the model's default."""
+    depth = getattr(ctx, "depth", None) or 1
+    if ctx.conversational or depth <= 1:
+        return "off", THINKING_OFF
+    if depth == 2:
+        return "low", THINKING_LOW
+    level = settings.GEMINI_THINKING_LEVEL
+    if level:
+        return level, types.ThinkingConfig(thinking_level=level)
+    return "default", None
+
+
+def build_config(final=False, thinking=None):
+    """Gemini config; on the final round only send_reply may be called, so a
+    turn always ends with an answer built from the tools already used (FC-3:
+    Gemini kept looking for more data until the rounds ran out)."""
+    calling = types.FunctionCallingConfig(
+        mode="ANY", allowed_function_names=["send_reply"] if final else None
+    )
+    declarations = tool_declarations()
+    if final:
+        # Live, Gemini ignored allowed_function_names, so declare only this.
+        declarations = [d for d in declarations if d.name == "send_reply"]
     return types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
-        tools=[types.Tool(function_declarations=tool_declarations())],
-        tool_config=types.ToolConfig(
-            function_calling_config=types.FunctionCallingConfig(mode="ANY")
-        ),
+        tools=[types.Tool(function_declarations=declarations)],
+        tool_config=types.ToolConfig(function_calling_config=calling),
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-        thinking_config=_thinking_config(),
+        thinking_config=_with_thoughts(thinking),
     )
 
 
-def _thinking_config():
-    """Flash thinks by default, which more than doubled reply time (11 s ->
-    5.6 s for "safe to spend" at "low"); empty level = model default.
-    include_thoughts adds thought summaries the chat shows while it waits
-    (progress.py); they cost no extra rounds."""
-    opts = {}
-    if settings.GEMINI_THINKING_LEVEL:
-        opts["thinking_level"] = settings.GEMINI_THINKING_LEVEL
-    if settings.GEMINI_SHOW_THOUGHTS:
-        opts["include_thoughts"] = True
-    return types.ThinkingConfig(**opts) if opts else None
+def _with_thoughts(thinking):
+    """Ask for thought summaries (the chat shows them while it waits,
+    progress.py) whenever the model thinks; they cost no extra rounds."""
+    if not settings.GEMINI_SHOW_THOUGHTS or thinking is THINKING_OFF:
+        return thinking
+    if thinking is None:
+        return types.ThinkingConfig(include_thoughts=True)
+    return thinking.model_copy(update={"include_thoughts": True})
 
 
 def normalise_question(text):
@@ -86,6 +124,11 @@ def profile_summary(profile):
             .get("label"),
             "goals": [{"id": g["id"], "name": g["name"]} for g in goals],
             "alert_count": len(profile.get("alerts", [])),
+            # Conversation A: lets "that one" / "looks familiar" find an alert.
+            "alerts": [
+                {"id": a.get("id"), "title": a.get("title")}
+                for a in profile.get("alerts", [])[:SUMMARY_ALERTS]
+            ],
             "inferences_available": _available_count(profile),
             "leaky_categories": [
                 c["category"]
@@ -117,6 +160,25 @@ def _call_within_budget(ctx, name, args, used):
     return result, used + size
 
 
+def _with_cards_shown(reply):
+    """The reply text plus a line naming what its cards showed (conversation
+    A): without it "looks familiar" had nothing to refer to."""
+    text = reply.get("text") or ""
+    shown = [card_summary(c) for c in reply.get("cards") or [] if isinstance(c, dict)]
+    if shown:
+        text = f"{text}\n[Shown: {'; '.join(shown)}]".strip()
+    return text
+
+
+def _earlier_coach_replies(customer_id, conversation=None):
+    """What the coach said in the last HISTORY_TURNS turns (conversation B):
+    its numbers were checked against tools when first said."""
+    stored = ChatTurn.objects.filter(
+        customer_id=customer_id, conversation=conversation
+    ).order_by("-created_at", "-id")[:HISTORY_TURNS]
+    return [t.reply for t in stored]
+
+
 def _history_contents(customer_id, history, conversation=None):
     turns = list(
         ChatTurn.objects.filter(
@@ -127,8 +189,9 @@ def _history_contents(customer_id, history, conversation=None):
     if turns:
         for t in turns:
             contents.append(_text("user", t.message))
-            if t.reply.get("text"):
-                contents.append(_text("model", t.reply["text"]))
+            said = _with_cards_shown(t.reply)
+            if said:
+                contents.append(_text("model", said))
         return contents
     for item in (history or [])[-HISTORY_TURNS * 2 :]:
         role = "model" if item.get("role") in ("assistant", "model") else "user"
@@ -260,11 +323,17 @@ def chat_stream(
     ctx.user_numbers = [
         ctx.previous_pending,
         *_earlier_user_messages(customer_id, history, conversation),
+        *_earlier_coach_replies(customer_id, conversation),
     ]
+    # Conversation C: small talk gets one round with send_reply only. Never
+    # while a proposal waits, so "ok" / "yes" still confirms it.
+    ctx.conversational = not ctx.previous_pending and router.is_conversational(message)
 
     if client is None:
         raise GeminiNotConfigured("Gemini is not configured: set GEMINI_API_KEY")
 
+    if ctx.conversational and depth is None:
+        depth = 1  # small talk: no router call needed
     routed = depth is None
     if routed:
         yield {"type": "step", "text": progress.ROUTER_STEP}
@@ -273,6 +342,7 @@ def chat_stream(
                 message, client=client, model=settings.GEMINI_ROUTER_MODEL
             )
 
+    ctx.depth = depth  # speed #2: thinking is set by depth (_thinking)
     contents = _history_contents(customer_id, history, conversation)
     contents.append(
         _text(
@@ -280,6 +350,7 @@ def chat_stream(
             f"Profile summary: {profile_summary(profile)}\n"
             f"Answer at depth {depth}.\n"
             + (f"{router.LEVELS_HINT}\n" if router.wants_levels(message) else "")
+            + (f"{CONVERSATION_NOTE}\n" if ctx.conversational else "")
             + f"User: {message}",
         )
     )
@@ -314,6 +385,8 @@ def chat_stream(
         "model": settings.GEMINI_MODEL,
         "depth": depth,
         "routed": routed,
+        "conversational": ctx.conversational,
+        "thinking": _thinking(ctx)[0],
         "tools": ctx.tools_called,
         "rounds": rounds,
         "fallback": bool(reason),
@@ -352,13 +425,21 @@ def _run(client, contents, ctx):
     A generator: yields progress events, returns (reply, rounds, fallback
     reason or None, detail).
     """
-    config = build_config()
+    thinking = _thinking(ctx)[1]
+    config = build_config(thinking=thinking)
+    final_config = build_config(final=True, thinking=thinking)
     retried = False
     used = 0
     for round_no in range(1, MAX_ROUNDS + 1):
         with _timed(ctx, "gemini", round=round_no):
             resp = client.models.generate_content(
-                model=settings.GEMINI_MODEL, contents=contents, config=config
+                model=settings.GEMINI_MODEL,
+                contents=contents,
+                config=(
+                    final_config
+                    if round_no == MAX_ROUNDS or ctx.conversational
+                    else config
+                ),
             )
         contents.append(resp.candidates[0].content)
         yield from progress.thoughts(resp)
@@ -375,7 +456,7 @@ def _run(client, contents, ctx):
                         reply = validate_reply(
                             args, ctx.results + ctx.user_numbers, ctx.message
                         )
-                    return reply, round_no, None, None
+                    return mark_alert_cards(ctx, reply), round_no, None, None
                 except ReplyError as exc:
                     log.warning("send_reply rejected: %s", exc)
                     ctx.validation_errors.append(str(exc))
@@ -392,5 +473,7 @@ def _run(client, contents, ctx):
             )
         if not parts:
             parts.append(_text("user", "Call send_reply to answer.").parts[0])
+        if round_no == MAX_ROUNDS - 1:
+            parts.append(_text("user", LAST_ROUND_NOTE).parts[0])
         contents.append(types.Content(role="user", parts=parts))
     return None, MAX_ROUNDS, "max_rounds", f"No send_reply after {MAX_ROUNDS} rounds."

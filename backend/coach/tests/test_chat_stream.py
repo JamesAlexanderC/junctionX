@@ -55,7 +55,8 @@ def test_stream_sends_steps_thoughts_then_reply(client, aino, fake_gemini):
 def test_routed_turn_starts_with_reading_step(client, aino, fake_gemini, monkeypatch):
     monkeypatch.setattr(loop.router, "route", lambda *a, **k: 1)
     fake_gemini(reply())
-    out = events(stream(client, "hi", depth=None))
+    # Not small talk ("hi" is answered without the router).
+    out = events(stream(client, "Where does my money go?", depth=None))
     assert out[0] == {"type": "step", "text": progress.ROUTER_STEP}
 
 

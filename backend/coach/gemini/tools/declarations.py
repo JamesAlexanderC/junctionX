@@ -81,7 +81,13 @@ CARD_SCHEMA = {
             "type": "array",
             "items": {
                 "type": "object",
-                "properties": {"label": STR, "value": NUM},
+                "properties": {
+                    "label": STR,
+                    "value": NUM,
+                    "low": NUM,
+                    "high": NUM,
+                    "flag": {"type": "string", "enum": ["danger", "bill", "payday"]},
+                },
             },
         },
         "essential": NUM,
@@ -109,6 +115,8 @@ CARD_SCHEMA = {
         "difficulty": STR,
         "monthly_needed": NUM,
         "level": INT,
+        "current_level": INT,
+        "current_name": STR,
         "progress": NUM,
         "euros_to_go": NUM,
         "next_step": STR,
@@ -158,7 +166,8 @@ def _decl(name, description, properties=None, required=None):
 DECLARATIONS = [
     _decl(
         "get_category_spend",
-        "Total spend in one category for a month (default: last full month).",
+        "Total spend in one category for a month. For 'last month' leave month "
+        "empty: the default is the latest complete month.",
         {"category": STR, "month": {"type": "string", "description": "YYYY-MM"}},
         ["category"],
     ),
@@ -227,6 +236,21 @@ DECLARATIONS = [
             "step": INT,
         },
         ["goal_id", "action"],
+    ),
+    _decl(
+        "calculate_goal",
+        "Goal maths for amounts the user types: how long saving amount takes at "
+        "their average monthly saving (or a monthly amount they give), and for a "
+        "date the monthly amount needed, difficulty and whether it is realistic "
+        "with a realistic amount and date. Saves nothing. Use it; never work out "
+        "months, dates or amounts yourself.",
+        {
+            "amount": NUM,
+            "date": {"type": "string", "description": "YYYY-MM-DD"},
+            "monthly": NUM,
+            "saved": NUM,
+        },
+        ["amount"],
     ),
     _decl("get_detected_goals", "Goals detected from the data, as suggestions."),
     _decl(

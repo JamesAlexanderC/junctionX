@@ -10,6 +10,10 @@ from inferences import thresholds as _th
 # Priority weights: priority = weight / max(1, days until impact).
 SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
 
+# Screens (Home, Insights, /api/alerts/) show the top alerts by priority; chat
+# (get_alerts) still sees every alert. Live: some customers had 8.
+MAX_SHOWN_ALERTS = 5
+
 from inferences.thresholds import (  # noqa: F401  shared with the inferences
     BUFFER_ESSENTIALS_SHARE,
     BUFFER_MIN_EUR,
@@ -117,6 +121,10 @@ PAYDAY_MISSED_DAYS = 3
 
 # #101 bill went up
 BILL_UP_RATIO = 1.10
+# #101 (#24 live test): shops visited about monthly are not bills, even when
+# their amounts are steady (a grocery shop was flagged as "Bill went up").
+# Entertainment and transport stay: they can be subscriptions or passes.
+NOT_BILL_CATEGORIES = frozenset({"groceries", "restaurants", "lifestyle", "travel"})
 
 # #102 big bill coming
 BIG_BILL_DAYS = 3
