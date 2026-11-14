@@ -89,6 +89,27 @@
   padding: 0 12px 12px;
 }
 
+.enter-row.flush {
+  padding: 0;
+}
+
+.logout {
+  margin-left: auto;
+  min-height: 32px;
+  padding: 0 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--on-brand);
+  background: none;
+  border: 1px solid rgb(255 255 255 / 50%);
+  border-radius: 999px;
+}
+
+.logout:hover,
+.logout:focus-visible {
+  background: rgb(255 255 255 / 15%);
+}
+
 .enter-row .send {
   min-height: 44px;
 }

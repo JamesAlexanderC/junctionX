@@ -40,6 +40,11 @@ Own-account transfers: `transaction_type` in `OWN_TRANSFER_TYPES`
 (thresholds.py), to be confirmed against real data.
 
 ## API
+- Auth: every endpoint needs `Authorization: Token <key>` (DRF TokenAuthentication,
+  401 without). `POST /api/auth/login/ {username, password}` -> `{token, user}`
+  (400 on wrong credentials), `POST /api/auth/logout/` deletes the token,
+  `GET /api/auth/me/` -> `{user}`. Users are Django users (`createsuperuser`);
+  any logged-in user may open any customer. `/api/schema/` and docs stay public.
 - `GET /api/home/<customer_id>/` -> full profile JSON (404 if unknown).
 - `GET /api/insights/<customer_id>/` -> `{customer_id, as_of, insights: [{key,
   inference, title, value, unit, text, section, severity?}]}`: only insights

@@ -1,14 +1,18 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
 import { ReplyCard } from '../components/Cards.jsx'
 import Chat from '../components/Chat.jsx'
 import Insights from '../components/Insights.jsx'
 import { niceTicks, shortLabel } from '../lib/chart.js'
 
+// Every App test starts logged in unless it clears the token itself.
+beforeEach(() => localStorage.setItem('saldo.token', 'test-token'))
+
 afterEach(() => {
   vi.unstubAllGlobals()
   window.location.hash = ''
+  localStorage.clear()
 })
 
 describe('cards', () => {
@@ -229,5 +233,64 @@ describe('level card', () => {
     expect(container.querySelectorAll('.ladder li.reached')).toHaveLength(2)
     expect(screen.getByLabelText('Level 3 Safety net, next')).toBeTruthy()
     expect(screen.getByText(/€445 to go/)).toBeTruthy()
+  })
+})
+
+describe('auth', () => {
+  const json = (body, status = 200) =>
+    new Response(JSON.stringify(body), { status })
+
+  it('without a token the login screen shows, and logging in opens the picker', async () => {
+    localStorage.clear()
+    const fetch = vi.fn(async (url) => {
+      if (url === '/api/auth/login/') {
+        return json({ token: 'abc', user: { username: 'demo' } })
+      }
+      return json([{ customer_id: 'CUST00001' }])
+    })
+    vi.stubGlobal('fetch', fetch)
+    render(<App />)
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'demo' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }))
+    await screen.findByRole('option', { name: /CUST00001/ })
+    expect(localStorage.getItem('saldo.token')).toBe('abc')
+    const [, init] = fetch.mock.calls.find(([url]) => url.startsWith('/api/customers/'))
+    expect(init.headers.Authorization).toBe('Token abc')
+  })
+
+  it('wrong credentials show the backend error', async () => {
+    localStorage.clear()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => json({ error: 'Wrong username or password' }, 400)),
+    )
+    render(<App />)
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'demo' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'x' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }))
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Wrong username or password',
+    )
+  })
+
+  it('a 401 forgets the token and returns to the login screen', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ detail: 'Invalid token.' }, 401)))
+    render(<App />)
+    expect(await screen.findByLabelText('Username')).toBeTruthy()
+    expect(localStorage.getItem('saldo.token')).toBeNull()
+  })
+
+  it('log out returns to the login screen', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) =>
+        url === '/api/auth/logout/' ? new Response(null, { status: 204 }) : json([]),
+      ),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
+    expect(await screen.findByLabelText('Username')).toBeTruthy()
+    expect(localStorage.getItem('saldo.token')).toBeNull()
   })
 })

@@ -134,7 +134,8 @@ def _csv_counts(ids):
 
 def check_loaded_and_served():
     """Step 5: DB rows match CSV, timestamps parsed, profile served by API."""
-    from django.test import Client
+    from django.contrib.auth import get_user_model
+    from rest_framework.test import APIClient
 
     from coach.models import Transaction
 
@@ -148,7 +149,9 @@ def check_loaded_and_served():
             return False, f"{cid}: {got} rows in DB, {expected} in CSV"
         if not txs.exclude(tx_timestamp__hour=0, tx_timestamp__minute=0).exists():
             return False, f"{cid}: every tx_timestamp is midnight (SAS parse failed)"
-    client = Client(HTTP_HOST=settings.ALLOWED_HOSTS[0])
+    client = APIClient(HTTP_HOST=settings.ALLOWED_HOSTS[0])
+    # The API needs a logged-in user; an unsaved one is enough in-process.
+    client.force_authenticate(get_user_model()(username="verify_handoff"))
     for cid in ids:
         resp = client.get(f"/api/home/{cid}/")
         if resp.status_code != 200:

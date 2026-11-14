@@ -4,10 +4,40 @@
 //   GET  /api/insights/<customer_id>/  -> [{key, inference, title, value,
 //                                          unit, text, section, severity?}]
 //   POST /api/chat/ {customer_id, message, history, depth?} -> send_reply
+//   POST /api/auth/login/ {username, password} -> {token, user}
+//   POST /api/auth/logout/                      -> 204
 //
+// Every call except login sends "Authorization: Token <key>". A 401 forgets
+// the token and fires AUTH_EVENT so the app shows the login screen again.
 // There is no offline or demo fallback: every error is shown as is.
 
 const API = import.meta.env.VITE_API_URL ?? ''
+const TOKEN_KEY = 'saldo.token'
+export const AUTH_EVENT = 'saldo:auth'
+// Used only when storage is blocked (private mode): lives until reload.
+let memoryToken = null
+
+function getToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return memoryToken
+  }
+}
+
+function setToken(token) {
+  memoryToken = token
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token)
+    else localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // storage blocked: memoryToken carries it
+  }
+  window.dispatchEvent(new Event(AUTH_EVENT))
+}
+
+const currentToken = getToken
+export const isLoggedIn = () => Boolean(currentToken())
 
 export class ApiError extends Error {
   constructor(message, status) {
@@ -21,7 +51,10 @@ async function request(path, { method = 'GET', body, signal } = {}) {
   try {
     res = await fetch(`${API}${path}`, {
       method,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      headers: {
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(currentToken() ? { Authorization: `Token ${currentToken()}` } : {}),
+      },
       body: body ? JSON.stringify(body) : undefined,
       signal,
     })
@@ -34,6 +67,10 @@ async function request(path, { method = 'GET', body, signal } = {}) {
     data = await res.json()
   } catch {
     // not JSON (e.g. the Vite proxy's 502 page)
+  }
+  if (res.status === 401) {
+    setToken(null)
+    throw new ApiError('Please log in again', 401)
   }
   if (!res.ok) {
     if (res.status >= 502 && res.status <= 504 && !data) {
@@ -71,4 +108,23 @@ export function sendChat({ customerId, message, history = [], depth }) {
       ...(depth ? { depth } : {}),
     },
   })
+}
+
+export async function login(username, password) {
+  const body = await request('/api/auth/login/', {
+    method: 'POST',
+    body: { username, password },
+  })
+  setToken(body.token)
+  return body.user
+}
+
+export async function logout() {
+  try {
+    await request('/api/auth/logout/', { method: 'POST' })
+  } catch {
+    // Already logged out or backend down: forget the token either way.
+  } finally {
+    setToken(null)
+  }
 }
