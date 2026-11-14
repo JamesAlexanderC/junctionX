@@ -7,6 +7,26 @@ import Insights from '../components/Insights.jsx'
 import { niceTicks, shortLabel } from '../lib/chart.js'
 import { SUGGESTIONS } from '../lib/suggestions.js'
 
+// Test-only shape of GET /api/customers/demo/.
+const row = (n, spender) => ({
+  customer_id: `CUST0000${n}`,
+  income_level: n,
+  income_label: `Income ${n}`,
+  spender_type: spender,
+})
+const SPENDERS = ['Night Owl', 'Payday Splurger', 'Balanced']
+const DEMO = {
+  built: true,
+  demos: SPENDERS.map((t, i) => ({
+    demo: i + 1,
+    customer_id: `CUST0000${i + 1}`,
+    income_level: i + 1,
+    income_label: `Income ${i + 1}`,
+    spender_type: t,
+  })),
+  customers: [...SPENDERS, 'Weekend Treater'].map((t, i) => row(i + 1, t)),
+}
+
 // Every App test starts logged in unless it clears the token itself.
 beforeEach(() => localStorage.setItem('saldo.token', 'test-token'))
 
@@ -107,15 +127,13 @@ describe('no fallbacks', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
     render(<App />)
     expect((await screen.findByRole('alert')).textContent).toContain('Backend not reachable')
-    const options = screen.getAllByRole('option')
-    expect(options).toHaveLength(1) // only "Pick a customer"
     expect(screen.queryAllByRole('listitem')).toHaveLength(0)
   })
 
   it('a 503 from chat shows the backend error text', async () => {
     const fetch = vi.fn(async (url) => {
-      if (url.startsWith('/api/customers/')) {
-        return new Response(JSON.stringify([{ customer_id: 'CUST00001' }]), { status: 200 })
+      if (url.startsWith('/api/customers/demo/')) {
+        return new Response(JSON.stringify(DEMO), { status: 200 })
       }
       if (url.startsWith('/api/insights/')) {
         return new Response('[]', { status: 200 })
@@ -126,9 +144,7 @@ describe('no fallbacks', () => {
     })
     vi.stubGlobal('fetch', fetch)
     render(<App />)
-    await screen.findByRole('option', { name: /CUST00001/ })
-    fireEvent.change(screen.getByLabelText('Customer'), { target: { value: 'CUST00001' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Open customer view' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Demo 1/ }))
     const input = await screen.findByLabelText('Message')
     fireEvent.change(input, { target: { value: 'Hi' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -162,10 +178,50 @@ describe('waiting for a reply (F2)', () => {
 describe('demo landing page', () => {
   const fetchOk = () =>
     vi.fn(async (url) =>
-      url.startsWith('/api/customers/')
-        ? new Response(JSON.stringify([{ customer_id: 'CUST00001' }]))
+      url.startsWith('/api/customers/demo/')
+        ? new Response(JSON.stringify(DEMO))
         : new Response('[]', { status: 200 }),
     )
+
+  it('demo buttons name only the demo, income level and spender type', async () => {
+    vi.stubGlobal('fetch', fetchOk())
+    render(<App />)
+    const list = await screen.findByRole('list', { name: 'Demo customers' })
+    const rows = list.querySelectorAll('li')
+    expect(rows).toHaveLength(3)
+    expect(rows[0].textContent).toBe('Demo 1Income 1 · Night Owl')
+    expect(list.textContent).not.toContain('CUST')
+    fireEvent.click(screen.getByRole('button', { name: /Demo 2/ }))
+    expect(window.location.hash).toBe('#/c/CUST00002')
+  })
+
+  it('every customer is listed with their tags, and opens on tap', async () => {
+    vi.stubGlobal('fetch', fetchOk())
+    render(<App />)
+    const all = await screen.findByRole('list', { name: 'All customers' })
+    expect(all.querySelectorAll('li')).toHaveLength(4)
+    expect(all.textContent).toContain('CUST00004Income 4 · Weekend Treater')
+    expect(screen.queryByLabelText('Search customer')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /CUST00004/ }))
+    expect(window.location.hash).toBe('#/c/CUST00004')
+  })
+
+  it('says so when the index is not built', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"built": false}')))
+    render(<App />)
+    expect(await screen.findByText(/build_customer_index/)).toBeTruthy()
+  })
+
+  it('the logo in the customer view goes back to the landing page', async () => {
+    vi.stubGlobal('fetch', fetchOk())
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    const home = await screen.findByRole('link', { name: 'Saldo home' })
+    expect(home.getAttribute('href')).toBe('#/')
+    window.location.hash = '#/'
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
+    expect(await screen.findByRole('list', { name: 'Demo customers' })).toBeTruthy()
+  })
 
   it('a #/c/<id> link opens the customer view directly', async () => {
     vi.stubGlobal('fetch', fetchOk())
@@ -173,7 +229,7 @@ describe('demo landing page', () => {
     render(<App />)
     expect(await screen.findByText('CUST00001')).toBeTruthy()
     expect(screen.getByLabelText('Message')).toBeTruthy()
-    expect(screen.queryByLabelText('Customer')).toBeNull()
+    expect(screen.queryByRole('list', { name: 'Demo customers' })).toBeNull()
   })
 
   it('the exit button returns to the landing page', async () => {
@@ -181,9 +237,7 @@ describe('demo landing page', () => {
     window.location.hash = '#/c/CUST00001'
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: 'Exit to demo' }))
-    expect(await screen.findByLabelText('Customer')).toBeTruthy()
-    const open = screen.getByRole('button', { name: 'Open customer view' })
-    expect(open.disabled).toBe(true)
+    expect(await screen.findByRole('list', { name: 'Demo customers' })).toBeTruthy()
   })
 })
 
@@ -312,22 +366,22 @@ describe('auth', () => {
   const json = (body, status = 200) =>
     new Response(JSON.stringify(body), { status })
 
-  it('without a token the login screen shows, and logging in opens the picker', async () => {
+  it('without a token the login screen shows, and logging in opens the demo customers', async () => {
     localStorage.clear()
     const fetch = vi.fn(async (url) => {
       if (url === '/api/auth/login/') {
         return json({ token: 'abc', user: { username: 'demo' } })
       }
-      return json([{ customer_id: 'CUST00001' }])
+      return json(DEMO)
     })
     vi.stubGlobal('fetch', fetch)
     render(<App />)
     fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'demo' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'pw' } })
     fireEvent.click(screen.getByRole('button', { name: 'Log in' }))
-    await screen.findByRole('option', { name: /CUST00001/ })
+    await screen.findByRole('button', { name: /Demo 1/ })
     expect(localStorage.getItem('saldo.token')).toBe('abc')
-    const [, init] = fetch.mock.calls.find(([url]) => url.startsWith('/api/customers/'))
+    const [, init] = fetch.mock.calls.find(([url]) => url.startsWith('/api/customers/demo/'))
     expect(init.headers.Authorization).toBe('Token abc')
   })
 
@@ -401,7 +455,7 @@ describe('help page', () => {
       return new Response('[]')
     })
 
-  it('the picker page has no Help button', () => {
+  it('the landing page has no Help button', () => {
     vi.stubGlobal('fetch', api())
     render(<App />)
     expect(screen.queryByRole('button', { name: 'Help' })).toBeNull()

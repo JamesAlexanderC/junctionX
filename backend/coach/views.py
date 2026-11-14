@@ -37,6 +37,13 @@ def customers(request):
 
 
 @api_view(["GET"])
+def demo_customers(request):
+    """Demo picks (one per spender type) and every customer with their income
+    level, app level and spender type (build_customer_index)."""
+    return Response(services.demo_directory())
+
+
+@api_view(["GET"])
 def insights(request, customer_id):
     profile = services.get_profile(customer_id)
     if profile is None:

@@ -27,6 +27,20 @@
   padding: 0 16px;
 }
 
+.home {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 999px;
+}
+
+.home:focus-visible {
+  outline: 2px solid var(--brand-mint);
+  outline-offset: 3px;
+}
+
 .topbar h1 {
   font-family: var(--condensed);
   font-size: 1.35rem;
@@ -85,6 +99,91 @@
   max-width: 480px;
   margin: 0 auto;
   padding: 8px 16px 24px;
+}
+
+.demo-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.demo-customer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+  cursor: pointer;
+}
+
+.demo-label {
+  font-weight: 700;
+}
+
+.demo-meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.customer-list {
+  max-height: 60vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+}
+
+.customer-list li + li {
+  border-top: 1px solid var(--surface-alt);
+}
+
+.customer-row {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 14px;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.customer-id {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.customer-tags {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.demo-customer:hover,
+.customer-row:hover {
+  background: var(--accent-soft);
+}
+
+.demo-customer:focus-visible,
+.customer-row:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: -2px;
 }
 
 .enter-row {
@@ -454,7 +553,7 @@
   color: var(--muted);
 }
 
-/* Customer picker */
+/* Login form and chat composer inputs */
 
 .picker {
   display: flex;
@@ -463,8 +562,11 @@
   padding: 12px;
 }
 
+.picker .error {
+  font-size: 0.85rem;
+}
+
 .picker input,
-.picker select,
 .composer input {
   width: 100%;
   min-height: 44px;
@@ -475,24 +577,10 @@
   outline: none;
 }
 
-.picker select {
-  appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, var(--brand) 50%),
-    linear-gradient(135deg, var(--brand) 50%, transparent 50%);
-  background-position: calc(100% - 20px) 50%, calc(100% - 15px) 50%;
-  background-size: 5px 5px;
-  background-repeat: no-repeat;
-}
-
 .picker input:focus,
-.picker select:focus,
 .composer input:focus {
   border-color: var(--brand-green);
   box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-.picker .error {
-  font-size: 0.85rem;
 }
 
 /* Insight rows */

@@ -55,6 +55,12 @@ Own-account transfers: `transaction_type` in `OWN_TRANSFER_TYPES`
 - `POST /api/loans/` `{customer_id, balance, interest_rate, years_left}`.
 - `GET /api/customers/?q=&limit=50` -> `[{customer_id, customer_age,
   customer_postal_code}]` (real customers only).
+- `GET /api/customers/demo/` -> `{built, as_of, demos: [{demo, customer_id,
+  income_level, income_label, spender_type, clarity}], customers: [{customer_id,
+  income_level (0-5), income_label, spender_type}]}`: one
+  demo per spender type (#16) spread over the income fifths, plus every
+  customer for the landing page (`inferences/demo.py`). Cached by
+  `manage.py build_customer_index`; `built: false` until it has run.
 - Tools return `{"available": false, "reason": ...}` when the data does not
   support an inference; Gemini must say so, never substitute a default.
 

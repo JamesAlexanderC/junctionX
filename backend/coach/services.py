@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from django.conf import settings
-from django.db.models import Max, Q
+from django.db.models import Case, Count, F, FloatField, Max, Min, Q, Sum, When
 
 from .models import (
     AlertSnooze,
@@ -45,6 +45,8 @@ TX_COLUMNS = [
 SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
 PEER_TABLE_KEY = "peer_table"
 MORTGAGE_MODEL_KEY = "mortgage_model"
+DEMO_CUSTOMERS_KEY = "demo_customers"
+CUSTOMER_INDEX_KEY = "customer_index"
 
 
 # --- dates ------------------------------------------------------------------
@@ -125,6 +127,119 @@ def list_customers(q=None, limit=50):
         }
         for c in qs[:limit]
     ]
+
+
+def customer_money_stats():
+    """Per customer: mean monthly income and spending, own-account transfers
+    excluded (#2, #41), aggregated in the database."""
+    import pandas as pd
+    from inferences import thresholds as th
+
+    own = Q(transaction_type__in=th.OWN_TRANSFER_TYPES)
+    rows = (
+        Transaction.objects.values("customer_id")
+        .annotate(
+            income=Sum(
+                Case(
+                    When(Q(tx_amount_eur__gt=0) & ~own, then=F("tx_amount_eur")),
+                    default=0.0,
+                    output_field=FloatField(),
+                )
+            ),
+            spend=Sum(
+                Case(
+                    When(Q(tx_amount_eur__lt=0) & ~own, then=-F("tx_amount_eur")),
+                    default=0.0,
+                    output_field=FloatField(),
+                )
+            ),
+            first=Min("tx_date"),
+            last=Max("tx_date"),
+            n=Count("tx_id"),
+        )
+        .order_by()
+    )
+    df = pd.DataFrame(list(rows))
+    if df.empty:
+        return df
+    days = (pd.to_datetime(df["last"]) - pd.to_datetime(df["first"])).dt.days + 1
+    df["months"] = days / 30.44
+    span = df["months"].clip(lower=1)
+    df["monthly_income"] = df["income"] / span
+    df["monthly_spend"] = df["spend"] / span
+    return df
+
+
+def build_customer_index(workers=None, progress=None):
+    """Income level and spender type for every customer, plus the demo
+    picks; both cached as artifacts."""
+    import pandas as pd
+
+    from inferences.demo import INCOME_LABELS, NO_INCOME_LABEL
+    from inferences.demo import income_levels, pick_spender_demos
+
+    from .customer_index import summarise_all
+
+    money = customer_money_stats()
+    ids = list(Customer.objects.order_by("customer_id").values_list("pk", flat=True))
+    summary = pd.DataFrame(summarise_all(ids, workers=workers, progress=progress))
+    for col in ("spender_type", "spender_scores"):
+        if col not in summary:
+            summary[col] = None
+    if summary.empty:
+        save_artifact(CUSTOMER_INDEX_KEY, data={"customers": []})
+        save_artifact(DEMO_CUSTOMERS_KEY, data={"customers": []})
+        return [], []
+    if money.empty:
+        money = pd.DataFrame(columns=["customer_id", "monthly_income", "months"])
+    df = summary.merge(
+        money[["customer_id", "monthly_income", "months"]], on="customer_id", how="left"
+    )
+    df["monthly_income"] = df["monthly_income"].fillna(0.0)
+    df["months"] = df["months"].fillna(0.0)
+    df["income_level"] = income_levels(df["monthly_income"])
+    df["spender_scores"] = df["spender_scores"].apply(
+        lambda s: s if isinstance(s, dict) else {}
+    )
+    demos = pick_spender_demos(df)
+
+    def clean(v):
+        return None if pd.isna(v) else v
+
+    index = [
+        {
+            "customer_id": r.customer_id,
+            "income_level": int(r.income_level),
+            "income_label": INCOME_LABELS.get(int(r.income_level), NO_INCOME_LABEL),
+            "spender_type": clean(r.spender_type),
+        }
+        for r in df.itertuples()
+    ]
+    meta = {"as_of": str(as_of_date()), "built_with": inference_version()}
+    save_artifact(CUSTOMER_INDEX_KEY, data={**meta, "customers": index})
+    save_artifact(DEMO_CUSTOMERS_KEY, data={**meta, "customers": demos})
+    return index, demos
+
+
+def demo_directory():
+    """Landing page data: demo picks and every customer with their tags.
+    built is False until build_customer_index has run."""
+    rows = dict(
+        ComputedArtifact.objects.filter(
+            key__in=[CUSTOMER_INDEX_KEY, DEMO_CUSTOMERS_KEY]
+        ).values_list("key", "data")
+    )
+    if CUSTOMER_INDEX_KEY not in rows:
+        return {"built": False, "demos": [], "customers": []}
+    known = set(Customer.objects.values_list("pk", flat=True))
+    index = [c for c in rows[CUSTOMER_INDEX_KEY].get("customers", [])]
+    demos = rows.get(DEMO_CUSTOMERS_KEY, {}).get("customers", [])
+    return {
+        "built": True,
+        "as_of": rows[CUSTOMER_INDEX_KEY].get("as_of"),
+        "demos": [d for d in demos if d["customer_id"] in known],
+        "customers": [c for c in index if c["customer_id"] in known],
+    }
 
 
 def transactions_df(customer_id):
