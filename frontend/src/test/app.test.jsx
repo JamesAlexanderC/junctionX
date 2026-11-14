@@ -4,8 +4,12 @@ import App from '../App.jsx'
 import { ReplyCard } from '../components/Cards.jsx'
 import Chat from '../components/Chat.jsx'
 import Insights from '../components/Insights.jsx'
+import { niceTicks, shortLabel } from '../lib/chart.js'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  window.location.hash = ''
+})
 
 describe('cards', () => {
   it('unknown card type renders nothing', () => {
@@ -104,7 +108,9 @@ describe('no fallbacks', () => {
     render(<App />)
     await screen.findByRole('option', { name: /CUST00001/ })
     fireEvent.change(screen.getByLabelText('Customer'), { target: { value: 'CUST00001' } })
-    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hi' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Open customer view' }))
+    const input = await screen.findByLabelText('Message')
+    fireEvent.change(input, { target: { value: 'Hi' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() =>
       expect((screen.getByRole('alert')).textContent).toContain('Gemini is not configured'),
@@ -119,6 +125,7 @@ describe('waiting for a reply (F2)', () => {
     vi.useFakeTimers()
     render(<Chat messages={[]} busy onSend={() => {}} />)
     const status = screen.getByRole('status')
+    expect(status.querySelectorAll('.typing span')).toHaveLength(3)
     expect(status.textContent).toBe('Checking your numbers…')
     act(() => vi.advanceTimersByTime(5000))
     expect(status.textContent).toBe('Looking deeper into your data…')
@@ -129,5 +136,119 @@ describe('waiting for a reply (F2)', () => {
   it('shows nothing when not waiting', () => {
     render(<Chat messages={[]} busy={false} onSend={() => {}} />)
     expect(screen.queryByRole('status')).toBeNull()
+  })
+})
+
+describe('demo landing page', () => {
+  const fetchOk = () =>
+    vi.fn(async (url) =>
+      url.startsWith('/api/customers/')
+        ? new Response(JSON.stringify([{ customer_id: 'CUST00001' }]))
+        : new Response('[]', { status: 200 }),
+    )
+
+  it('a #/c/<id> link opens the customer view directly', async () => {
+    vi.stubGlobal('fetch', fetchOk())
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    expect(await screen.findByText('CUST00001')).toBeTruthy()
+    expect(screen.getByLabelText('Message')).toBeTruthy()
+    expect(screen.queryByLabelText('Customer')).toBeNull()
+  })
+
+  it('the exit button returns to the landing page', async () => {
+    vi.stubGlobal('fetch', fetchOk())
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Exit to demo' }))
+    expect(await screen.findByLabelText('Customer')).toBeTruthy()
+    const open = screen.getByRole('button', { name: 'Open customer view' })
+    expect(open.disabled).toBe(true)
+  })
+})
+
+describe('chart card', () => {
+  const bars = {
+    type: 'chart',
+    kind: 'bar',
+    title: 'Spending by basket this month',
+    unit: 'EUR',
+    data: [
+      { label: 'essential', value: 890 },
+      { label: 'leaky', value: 172.99 },
+      { label: 'saver', value: 150 },
+    ],
+  }
+
+  it('draws one column per point and tapping shows the exact value', () => {
+    const { container } = render(<ReplyCard card={bars} onSend={() => {}} />)
+    expect(container.querySelectorAll('path.col')).toHaveLength(3)
+    fireEvent.click(screen.getAllByTestId('chart-hit')[1])
+    const readout = screen.getByTestId('chart-readout').textContent
+    expect(readout).toContain('Leaky')
+    expect(readout).toContain('€172.99')
+  })
+
+  it('arrow keys move the selection', () => {
+    render(<ReplyCard card={bars} onSend={() => {}} />)
+    const svg = screen.getByRole('img')
+    fireEvent.keyDown(svg, { key: 'ArrowRight' })
+    expect(screen.getByTestId('chart-readout').textContent).toContain('€890')
+    fireEvent.keyDown(svg, { key: 'ArrowRight' })
+    expect(screen.getByTestId('chart-readout').textContent).toContain('€172.99')
+  })
+
+  it('draws a line chart with an end dot', () => {
+    const card = {
+      type: 'chart',
+      kind: 'line',
+      title: 'Expected balance until payday',
+      unit: 'EUR',
+      data: [
+        { label: '2026-10-19', value: 486 },
+        { label: '2026-10-20', value: 450 },
+      ],
+    }
+    const { container } = render(<ReplyCard card={card} onSend={() => {}} />)
+    expect(container.querySelector('path.line')).toBeTruthy()
+    expect(container.querySelector('circle.dot')).toBeTruthy()
+    fireEvent.click(screen.getAllByTestId('chart-hit')[0])
+    expect(screen.getByTestId('chart-readout').textContent).toContain('19 October 2026')
+  })
+
+  it('every value is in the screen-reader table', () => {
+    render(<ReplyCard card={bars} onSend={() => {}} />)
+    expect(screen.getAllByRole('row')).toHaveLength(3)
+  })
+
+  it('ticks are clean steps that cover the data', () => {
+    expect(niceTicks(0, 890)).toEqual([0, 250, 500, 750, 1000])
+    expect(shortLabel('2026-07')).toBe('Jul')
+    expect(shortLabel('2026-10-19')).toBe('19 Oct')
+  })
+})
+
+describe('level card', () => {
+  it('shows the ladder with reached and next levels', () => {
+    const card = {
+      type: 'level_progress',
+      level: 3,
+      name: 'Safety net',
+      progress: 0.5,
+      euros_to_go: 445,
+      next_step: 'Cut takeaway by 20% (about EUR 18 a month)',
+      ladder: [
+        { level: 1, name: 'Getting started', reached: true },
+        { level: 2, name: 'In control', reached: true },
+        { level: 3, name: 'Safety net', reached: false },
+        { level: 4, name: 'Goal setter', reached: false },
+        { level: 5, name: 'Mortgage ready', reached: false },
+        { level: 6, name: 'Wealth builder', reached: false },
+      ],
+    }
+    const { container } = render(<ReplyCard card={card} onSend={() => {}} />)
+    expect(container.querySelectorAll('.ladder li.reached')).toHaveLength(2)
+    expect(screen.getByLabelText('Level 3 Safety net, next')).toBeTruthy()
+    expect(screen.getByText(/€445 to go/)).toBeTruthy()
   })
 })

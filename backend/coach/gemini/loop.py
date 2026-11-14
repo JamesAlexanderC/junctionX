@@ -218,7 +218,9 @@ def chat(
         _text(
             "user",
             f"Profile summary: {profile_summary(profile)}\n"
-            f"Answer at depth {depth}.\nUser: {message}",
+            f"Answer at depth {depth}.\n"
+            + (f"{router.LEVELS_HINT}\n" if router.wants_levels(message) else "")
+            + f"User: {message}",
         )
     )
     try:

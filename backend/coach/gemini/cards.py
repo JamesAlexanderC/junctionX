@@ -32,6 +32,12 @@ class _PlanStep(_Card):
     clears: list[str] = []
 
 
+class _Rung(_Card):
+    level: int
+    name: str
+    reached: bool
+
+
 class _Snapshot(_Card):
     safe_to_spend: float | None = None
     buffer_months: float | None = None
@@ -82,6 +88,7 @@ class LevelProgressCard(_Card):
     progress: float
     euros_to_go: float | None = None
     next_step: str | None = None
+    ladder: list[_Rung] | None = None
 
 
 class QuestionCard(_Card):

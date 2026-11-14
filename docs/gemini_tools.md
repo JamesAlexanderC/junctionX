@@ -39,6 +39,32 @@ returns one item:
 - Unavailable items return `{"available": false, "reason": ...}`, never a
   default value.
 
+## Charts
+
+The app draws charts on the phone; Gemini only picks what to chart.
+`get_chart(item)` takes any catalogue item with a `chart` spec and returns a
+complete card that Gemini attaches to `send_reply` unchanged:
+
+```json
+{"available": true, "item": "baskets.totals", "inferences": [7, 8, 9, 10],
+ "card": {"type": "chart", "kind": "bar", "title": "Spending by basket this month",
+          "unit": "EUR", "data": [{"label": "essential", "value": 890.0}]}}
+```
+
+The frontend (`frontend/src/components/Chart.jsx`) draws `bar` as columns
+from zero and `line` as a line with a light area. Tap, hover or the arrow keys
+show the exact value of a point. To make an item chartable, give its `Entry` a
+`Chart(kind, label_key, value_key, title, unit)`; `get_chart`, its enum and
+`list_inferences` pick it up.
+
+## Levels guidance
+
+`get_level` returns the levels profile (#28 to #33) plus `card`, a ready
+`level_progress` card for the level the user is working towards, with the
+six-step ladder. The router's `wants_levels` spots saving and progress
+questions ("How can I save more?") and adds a hint to that turn to answer
+with `get_level` and its card, framed as the step to the next level.
+
 ### Exposing a new inference
 
 Add one `Entry` to `_ENTRIES` in `catalogue.py`:

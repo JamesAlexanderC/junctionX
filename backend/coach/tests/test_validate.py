@@ -164,3 +164,19 @@ def test_plan_card_built_from_suggest_fixes_passes():
     card = {"type": "plan", "steps": [step]}
     out = validate_reply(_reply(card, text="Two easy steps."), tool)
     assert out["cards"][0]["steps"][0]["monthly_impact"] == 24.6
+
+
+def test_chips_repeating_question_options_are_dropped():
+    card = {
+        "type": "question",
+        "question": "When would you like to achieve this goal?",
+        "options": ["July 2027", "October 2027", "December 2027"],
+    }
+    args = {
+        "text": "When?",
+        "depth": 4,
+        "cards": [card],
+        "chips": ["July 2027", "october 2027 ", "Different goal"],
+    }
+    reply = validate_reply(args, [], "")
+    assert reply["chips"] == ["Different goal"]

@@ -81,11 +81,37 @@ def get_baskets(ctx):
     return baskets
 
 
+def level_card(levels):
+    """level_progress card for the level the user is working towards (#28-#33).
+
+    At the top level it shows the level reached, at 100 %. Levels are climbed
+    in order, so the ladder marks only levels up to the current one as
+    reached: a later level whose own test passes (e.g. mortgage readiness)
+    stays open until the levels below it are reached.
+    """
+    current = levels["current"]
+    nxt = levels.get("next")
+    step = levels.get("easiest_next_step") or {}
+    card = {
+        "type": "level_progress",
+        "level": nxt or current,
+        "name": levels.get("next_name") or levels.get("current_name"),
+        "progress": levels.get("progress", 1.0),
+        "euros_to_go": levels.get("euros_to_go"),
+        "next_step": step.get("text"),
+        "ladder": [
+            {"level": r["level"], "name": r["name"], "reached": r["level"] <= current}
+            for r in levels.get("ladder") or []
+        ],
+    }
+    return {k: v for k, v in card.items() if v not in (None, [])}
+
+
 def get_level(ctx):
     levels = ctx.profile.get("levels") or {}
     if levels.get("current") is None:
         return unavailable("Levels could not be computed from the data.")
-    return levels
+    return {**levels, "card": level_card(levels)}
 
 
 def simulate_cut(ctx, category, pct, goal_id=None):

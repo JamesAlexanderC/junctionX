@@ -136,5 +136,18 @@ def validate_reply(args, tool_results, message=""):
         "text": reply.text,
         "depth": reply.depth,
         "cards": cards,
-        "chips": [str(c) for c in reply.chips][:MAX_CHIPS],
+        "chips": _chips(reply.chips, cards),
     }
+
+
+def _chips(chips, cards):
+    """Chips without the answers a question card already offers as buttons."""
+    offered = {
+        str(o).strip().casefold()
+        for card in cards
+        if card["type"] == "question"
+        for o in [*card.get("options", []), card.get("quick_answer")]
+        if o
+    }
+    out = [str(c) for c in chips if str(c).strip().casefold() not in offered]
+    return out[:MAX_CHIPS]
