@@ -142,7 +142,7 @@ def check_loaded_and_served():
     if not ids:
         return False, "no DEMO_CUSTOMERS (step 4 first)"
     for cid, expected in _csv_counts(ids).items():
-        txs = Transaction.objects.filter(customer_id=cid, is_synthetic=False)
+        txs = Transaction.objects.filter(customer_id=cid)
         got = txs.count()
         if got != expected:
             return False, f"{cid}: {got} rows in DB, {expected} in CSV"

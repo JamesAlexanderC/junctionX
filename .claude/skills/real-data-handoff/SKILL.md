@@ -17,8 +17,8 @@ PASS line from it.
    `coach/tests/` for commands, DB and API). Run it, see it fail.
 3. Implement the smallest change, then run `../.venv/bin/python -m pytest -q`.
 4. Re-run `verify_handoff --step N` and continue only on PASS.
-5. `black` the changed files (max line 88), commit one step per commit on
-   the `<name>-feature` branch. Never merge without explicit direction.
+5. Run `scripts/bin/check` (black, max line 88), commit one step per
+   commit on the `<name>-feature` branch. Never merge without explicit direction.
 
 ## Fixed decisions (do not re-ask)
 
@@ -27,19 +27,24 @@ PASS line from it.
 - `investment_deposit` is Saver, `investment_withdrawal` negative Saver.
 - Transportation is essential only for MCC 4111/4112/4131/5541/5542/7523 or
   blank; taxis (4121) are other spending.
-- Reference date = max(tx_date) (`services.today()`), never the wall clock.
 - `tx_timestamp` is SAS `%d%b%y:%H:%M:%S`; parsing fails above 1% bad rows.
-- Loan/fee/gambling labels match no real rows; those alerts run on the
-  synthetic credit register and injected events only.
+- Team rule (binding): no demo, mock, synthetic or injected data at
+  runtime. Loan/fee/gambling labels match no real rows, so those alerts are
+  reported unavailable (`inferences/availability.py`), never faked.
 - Demo customers: you pick from the `rank_demo_customers` shortlist; prefer
-  coverage < 0.3, plus one high-sweep customer for the multi-bank demo.
+  coverage < 0.3, plus one high-sweep customer shown as a "partial view"
+  (no mock second bank).
+- Reference date: `services.as_of_date()` (max tx_date, or `AS_OF_DATE`),
+  never the wall clock.
 
 ## Step 6: mortgage model rules
 
-Build it only after steps 1 to 5 pass. Features from the 6 months before each
-application, at most 4 to 6, standardised, logistic regression with L2,
+`manage.py build_artifacts` fits it and stores it in `ComputedArtifact`
+(after `load_data --all`); `verify_handoff` step 6 reads it from there.
+Features from the 6 months before each application, at most 4 to 6,
+standardised, logistic regression with L2,
 `class_weight="balanced"`, fixed `random_state`, 5-fold stratified CV AUC.
-Write `docs/mortgage_model.json` as `{cv_auc, mode, features, ...}`:
+The stored model carries `{cv_auc, mode, features, ...}`:
 `mode = "model"` if AUC >= 0.70, otherwise `"percentile_fallback"` (score =
 mean percentile of the user's features within approved applicants; the
 regression only ranks which gaps matter). Always report the AUC.

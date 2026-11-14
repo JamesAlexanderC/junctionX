@@ -10,7 +10,11 @@ from inferences.profile import age_band, build_profile
 from inferences.tests.fixtures import TODAY, aino_df
 
 FIXTURE = (
-    Path(__file__).resolve().parents[3] / "shared" / "fixtures" / "profile_demo.json"
+    Path(__file__).resolve().parents[2]
+    / "coach"
+    / "tests"
+    / "fixtures"
+    / "profile_demo.json"
 )
 CUSTOMER = {"customer_id": "C-AINO", "age": 24, "postal_code": "00510"}
 

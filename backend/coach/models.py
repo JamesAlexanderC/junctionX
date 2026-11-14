@@ -38,8 +38,6 @@ class Transaction(models.Model):
     transaction_type = models.CharField(max_length=64, blank=True, default="")
     merchant_id = models.CharField(max_length=64, blank=True, default="")
     mcc_code = models.CharField(max_length=8, blank=True, default="")
-    # Demo events injected by `inject_demo_events`, never in the S-Bank CSVs.
-    is_synthetic = models.BooleanField(default=False)
 
     class Meta:
         indexes = [models.Index(fields=["customer", "tx_date"])]

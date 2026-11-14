@@ -187,11 +187,11 @@ def test_build_profiles_end_to_end_serves_home(tmp_path, client):
     call_command(
         "load_data", "--customers", "C1", "--data-dir", str(data), stdout=io.StringIO()
     )
-    call_command("build_profiles", stdout=io.StringIO())
+    call_command("build_profiles", "--all", stdout=io.StringIO())
     resp = client.get("/api/home/C1/")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["today"] == services.today().isoformat()
+    assert body["today"] == services.as_of_date().isoformat()
     assert body["income"]["monthly_income"] == pytest.approx(2000)
     assert body["baskets"]["monthly_saving"] == pytest.approx(150)
 
@@ -228,8 +228,10 @@ def test_build_profiles_uses_the_shared_reference_date(tmp_path, client):
         str(data),
         stdout=io.StringIO(),
     )
-    call_command("build_profiles", stdout=io.StringIO())
-    assert client.get("/api/home/C2/").json()["today"] == services.today().isoformat()
+    call_command("build_profiles", "--all", stdout=io.StringIO())
+    assert (
+        client.get("/api/home/C2/").json()["today"] == services.as_of_date().isoformat()
+    )
 
 
 def _load_c1(tmp_path):
@@ -250,9 +252,9 @@ def test_refresh_profile_fills_stress_test_for_real_customers(tmp_path):
     assert out["mortgage"]["stress_test"] is not None
 
 
-def test_build_profile_receives_goals_with_on_track(tmp_path, monkeypatch):
+def test_on_track_goal_reaches_level_4(tmp_path):
+    # Review: levels must see goal on_track (#31) when the profile is built.
     from coach.models import Goal
-    from inferences import profile as profile_mod
 
     _load_c1(tmp_path)
     Goal.objects.create(
@@ -263,22 +265,6 @@ def test_build_profile_receives_goals_with_on_track(tmp_path, monkeypatch):
         start_date="2026-09-01",
         target_date="2027-03-01",
     )
-    seen = {}
-    real = profile_mod.build_profile
-
-    def spy(df, customer, today, goals=None, loans=None):
-        seen["goals"] = goals
-        return real(df, customer, today, goals=goals, loans=loans)
-
-    monkeypatch.setattr(profile_mod, "build_profile", spy)
-    services.refresh_profile("C1")
-    assert seen["goals"][0]["on_track"] is True
-
-
-def test_refresh_profile_ignores_demo_fixture_date(tmp_path, settings, monkeypatch):
-    from datetime import date
-
-    _load_c1(tmp_path)
-    settings.DEMO_MODE = True
-    monkeypatch.setattr(services, "today", lambda: date(2026, 10, 26))
-    assert services.refresh_profile("C1")["today"] == "2026-10-26"
+    out = services.refresh_profile("C1")
+    ladder = {r["level"]: r for r in out["levels"]["ladder"]}
+    assert ladder[4]["reached"] is True
