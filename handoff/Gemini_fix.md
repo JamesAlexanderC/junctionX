@@ -321,7 +321,7 @@ Run: pytest ; python manage.py verify_handoff ; python manage.py run_evals ;
 =====================================================================================
 PROGRESS (Claude: tick as you go, add the commit hash)
 =====================================================================================
-P0: [x] F3 f366bb2  [x] F1  [ ] F4  [ ] F2  [ ] F5 (options listed, waiting for choice)
+P0: [x] F3 f366bb2  [x] F1 7c72320  [x] F4  [ ] F2  [ ] F5 (options listed, waiting for choice)
 P1: [ ] F6  [ ] F7  [ ] F8  [ ] F9  [ ] F10  [ ] F11  [ ] F12
 P2: [ ] F13 [ ] F14 [ ] F15 [ ] F16 [ ] F17 [ ] F18 [ ] F19 [ ] F20 [ ] F21
 Notes:

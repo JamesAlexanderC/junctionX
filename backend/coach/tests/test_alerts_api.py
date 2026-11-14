@@ -5,6 +5,7 @@ from datetime import date
 import pytest
 
 from coach import services
+from coach.gemini.system_prompt import FALLBACK_REPLY
 from coach.models import Goal
 
 from .conftest import AINO, TODAY, load_customer, response
@@ -130,3 +131,53 @@ def test_loans_valid_computes_stress_test(client, aino):
     assert stress["stressed_payment"] == pytest.approx(966.45, abs=0.01)
     assert stress["ratio"] == pytest.approx(0.48, abs=0.01)
     assert stress["passes"] is True
+
+
+# --- F4: the alert coach answers instead of falling back --------------------------
+
+
+def _coach_reply(plan):
+    if plan["steps"]:
+        keep = ("text", "monthly_impact", "clears")
+        steps = [{k: s[k] for k in keep} for s in plan["steps"]]
+        return "Here is a plan.", [{"type": "plan", "steps": steps}]
+    return plan["unclearable"][0]["why"], []
+
+
+def _clear_alerts(client, fake_gemini, args):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    plan = call_tool(ToolContext(BROKE), "suggest_fixes", args)
+    text, cards = _coach_reply(plan)
+    fake_gemini(
+        response(("suggest_fixes", args)),
+        response(("send_reply", {"text": text, "depth": 4, "cards": cards})),
+    )
+    body = client.post(
+        "/api/chat/",
+        {"customer_id": BROKE, "message": "Help me clear my alerts", "depth": 4},
+        content_type="application/json",
+    ).json()
+    return plan, body
+
+
+def test_clear_my_alerts_gives_a_plan_or_reason(client, broke, fake_gemini):
+    plan, body = _clear_alerts(client, fake_gemini, {})
+    assert body["text"] != FALLBACK_REPLY["text"]
+    assert len(plan["steps"]) <= 3
+    assert Goal.objects.count() == 0
+
+
+def test_unclearable_alert_is_explained_not_failed(
+    client, broke, fake_gemini, monkeypatch
+):
+    from coach import planner
+
+    def stuck(df, profile, today):
+        return profile["alerts"]
+
+    monkeypatch.setattr(planner, "default_alert_runner", stuck)
+    plan, body = _clear_alerts(client, fake_gemini, {"alert_ids": [ALERT]})
+    assert plan["steps"] == []
+    assert body["text"] == plan["unclearable"][0]["why"]
+    assert Goal.objects.count() == 0
