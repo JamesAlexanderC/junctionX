@@ -16,6 +16,7 @@ from ..models import ChatTurn, DemoCache
 from . import router
 from .system_prompt import FALLBACK_REPLY, SYSTEM_PROMPT
 from .tools import ToolContext, call_tool, tool_declarations
+from .tools.alerts import mark_alert_cards
 from .tools.inference import list_inferences
 from .cards import card_summary
 from .validate import ReplyError, validate_reply
@@ -359,7 +360,7 @@ def _run(client, contents, ctx):
                         reply = validate_reply(
                             args, ctx.results + ctx.user_numbers, ctx.message
                         )
-                    return reply, round_no, None, None
+                    return mark_alert_cards(ctx, reply), round_no, None, None
                 except ReplyError as exc:
                     log.warning("send_reply rejected: %s", exc)
                     ctx.validation_errors.append(str(exc))

@@ -32,6 +32,7 @@ class ToolContext:
         self.user_numbers = []  # earlier user messages and proposal (F1)
         self.timings = []  # [{step, ms, ...}] for router, gemini, tool (F2)
         self.conversational = False  # small talk: one round, send_reply only
+        self.fixable = None  # alert ids a "Fix this" plan clears (per turn)
         self.alert_runner = None
         self._profile = None
 

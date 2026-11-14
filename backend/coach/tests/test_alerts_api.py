@@ -181,3 +181,56 @@ def test_unclearable_alert_is_explained_not_failed(
     assert plan["steps"] == []
     assert body["text"] == plan["unclearable"][0]["why"]
     assert Goal.objects.count() == 0
+
+
+# --- "Fix this" only where a plan can fix the alert (no loop) ------------------------
+
+
+def _alerts(customer):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    return call_tool(ToolContext(customer), "get_alerts", {})["alerts"]
+
+
+def _fix_only(monkeypatch, fixable_ids):
+    """Make the planner clear exactly ``fixable_ids``."""
+    from coach import planner
+
+    def plan(profile, alerts, **kw):
+        step = {"action": {}, "text": "x", "monthly_impact": 1.0, "effort": 1}
+        return {"steps": [{**step, "clears": sorted(fixable_ids)}]}
+
+    monkeypatch.setattr(planner, "suggest_fixes", plan)
+
+
+def test_get_alerts_says_which_alerts_a_plan_can_fix(broke, monkeypatch):
+    first = _alerts(BROKE)[0]["id"]
+    _fix_only(monkeypatch, {first})
+    flags = {a["id"]: a["fixable"] for a in _alerts(BROKE)}
+    assert flags[first] is True
+    assert all(v is False for k, v in flags.items() if k != first)
+
+
+def test_alert_card_fixable_is_set_by_python_not_gemini(
+    client, broke, fake_gemini, monkeypatch
+):
+    alert = _alerts(BROKE)[0]
+    _fix_only(monkeypatch, set())  # nothing can fix it
+    card = {
+        "type": "alert",
+        "id": alert["id"],
+        "severity": alert["severity"],
+        "title": alert["title"],
+        "text": alert["text"],
+        "fixable": True,  # Gemini's claim is ignored
+    }
+    fake_gemini(
+        response(("get_alerts", {})),
+        response(("send_reply", {"text": "Here.", "depth": 2, "cards": [card]})),
+    )
+    body = client.post(
+        "/api/chat/",
+        {"customer_id": BROKE, "message": "What alerts do I have?", "depth": 2},
+        content_type="application/json",
+    ).json()
+    assert body["cards"][0]["fixable"] is False

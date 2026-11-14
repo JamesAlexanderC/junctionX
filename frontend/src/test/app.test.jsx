@@ -311,3 +311,22 @@ describe('level card (FC-7)', () => {
     expect(screen.getByText('Next: Level 3 Safety net')).toBeTruthy()
   })
 })
+
+describe('alert card button', () => {
+  const alert = { type: 'alert', id: 'a-101', severity: 'amber', title: 'Bill went up', text: 'x' }
+
+  it('a fixable alert offers Fix this', () => {
+    const onSend = vi.fn()
+    render(<ReplyCard card={{ ...alert, fixable: true }} onSend={onSend} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Fix this' }))
+    expect(onSend).toHaveBeenCalledWith('Help me fix the "Bill went up" alert', 4)
+  })
+
+  it('an alert no plan can fix offers Why? instead, so it cannot loop', () => {
+    const onSend = vi.fn()
+    render(<ReplyCard card={{ ...alert, fixable: false }} onSend={onSend} />)
+    expect(screen.queryByRole('button', { name: 'Fix this' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Why?' }))
+    expect(onSend).toHaveBeenCalledWith('Why did I get the "Bill went up" alert?', 2)
+  })
+})

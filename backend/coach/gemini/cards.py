@@ -115,6 +115,9 @@ class AlertCard(_Card):
     severity: Literal["red", "amber", "blue"]
     title: str
     text: str
+    # Set by Python after validation (tools/alerts.mark_alert_cards): the app
+    # shows "Fix this" only when a plan can clear the alert, else "Why?".
+    fixable: bool | None = None
 
 
 class PlanCard(_Card):

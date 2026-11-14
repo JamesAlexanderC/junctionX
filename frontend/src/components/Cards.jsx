@@ -181,13 +181,25 @@ function AlertCard({ card, onSend }) {
         <i className={`dot sev-${card.severity}`} /> {card.title}
       </strong>
       <p>{card.text}</p>
-      <button
-        type="button"
-        className="btn-primary"
-        onClick={() => onSend(`Help me fix the "${card.title}" alert`, 4)}
-      >
-        Fix this
-      </button>
+      {/* Only a plan-fixable alert gets "Fix this"; the backend sets fixable.
+          Otherwise "Why?" asks for the evidence instead of looping. */}
+      {card.fixable === false ? (
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => onSend(`Why did I get the "${card.title}" alert?`, 2)}
+        >
+          Why?
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => onSend(`Help me fix the "${card.title}" alert`, 4)}
+        >
+          Fix this
+        </button>
+      )}
     </div>
   )
 }
