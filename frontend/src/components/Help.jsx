@@ -18,6 +18,7 @@ import {
   SliderArt,
   StepIcon,
 } from './HelpArt.jsx'
+import Icon from './Icon.jsx'
 
 const STEPS = [
   ['ask', 'You ask', 'In your own words.'],
@@ -100,6 +101,7 @@ export default function Help({ onBack, onAsk }) {
           <h1>Help</h1>
           <div className="topbar-actions">
             <button type="button" className="logout" onClick={onBack}>
+              <Icon name="back" size={16} />
               Back
             </button>
           </div>

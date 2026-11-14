@@ -5,6 +5,7 @@
 
 import { eur } from '../lib/format.js'
 import { Bar } from './Cards.jsx'
+import Icon from './Icon.jsx'
 
 const TOP = 3
 
@@ -45,9 +46,7 @@ function BucketRow({ bucket, onAsk }) {
         {bucket.share != null && (
           <strong className="ins-value">{Math.round(bucket.share)}%</strong>
         )}
-        <span className="chevron" aria-hidden="true">
-          ›
-        </span>
+        <Icon name="chevron" className="chevron" />
       </button>
       {more > 0 && (
         <details className="goal-note basket-all">
@@ -69,6 +68,7 @@ export default function Baskets({ baskets, onAsk }) {
   return (
     <div className="section goals" aria-label="Spending buckets">
       <h2 className="section-title">
+        <Icon name="baskets" size={16} />
         Where your money went{month ? ` (${month})` : ''}
       </h2>
       <ul className="panel rows">

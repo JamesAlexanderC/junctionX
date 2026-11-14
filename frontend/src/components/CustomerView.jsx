@@ -8,6 +8,7 @@ import Baskets from './Baskets.jsx'
 import Chat from './Chat.jsx'
 import Goals from './Goals.jsx'
 import Help from './Help.jsx'
+import Icon from './Icon.jsx'
 import Insights, { InsightsSkeleton } from './Insights.jsx'
 
 // Chat history in the API's shape: [{role, content}].
@@ -21,8 +22,8 @@ const toHistory = (messages) =>
     )
 
 const TABS = [
-  ['overview', 'Overview', 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z'],
-  ['coach', 'Coach', 'M4 5h16v11H8l-4 4z'],
+  ['overview', 'Overview'],
+  ['coach', 'Coach'],
 ]
 
 export default function CustomerView({
@@ -126,6 +127,7 @@ export default function CustomerView({
             </a>
             <span className="who">{customerId}</span>
             <button type="button" className="logout" onClick={onHelp}>
+              <Icon name="help" size={16} />
               Help
             </button>
             <button
@@ -134,9 +136,7 @@ export default function CustomerView({
               aria-label="Exit to demo"
               onClick={onExit}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
+              <Icon name="close" size={20} />
             </button>
           </div>
         </header>
@@ -147,6 +147,7 @@ export default function CustomerView({
               .filter((e, i, all) => e && all.indexOf(e) === i)
               .map((e) => (
                 <p key={e} className="error banner" role="alert">
+                  <Icon name="error" />
                   {e}
                 </p>
               ))}
@@ -167,7 +168,7 @@ export default function CustomerView({
         </main>
 
         <nav className="tabbar" aria-label="Sections">
-          {TABS.map(([key, label, icon]) => (
+          {TABS.map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -175,9 +176,7 @@ export default function CustomerView({
               aria-current={tab === key ? 'page' : undefined}
               onClick={() => setTab(key)}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d={icon} />
-              </svg>
+              <Icon name={key} size={24} />
               {label}
             </button>
           ))}

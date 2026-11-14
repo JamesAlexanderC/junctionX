@@ -4,6 +4,7 @@
 
 import { eur, longDate } from '../lib/format.js'
 import { Bar } from './Cards.jsx'
+import Icon from './Icon.jsx'
 
 const share = (num, den) => (den ? (num ?? 0) / den : 0)
 
@@ -22,7 +23,10 @@ function GoalRow({ goal, onAsk }) {
             {goal.emoji && <span aria-hidden="true">{goal.emoji}</span>}
             {name}
             {goal.paused ? (
-              <span className="tag">Paused</span>
+              <span className="tag">
+                <Icon name="paused" size={12} />
+                Paused
+              </span>
             ) : (
               goal.difficulty && <span className="tag">{goal.difficulty}</span>
             )}
@@ -36,6 +40,9 @@ function GoalRow({ goal, onAsk }) {
             {goal.target_date && ` · by ${longDate(goal.target_date)}`}
           </small>
           <small className={`ins-text goal-status ${status.replace(' ', '-')}`}>
+            {!goal.paused && (
+              <Icon name={goal.on_track ? 'check' : 'behind'} size={14} />
+            )}
             {goal.monthly_needed > 0 && `${eur(goal.monthly_needed)} a month needed · `}
             {status}
           </small>
@@ -50,9 +57,7 @@ function GoalRow({ goal, onAsk }) {
         {goal.progress_pct != null && (
           <strong className="ins-value">{Math.round(goal.progress_pct)}%</strong>
         )}
-        <span className="chevron" aria-hidden="true">
-          ›
-        </span>
+        <Icon name="chevron" className="chevron" />
       </button>
     </li>
   )
@@ -64,7 +69,10 @@ export default function Goals({ goals, onAsk }) {
   const clash = goals?.clash
   return (
     <div className="section goals" aria-label="Goals">
-      <h2 className="section-title">Your goals</h2>
+      <h2 className="section-title">
+        <Icon name="goals" size={16} />
+        Your goals
+      </h2>
       <ul className="panel rows">
         {active.map((g) => (
           <GoalRow key={g.id} goal={g} onAsk={onAsk} />
@@ -80,9 +88,7 @@ export default function Goals({ goals, onAsk }) {
                 <span className="ins-title">No goals yet</span>
                 <small className="ins-text">Ask the coach to help you set one.</small>
               </span>
-              <span className="chevron" aria-hidden="true">
-                ›
-              </span>
+              <Icon name="chevron" className="chevron" />
             </button>
           </li>
         )}

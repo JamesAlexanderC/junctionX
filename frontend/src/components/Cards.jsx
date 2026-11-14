@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { eur, formatValue, longDate } from '../lib/format.js'
 import { cutSaving, goalWithCut } from '../lib/formulas.js'
 import ChartCard from './Chart.jsx'
+import Icon from './Icon.jsx'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
@@ -193,6 +194,7 @@ function AlertCard({ card, onSend }) {
         className="btn-primary"
         onClick={() => onSend(`Help me fix the "${card.title}" alert`, 4)}
       >
+        <Icon name="fix" size={16} />
         Fix this
       </button>
     </div>
@@ -215,6 +217,7 @@ export function PlanCard({ card, onSend }) {
         })}
       </ol>
       <button type="button" className="btn-primary" onClick={() => onSend('Accept plan', 4)}>
+        <Icon name="check" size={16} />
         Accept plan
       </button>
     </div>
