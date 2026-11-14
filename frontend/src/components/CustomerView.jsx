@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getInsights, sendChat } from '../api.js'
 import Chat from './Chat.jsx'
+import Help from './Help.jsx'
 import Insights, { InsightsSkeleton } from './Insights.jsx'
 
 // Chat history in the API's shape: [{role, content}].
@@ -22,7 +23,13 @@ const TABS = [
   ['coach', 'Coach', 'M4 5h16v11H8l-4 4z'],
 ]
 
-export default function CustomerView({ customerId, onExit }) {
+export default function CustomerView({
+  customerId,
+  onExit,
+  help = false,
+  onHelp,
+  onCloseHelp,
+}) {
   const [insights, setInsights] = useState([])
   const [insightsError, setInsightsError] = useState(null)
   const [insightsLoading, setInsightsLoading] = useState(true)
@@ -75,62 +82,81 @@ export default function CustomerView({ customerId, onExit }) {
   }
 
   return (
-    <div className="app" data-tab={tab}>
-      <header className="topbar">
-        <div className="topbar-inner">
-          <span className="logo" aria-hidden="true">
-            S
-          </span>
-          <h1>Saldo</h1>
-          <span className="who">{customerId}</span>
-          <button
-            type="button"
-            className="exit"
-            aria-label="Exit to demo"
-            onClick={onExit}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        </div>
-      </header>
+    <>
+      {help && (
+        <Help
+          onBack={onCloseHelp}
+          onAsk={(text, depth) => {
+            onCloseHelp()
+            ask(text, depth)
+          }}
+        />
+      )}
+      {/* Hidden, not unmounted, under the help page so the chat is kept. */}
+      <div
+        className="app"
+        data-tab={tab}
+        style={help ? { display: 'none' } : undefined}
+      >
+        <header className="topbar">
+          <div className="topbar-inner">
+            <span className="logo" aria-hidden="true">
+              S
+            </span>
+            <h1>Saldo</h1>
+            <span className="who">{customerId}</span>
+            <button type="button" className="logout" onClick={onHelp}>
+              Help
+            </button>
+            <button
+              type="button"
+              className="exit"
+              aria-label="Exit to demo"
+              onClick={onExit}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+        </header>
 
-      <main className="layout">
-        <section className="pane overview" aria-label="Overview">
-          {insightsError && (
-            <p className="error banner" role="alert">
-              {insightsError}
-            </p>
-          )}
-          {insightsLoading ? (
-            <InsightsSkeleton />
-          ) : (
-            <Insights items={insights} onAsk={ask} />
-          )}
-        </section>
+        <main className="layout">
+          <section className="pane overview" aria-label="Overview">
+            {insightsError && (
+              <p className="error banner" role="alert">
+                {insightsError}
+              </p>
+            )}
+            {insightsLoading ? (
+              <InsightsSkeleton />
+            ) : (
+              <Insights items={insights} onAsk={ask} />
+            )}
+          </section>
 
-        <section className="pane coach" aria-label="Coach">
-          <Chat messages={messages} busy={busy} onSend={send} />
-        </section>
-      </main>
+          <section className="pane coach" aria-label="Coach">
+            <Chat messages={messages} busy={busy} onSend={send} />
+          </section>
+        </main>
 
-      <nav className="tabbar" aria-label="Sections">
-        {TABS.map(([key, label, icon]) => (
-          <button
-            key={key}
-            type="button"
-            className={tab === key ? 'active' : ''}
-            aria-current={tab === key ? 'page' : undefined}
-            onClick={() => setTab(key)}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d={icon} />
-            </svg>
-            {label}
-          </button>
-        ))}
-      </nav>
-    </div>
+        <nav className="tabbar" aria-label="Sections">
+          {TABS.map(([key, label, icon]) => (
+            <button
+              key={key}
+              type="button"
+              className={tab === key ? 'active' : ''}
+              aria-current={tab === key ? 'page' : undefined}
+              onClick={() => setTab(key)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d={icon} />
+              </svg>
+              {label}
+            </button>
+          ))}
+        </nav>
+      </div>
+    </>
   )
 }
