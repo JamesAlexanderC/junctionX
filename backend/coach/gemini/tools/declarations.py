@@ -2,6 +2,7 @@
 
 from google.genai import types
 
+from ..catalogue import CATALOGUE, section
 from .context import ToolError
 
 STR = {"type": "string"}
@@ -169,6 +170,27 @@ DECLARATIONS = [
         "Compare spending with the user's age group or area (#36-#37).",
         {"kind": {"type": "string", "enum": ["age", "area"]}, "category": STR},
         ["kind"],
+    ),
+    _decl(
+        "list_inferences",
+        "Every computed inference for this user: item key, what it is, whether "
+        "the data supports it (with the reason if not) and if it can be charted.",
+        {
+            "section": {
+                "type": "string",
+                "enum": sorted({section(item) for item in CATALOGUE}),
+            }
+        },
+    ),
+    _decl(
+        "get_inference",
+        "Read one computed inference by item key (see list_inferences). "
+        "Chartable items include chart_data for a chart card.",
+        {
+            "item": {"type": "string", "enum": list(CATALOGUE)},
+            "detail": {"type": "string", "enum": ["summary", "full"]},
+        },
+        ["item"],
     ),
     _decl("get_alerts", "Active alerts with severity, priority and trigger values."),
     _decl(
