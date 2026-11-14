@@ -22,6 +22,7 @@ them in code comments). Everything below is binding for every teammate.
 - `frontend/` React + Vite (JSX). Falls back to `shared/fixtures/profile_demo.json`.
 - `shared/fixtures/profile_demo.json` is the canonical profile JSON shape.
 - `handoff/` notes for work too far out of scope to finish here.
+- `scripts/bin/`: `setup`, `dev` (run everything), `check` (all PR checks).
 
 ## Transaction DataFrame columns
 `tx_id, customer_id, bank_account_id, tx_date (datetime64), tx_timestamp
