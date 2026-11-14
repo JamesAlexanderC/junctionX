@@ -10,6 +10,10 @@ from inferences import thresholds as _th
 # Priority weights: priority = weight / max(1, days until impact).
 SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
 
+# Screens (Home, Insights, /api/alerts/) show the top alerts by priority; chat
+# (get_alerts) still sees every alert. Live: some customers had 8.
+MAX_SHOWN_ALERTS = 5
+
 from inferences.thresholds import (  # noqa: F401  shared with the inferences
     BUFFER_ESSENTIALS_SHARE,
     BUFFER_MIN_EUR,

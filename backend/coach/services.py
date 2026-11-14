@@ -350,8 +350,11 @@ def alert_priority(alert, on):
     return weight / max(1, days)
 
 
-def active_alerts(customer_id, profile, on=None):
-    """Profile alerts minus snoozed ones, sorted by priority (highest first)."""
+def active_alerts(customer_id, profile, on=None, limit=None):
+    """Profile alerts minus snoozed ones, sorted by priority (highest first).
+
+    With ``limit``, only the first ``limit`` of them (screens; chat sees all).
+    """
     hidden = snoozed_ids(customer_id, on)
     p_today = profile_today(profile)
     alerts = []
@@ -362,7 +365,8 @@ def active_alerts(customer_id, profile, on=None):
         if alert.get("priority") is None:
             alert["priority"] = round(alert_priority(alert, p_today), 4)
         alerts.append(alert)
-    return sorted(alerts, key=lambda a: a["priority"], reverse=True)
+    ranked = sorted(alerts, key=lambda a: a["priority"], reverse=True)
+    return ranked if limit is None else ranked[:limit]
 
 
 def add_days(on, days):

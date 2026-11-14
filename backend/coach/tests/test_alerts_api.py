@@ -7,6 +7,7 @@ import pytest
 from coach import services
 from coach.gemini.system_prompt import FALLBACK_REPLY
 from coach.models import Goal
+from inferences.alert_thresholds import MAX_SHOWN_ALERTS
 
 from .conftest import AINO, TODAY, load_customer, response
 
@@ -234,3 +235,57 @@ def test_alert_card_fixable_is_set_by_python_not_gemini(
         content_type="application/json",
     ).json()
     assert body["cards"][0]["fixable"] is False
+
+
+# --- Fix 3: at most MAX_SHOWN_ALERTS on screen, every alert in chat -----------
+
+
+def many_alerts_profile(n=8):
+    """The broke customer's profile with n made-up alerts, priority n..1."""
+    profile = dict(services.get_profile(BROKE))
+    profile["alerts"] = [
+        {
+            "id": f"a-test-{i}",
+            "inference": 23,
+            "severity": "amber",
+            "title": f"Alert {i}",
+            "text": f"Alert {i}",
+            "impact_date": "2026-10-25",
+            "priority": float(i),
+        }
+        for i in range(n, 0, -1)
+    ]
+    return profile
+
+
+@pytest.fixture
+def eight_alerts(broke, monkeypatch):
+    profile = many_alerts_profile(8)
+    monkeypatch.setattr(services, "get_profile", lambda cid: profile)
+    return profile
+
+
+def test_active_alerts_limit_keeps_highest_priority(eight_alerts):
+    shown = services.active_alerts(BROKE, eight_alerts, limit=5)
+    assert [a["priority"] for a in shown] == [8.0, 7.0, 6.0, 5.0, 4.0]
+    assert len(services.active_alerts(BROKE, eight_alerts)) == 8
+
+
+@pytest.mark.parametrize("path", ["home", "alerts"])
+def test_screens_show_at_most_five_alerts(client, eight_alerts, path):
+    alerts = client.get(f"/api/{path}/{BROKE}/").json()["alerts"]
+    assert len(alerts) == MAX_SHOWN_ALERTS
+    assert alerts[0]["id"] == "a-test-8"
+
+
+def test_insights_show_at_most_five_alerts(client, eight_alerts):
+    items = client.get(f"/api/insights/{BROKE}/").json()["insights"]
+    ids = [i["key"] for i in items if str(i["key"]).startswith("a-test-")]
+    assert len(ids) == MAX_SHOWN_ALERTS
+
+
+def test_chat_tool_still_sees_every_alert(eight_alerts):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    alerts = call_tool(ToolContext(BROKE), "get_alerts", {})["alerts"]
+    assert len(alerts) == 8
