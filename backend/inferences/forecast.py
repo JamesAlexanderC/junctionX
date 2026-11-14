@@ -91,6 +91,22 @@ def _scheduled(income: dict, bills: list[dict], today, end):
     return flows
 
 
+def safe_to_spend_week(
+    balance, bills_before_payday, monthly_saving, buffer, days_to_payday, cycle_days
+):
+    """#17 Safe to spend this week (context.md "Forecasts").
+
+    Available = B - bills due before payday - monthly saving x share of the
+    pay cycle left - buffer; safe this week = Available x min(7, D) / D,
+    floored at 0. Only the saving still due this cycle is held back (not the
+    whole month's), as context.md specifies and Will confirmed (FC-5).
+    """
+    days = max(1, days_to_payday)
+    cycle_left = min(1.0, days / max(1, cycle_days))
+    available = balance - bills_before_payday - monthly_saving * cycle_left - buffer
+    return max(0.0, available * min(7, days) / days)
+
+
 def month_end_target(today):
     """#19 target date: this month's last day, or next month's when fewer
     than MONTH_END_ROLLOVER_DAYS are left (FC-1: on the data's as-of date,
@@ -156,10 +172,14 @@ def compute_forecast(df: pd.DataFrame, today, income: dict, baskets: dict) -> di
         cycle_days = (
             (payday_date - to_date(last)).days if last else th.DEFAULT_CYCLE_DAYS
         )
-        cycle_left = min(1.0, days_to_payday / max(1, cycle_days))
-        planned_saving = (baskets.get("monthly_saving") or 0.0) * cycle_left
-        available = b0 - due - planned_saving - buf
-        safe_week = max(0.0, available * min(7, days_to_payday) / days_to_payday)
+        safe_week = safe_to_spend_week(
+            b0,
+            due,
+            baskets.get("monthly_saving") or 0.0,
+            buf,
+            days_to_payday,
+            cycle_days,
+        )
     else:
         # No payday found: fall back to balance - buffer (edge-case test).
         safe_week = max(0.0, b0 - buf)

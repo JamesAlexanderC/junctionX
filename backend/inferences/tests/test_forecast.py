@@ -77,3 +77,34 @@ def test_tight_days_without_payday_says_next_30_days():
 
 def test_tight_days_with_payday_still_says_before_payday():
     assert "before payday" in _tight_days_alert(payday_found=True)["text"]
+
+
+# --- FC-5: #17 safe to spend, the app's formula (context.md, chosen by Will) ------
+# Available = B - bills before payday - monthly saving x share of cycle left
+#             - buffer; safe this week = Available x min(7, D) / D, floor 0.
+# Hand-checked live values from handoff/forcasting.md (D = 15 of a 30-day cycle).
+
+
+@pytest.mark.parametrize(
+    "balance, bills, saving, buffer, expected",
+    [
+        (1085.77, 730.54, 445.37, 92.48, 18.70),  # CUST03369
+        (1103.89, 622.19, 116.11, 107.15, 147.70),  # CUST00025
+    ],
+)
+def test_safe_to_spend_matches_the_hand_checked_customers(
+    balance, bills, saving, buffer, expected
+):
+    out = forecast.safe_to_spend_week(
+        balance, bills, saving, buffer, days_to_payday=15, cycle_days=30
+    )
+    assert out == pytest.approx(expected, abs=0.01)
+
+
+def test_safe_to_spend_is_never_negative():
+    assert forecast.safe_to_spend_week(100, 500, 0, 50, 10, 30) == 0
+
+
+def test_safe_to_spend_uses_a_full_week_only_when_payday_is_far():
+    # D <= 7: everything available may be spent before payday.
+    assert forecast.safe_to_spend_week(500, 0, 0, 100, 3, 30) == pytest.approx(400)
