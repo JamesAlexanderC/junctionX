@@ -75,7 +75,17 @@ export default function Chat({ messages, busy, onSend, disabled }) {
             />
           ),
         )}
-        {busy && <div className="msg coach muted">Thinking…</div>}
+        {busy && (
+          <div
+            className="msg coach typing"
+            role="status"
+            aria-label="Coach is thinking"
+          >
+            <span />
+            <span />
+            <span />
+          </div>
+        )}
         <div ref={endRef} />
       </div>
       <form

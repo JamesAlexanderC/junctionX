@@ -6,6 +6,7 @@ import { getCustomers } from '../api.js'
 export default function CustomerPicker({ value, onChange }) {
   const [q, setQ] = useState('')
   const [list, setList] = useState([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -15,9 +16,12 @@ export default function CustomerPicker({ value, onChange }) {
         .then((c) => {
           setList(c)
           setError(null)
+          setLoading(false)
         })
         .catch((e) => {
-          if (e?.name !== 'AbortError') setError(e.message)
+          if (e?.name === 'AbortError') return
+          setError(e.message)
+          setLoading(false)
         })
     }, 200)
     return () => {
@@ -39,7 +43,7 @@ export default function CustomerPicker({ value, onChange }) {
         onChange={(e) => onChange(e.target.value || null)}
         aria-label="Customer"
       >
-        <option value="">Pick a customer</option>
+        <option value="">{loading ? 'Loading customers…' : 'Pick a customer'}</option>
         {list.map((c) => (
           <option key={c.customer_id} value={c.customer_id}>
             {c.customer_id}
