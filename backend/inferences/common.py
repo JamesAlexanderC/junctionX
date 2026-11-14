@@ -90,6 +90,18 @@ def full_months(today, n: int, df: pd.DataFrame | None = None) -> list[str]:
     return months
 
 
+def last_complete_month(today) -> str:
+    """'YYYY-MM' of the latest complete calendar month as of ``today``: the
+    current month when today is its last day, otherwise the month before.
+    One rule for "last month" in chat and the Overview (F8: with data ending
+    30 Sep, "last month" said August)."""
+    today = to_date(today)
+    current = month_key(today)
+    if today.day == days_in_month(current):
+        return current
+    return add_months(current, -1)
+
+
 def days_in_month(month: str) -> int:
     return pd.Period(month, freq="M").days_in_month
 

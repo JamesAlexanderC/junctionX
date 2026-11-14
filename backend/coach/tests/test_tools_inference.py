@@ -194,3 +194,15 @@ def test_trim_replaces_id_lists_with_counts_without_mutating():
 )
 def test_chart_data_skips_missing_values(item, value, expected):
     assert chart_data(CATALOGUE[item], value) == expected
+
+
+# --- F8: "last month" in chat = the latest complete month --------------------------
+
+
+def test_category_spend_defaults_to_the_latest_complete_month(aino, settings):
+    from coach import services
+
+    settings.AS_OF_DATE = "2026-09-30"  # the real data's as-of date
+    services.reset_as_of_cache()
+    out = _call(aino, "get_category_spend", category="groceries")
+    assert out["month"] == "2026-09"

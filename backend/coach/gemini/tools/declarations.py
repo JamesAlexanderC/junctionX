@@ -149,7 +149,8 @@ def _decl(name, description, properties=None, required=None):
 DECLARATIONS = [
     _decl(
         "get_category_spend",
-        "Total spend in one category for a month (default: last full month).",
+        "Total spend in one category for a month. For 'last month' leave month "
+        "empty: the default is the latest complete month.",
         {"category": STR, "month": {"type": "string", "description": "YYYY-MM"}},
         ["category"],
     ),

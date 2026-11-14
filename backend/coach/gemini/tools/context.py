@@ -1,7 +1,6 @@
 """ToolContext, ToolError and helpers shared by every tool (P2.2)."""
 
 import re
-from datetime import timedelta
 
 from ... import services
 
@@ -86,11 +85,6 @@ def form_errors(errors):
 
 
 # --- helpers ---------------------------------------------------------------
-
-
-def _last_full_month(on):
-    first = on.replace(day=1)
-    return (first - timedelta(days=1)).strftime("%Y-%m")
 
 
 def _norm(text):

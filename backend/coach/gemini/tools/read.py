@@ -5,13 +5,15 @@ import re
 
 from ...models import Transaction
 from ... import services
-from .context import ToolError, _last_full_month, _missing, _norm, unavailable
+from inferences.common import last_complete_month
+
+from .context import ToolError, _missing, _norm, unavailable
 
 # --- tool implementations --------------------------------------------------
 
 
 def get_category_spend(ctx, category, month=None):
-    month = month or _last_full_month(ctx.today)
+    month = month or last_complete_month(ctx.today)  # F8
     if not re.fullmatch(r"\d{4}-\d{2}", month):
         raise ToolError("month must be YYYY-MM")
     year, mon = (int(x) for x in month.split("-"))
