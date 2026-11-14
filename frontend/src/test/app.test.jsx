@@ -13,11 +13,14 @@ const NO_GOALS = { customer_id: 'CUST00001', active: [], completed: [], clash: n
 const NO_BASKETS = { customer_id: 'CUST00001', month: null, total: 0, buckets: [] }
 
 // Test-only shape of GET /api/customers/demo/.
+const LEVEL_NAMES = ['Not started', 'Getting started', 'In control', 'Safety net']
 const row = (n, spender) => ({
   customer_id: `CUST0000${n}`,
   income_level: n,
   income_label: `Income ${n}`,
   spender_type: spender,
+  level: n - 1,
+  level_name: LEVEL_NAMES[n - 1],
 })
 const SPENDERS = ['Night Owl', 'Payday Splurger', 'Balanced']
 const DEMO = {
@@ -25,6 +28,8 @@ const DEMO = {
   demos: SPENDERS.map((t, i) => ({
     demo: i + 1,
     customer_id: `CUST0000${i + 1}`,
+    level: i,
+    level_name: LEVEL_NAMES[i],
     income_level: i + 1,
     income_label: `Income ${i + 1}`,
     spender_type: t,
@@ -350,13 +355,13 @@ describe('demo landing page', () => {
         : new Response('[]', { status: 200 }),
     )
 
-  it('demo buttons name only the demo, income level and spender type', async () => {
+  it('demo buttons name the demo, level, income and spender type', async () => {
     vi.stubGlobal('fetch', fetchOk())
     render(<App />)
     const list = await screen.findByRole('list', { name: 'Demo customers' })
     const rows = list.querySelectorAll('li')
     expect(rows).toHaveLength(3)
-    expect(rows[0].textContent).toBe('Demo 1Income 1 · Night Owl')
+    expect(rows[0].textContent).toBe('Demo 1Level 0: Not startedIncome 1 · Night Owl')
     expect(list.textContent).not.toContain('CUST')
     fireEvent.click(screen.getByRole('button', { name: /Demo 2/ }))
     expect(window.location.hash).toBe('#/c/CUST00002')
@@ -367,7 +372,9 @@ describe('demo landing page', () => {
     render(<App />)
     const all = await screen.findByRole('list', { name: 'All customers' })
     expect(all.querySelectorAll('li')).toHaveLength(4)
-    expect(all.textContent).toContain('CUST00004Income 4 · Weekend Treater')
+    expect(all.textContent).toContain(
+      'CUST00004Safety net · Income 4 · Weekend Treater',
+    )
     expect(screen.queryByLabelText('Search customer')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /CUST00004/ }))
     expect(window.location.hash).toBe('#/c/CUST00004')

@@ -380,9 +380,18 @@ def test_demo_directory_lists_demos_and_every_customer(client, db, monkeypatch):
     assert [rows[f"C-L{i}"]["income_level"] for i in range(1, 6)] == [1, 2, 3, 4, 5]
     assert rows["C-L1"]["income_label"] == "Lowest income"
     assert rows["C-L1"]["spender_type"]
-    # Same spending habits at every income level: one spender type, one demo.
+    assert all(isinstance(rows[f"C-L{i}"]["level"], int) for i in range(1, 6))
+    assert rows["C-L1"]["level_name"]
+    # Same habits scaled by income: every customer is at the same app level,
+    # so there is one demo, for that level.
     assert len(body["demos"]) == 1
-    assert body["demos"][0]["demo"] == 1
+    demo = body["demos"][0]
+    assert demo["demo"] == 1
+    assert demo["level"] == rows[demo["customer_id"]]["level"]
+    assert demo["level_name"] == rows[demo["customer_id"]]["level_name"]
+    # No goals, no readiness model: the index level is the profile's level.
+    profile = services.get_profile(demo["customer_id"])
+    assert profile["levels"]["current"] == demo["level"]
 
 
 def test_demo_directory_not_built(client, db):
