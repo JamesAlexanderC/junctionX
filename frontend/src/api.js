@@ -1,84 +1,74 @@
-// API client for the Django coach backend.
+// API client for the Django backend (contract: CLAUDE.md "API").
 //
-// Chat stream contract (SSE over POST /api/chat/). Each event is one line of
-// `data: <json>` followed by a blank line, where the JSON is one of:
-//   { "type": "token",   "text": "..." }                  streamed answer text
-//   { "type": "chart",   "chart": Chart }                 optional chart payload
-//   { "type": "concept", "title": "...", "text": "..." }  optional explainer
-//   { "type": "error",   "message": "..." }
-//   { "type": "done" }
+//   GET  /api/customers/?q=<search>   -> [{customer_id, customer_age, ...}]
+//   GET  /api/insights/<customer_id>/  -> [{key, inference, title, value,
+//                                          unit, text, section, severity?}]
+//   POST /api/chat/ {customer_id, message, history, depth?} -> send_reply
 //
-// Chart = {
-//   kind: "bar" | "line" | "pie",
-//   title: string,
-//   unit?: string,                      // e.g. "€"
-//   data: [{ label: string, value: number }]
-// }
-//
-// If the backend can't be reached, the app falls back to demo mode and uses
-// canned answers from mock.js so the UI can still be developed and shown.
-
-import { mockChat, MOCK_CUSTOMERS } from './mock.js'
+// There is no offline or demo fallback: every error is shown as is.
 
 const API = import.meta.env.VITE_API_URL ?? ''
 
-export async function getCustomers() {
-  try {
-    const res = await fetch(`${API}/api/customers/`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const body = await res.json()
-    const customers = Array.isArray(body) ? body : body.results ?? []
-    return { customers, demo: false }
-  } catch {
-    return { customers: MOCK_CUSTOMERS, demo: true }
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message)
+    this.status = status
   }
 }
 
-function handleEvent(raw, onEvent) {
-  const data = raw
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => line.slice(5).trimStart())
-    .join('\n')
-  if (!data) return
-  let event
+async function request(path, { method = 'GET', body, signal } = {}) {
+  let res
   try {
-    event = JSON.parse(data)
-  } catch {
-    // Treat non-JSON data lines as plain answer text.
-    event = { type: 'token', text: data }
+    res = await fetch(`${API}${path}`, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+      signal,
+    })
+  } catch (e) {
+    if (e?.name === 'AbortError') throw e
+    throw new ApiError('Backend not reachable', 0)
   }
-  onEvent(event)
+  let data = null
+  try {
+    data = await res.json()
+  } catch {
+    // not JSON (e.g. the Vite proxy's 502 page)
+  }
+  if (!res.ok) {
+    if (res.status >= 502 && res.status <= 504 && !data) {
+      throw new ApiError('Backend not reachable', res.status)
+    }
+    const msg = data?.error ?? data?.detail ?? `Request failed (HTTP ${res.status})`
+    throw new ApiError(msg, res.status)
+  }
+  return data
 }
 
-// Streams one coach reply. Calls onEvent for every event, resolves when done.
-export async function streamChat({ customerId, messages, demo, onEvent, signal }) {
-  if (demo) return mockChat({ customerId, messages, onEvent, signal })
+export async function getCustomers(q = '', { signal } = {}) {
+  const query = q ? `?q=${encodeURIComponent(q)}` : ''
+  const body = await request(`/api/customers/${query}`, { signal })
+  return Array.isArray(body) ? body : (body?.results ?? [])
+}
 
-  const res = await fetch(`${API}/api/chat/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
-    body: JSON.stringify({ customer_id: customerId, messages }),
+export async function getInsights(customerId, { signal } = {}) {
+  const body = await request(`/api/insights/${encodeURIComponent(customerId)}/`, {
     signal,
   })
-  if (!res.ok || !res.body) throw new Error(`Chat failed (HTTP ${res.status})`)
+  // Backend shape: {customer_id, as_of, insights: [...]} (CLAUDE.md "API").
+  if (Array.isArray(body)) return body
+  return Array.isArray(body?.insights) ? body.insights : []
+}
 
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  for (;;) {
-    const { value, done } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
-    let split
-    while ((split = buffer.indexOf('\n\n')) !== -1) {
-      handleEvent(buffer.slice(0, split), onEvent)
-      buffer = buffer.slice(split + 2)
-    }
-  }
-  if (buffer.trim()) handleEvent(buffer, onEvent)
-  onEvent({ type: 'done' })
+// Only the last 6 turns are sent (context.md "Controls").
+export function sendChat({ customerId, message, history = [], depth }) {
+  return request('/api/chat/', {
+    method: 'POST',
+    body: {
+      customer_id: customerId,
+      message,
+      history: history.slice(-6),
+      ...(depth ? { depth } : {}),
+    },
+  })
 }

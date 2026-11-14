@@ -62,7 +62,28 @@ setup_env() {
     local target="${REPO_ROOT}/.env"
 
     if [ -f "${target}" ]; then
-        echo ".env already exists, leaving it untouched."
+        # Append keys that .env.example gained since .env was created, so new
+        # settings (GEMINI_API_KEY, DATA_DIR, ...) appear without a reset.
+        local line key added=0
+        if [ -f "${example}" ]; then
+            while IFS= read -r line || [ -n "${line}" ]; do
+                case "${line}" in
+                    ''|'#'*) continue ;;
+                esac
+                key="${line%%=*}"
+                if ! grep -q "^${key}=" "${target}"; then
+                    case "${line}" in
+                        *"${ENV_PLACEHOLDER}"*)
+                            line="${line%%"${ENV_PLACEHOLDER}"*}$(random_secret)"
+                            ;;
+                    esac
+                    printf '%s\n' "${line}" >>"${target}"
+                    echo "Added missing ${key} to .env"
+                    added=1
+                fi
+            done <"${example}"
+        fi
+        [ "${added}" -eq 0 ] && echo ".env already exists and is up to date."
         return
     fi
     if [ ! -f "${example}" ]; then
@@ -176,10 +197,6 @@ setup_env
 
 section "Done"
 echo "Next steps:"
-echo "  docker compose up -d           # start Postgres"
-if [ "${DO_BACKEND}" -eq 1 ]; then
-    echo "  source venv                    # activate the Python virtualenv"
-fi
-if [ "${DO_FRONTEND}" -eq 1 ]; then
-    echo "  cd frontend && npm run dev     # start the frontend dev server"
-fi
+echo "  dev                            # Postgres + migrate + Django + Vite"
+echo "  check                          # black, pytest, vitest, lint, build"
+echo "See README.md for loading the S-Bank data and building profiles."

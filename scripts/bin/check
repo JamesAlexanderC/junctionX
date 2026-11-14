@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Run every check a PR needs (see Contributing.md): black, Django system
+# check, pytest (backend on SQLite, Gemini mocked), Vitest, oxlint and a
+# production build of the frontend.
+#
+# Usage: scripts/bin/check [--fix] [--backend-only | --frontend-only]
+#   --fix             run black to reformat instead of only checking
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+FIX=0
+DO_BACKEND=1
+DO_FRONTEND=1
+for arg in "$@"; do
+    case "${arg}" in
+        --fix) FIX=1 ;;
+        --backend-only) DO_FRONTEND=0 ;;
+        --frontend-only) DO_BACKEND=0 ;;
+        -h|--help)
+            sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: ${arg}" >&2
+            exit 1
+            ;;
+    esac
+done
+
+PY="${REPO_ROOT}/.venv/bin/python"
+[ -x "${PY}" ] || PY="${REPO_ROOT}/venv/bin/python"
+
+failed=()
+run() {
+    local name="$1"
+    shift
+    echo
+    echo "==> ${name}"
+    if "$@"; then
+        echo "--> ${name}: ok"
+    else
+        echo "--> ${name}: FAILED"
+        failed+=("${name}")
+    fi
+}
+
+if [ "${DO_BACKEND}" -eq 1 ]; then
+    cd "${REPO_ROOT}/backend" || exit 1
+    export USE_SQLITE=1
+    if [ "${FIX}" -eq 1 ]; then
+        run "black" "${PY}" -m black .
+    else
+        run "black" "${PY}" -m black --check .
+    fi
+    run "django check" "${PY}" manage.py check
+    run "migrations up to date" "${PY}" manage.py makemigrations --check --dry-run
+    run "pytest" "${PY}" -m pytest -q
+fi
+
+if [ "${DO_FRONTEND}" -eq 1 ]; then
+    cd "${REPO_ROOT}/frontend" || exit 1
+    run "vitest" npm test --silent
+    run "oxlint" npm run lint --silent
+    run "vite build" npm run build --silent
+fi
+
+echo
+if [ "${#failed[@]}" -eq 0 ]; then
+    echo "All checks passed."
+else
+    echo "Failed: ${failed[*]}"
+    exit 1
+fi
