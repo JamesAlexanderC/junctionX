@@ -59,7 +59,9 @@ def _english_unit(value):
 
 
 class NumberCard(_Card):
-    label: str
+    # Optional (item 5): Gemini often left it out, and each rejected reply
+    # cost another 6-16 s Gemini call; the app draws the card without it.
+    label: str = ""
     value: float
     unit: str | None = None
 

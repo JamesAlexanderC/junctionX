@@ -79,7 +79,7 @@ def test_numbers_inside_card_strings_are_checked():
             "title": "x",
             "data": [{"label": "a", "value": 820.0}],
         },
-        {"type": "number", "value": 820.0},  # no label
+        {"type": "number", "label": "Leaky"},  # no value
         {"type": "alert", "id": "a1", "severity": "purple", "title": "t", "text": "t"},
         {"type": "question", "question": "Which?", "options": ["only one"]},
     ],
@@ -185,3 +185,10 @@ def test_chips_repeating_question_options_are_dropped():
 def test_raw_merchant_ids_are_rejected_with_the_friendly_name():
     with pytest.raises(ReplyError, match="a grocery shop"):
         validate_reply({"text": "MRC-GRO-0016 went up.", "depth": 1}, [])
+
+
+def test_number_card_without_a_label_is_accepted():
+    """Item 5: Gemini often omits the label; a retry costs 6-16 s per reply."""
+    card = {"type": "number", "value": 820.0}
+    out = validate_reply(_reply(card), BASKETS)
+    assert out["cards"][0]["value"] == 820.0
