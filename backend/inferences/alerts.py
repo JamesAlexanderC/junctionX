@@ -41,13 +41,13 @@ Inputs per rule (profile keys use dotted paths):
 85    Overdraft                   df
 86    Fees and late charges       df
 87    Income dropped              df, income.payday.day_of_month
-88    Spending pace               df, income.monthly_income
+88    Spending pace               df, income.retained_income
 89    Lifestyle creep             baskets.history[].totals, baskets.totals
 90    Subscription creep          df, income.subscriptions
 91    Free trial turned paid      df
 92    Similar subscriptions       income.subscriptions[].mcc_code
 93    Annual bill coming          df
-94    Savings withdrawn           df (own-account transfers)
+94    Savings withdrawn           df (Saver deposits/withdrawals)
 95    Saving streak broken        df, income.payday.day_of_month
 96    Cash withdrawals up         df
 97    Small leaks                 df
@@ -195,6 +195,17 @@ def _buffer(profile):
 
 def _income(profile):
     return float(_get(profile, "income.monthly_income", 0.0) or 0.0)
+
+
+def _retained_income(profile):
+    """Income left after salary_sweep (P1.1); falls back to #2 income."""
+    retained = _get(profile, "income.retained_income")
+    return float(retained) if retained is not None else _income(profile)
+
+
+def _saver(df):
+    types = T.SAVER_DEPOSIT_TYPES | T.SAVER_WITHDRAWAL_TYPES
+    return df["transaction_type"].isin(types)
 
 
 def _cv(values):
@@ -1042,7 +1053,7 @@ def rule_88_spending_pace(df, profile, today, **ctx):
     start, days_in_month = _month_bounds(today)
     if today.day < T.PACE_MIN_DAY:
         return None
-    income = _income(profile)
+    income = _retained_income(profile)
     spent = float(_this_month(_outflows(df), today)["tx_amount_eur"].abs().sum())
     projected = spent / today.day * days_in_month
     if income <= 0 or projected <= income:
@@ -1157,7 +1168,7 @@ def rule_93_annual_bill(df, profile, today, **ctx):
 
 
 def rule_94_savings_withdrawn(df, profile, today, **ctx):
-    own = _this_month(df[_own(df)], today)
+    own = _this_month(df[_saver(df)], today)
     if own.empty:
         return None
     net_saved = float(-own["tx_amount_eur"].sum())

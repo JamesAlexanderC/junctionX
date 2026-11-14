@@ -1,9 +1,10 @@
 """Thresholds and category/MCC sets for the alert rules (context.md #6 to #102).
 
 All values are starting points: tune them on the demo customers. Category and
-MCC sets are guesses until the S-Bank data scientist confirms the real values
-(see handoff/alert-category-values.md).
+MCC sets are mapped from the real data in docs/data_profile.md.
 """
+
+from inferences import thresholds as _th
 
 # Priority weights: priority = weight / max(1, days until impact).
 SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
@@ -12,13 +13,13 @@ SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
 BUFFER_MIN_EUR = 50.0
 BUFFER_ESSENTIALS_SHARE = 0.10
 
-# Transaction classification (TODO: confirm with real category values).
-OWN_TRANSFER_TYPES = {
-    "own_transfer",
-    "transfer_own",
-    "internal_transfer",
-    "savings_transfer",
-}
+# Transaction classification. Own-transfer and Saver types come from the real
+# data mapping in thresholds.py. Loan, fee and gambling values match no real
+# rows: #76-#84 and #86 only fire on the synthetic credit register and
+# injected events, which must use these labels.
+OWN_TRANSFER_TYPES = _th.OWN_TRANSFER_TYPES
+SAVER_DEPOSIT_TYPES = _th.SAVER_DEPOSIT_TYPES
+SAVER_WITHDRAWAL_TYPES = _th.SAVER_WITHDRAWAL_TYPES
 LOAN_CATEGORIES = {
     "loan",
     "loans",

@@ -1,45 +1,49 @@
 """Every threshold and constant used by the inferences (context.md #1 to #33).
 
 All values are starting points from context.md: tune them on the demo customers.
-Category, transaction_type and MCC sets marked TODO are guesses until P1.1 has
-profiled the real S-Bank data and the S-Bank data scientist has confirmed them.
+The data vocabulary below is mapped from the real S-Bank values profiled in
+docs/data_profile.md (P1.1). Categories are compared lower-cased.
 """
 
-# --- Data vocabulary (TODO confirm with S-Bank data) ---------------------------
+# --- Data vocabulary (real S-Bank values, docs/data_profile.md) ----------------
 
-# transaction_type values that mark a transfer between the customer's own
-# accounts (savings, investments, other own current accounts).
-# TODO confirm with S-Bank data.
-OWN_TRANSFER_TYPES = frozenset(
-    {"own_transfer", "internal_transfer", "savings_transfer", "own_account"}
-)
+# 90% of salary leaves the day after payday to an account outside the data.
+# It is neutral: neither spending nor Saver.
+NEUTRAL_TRANSFER_TYPES = frozenset({"salary_sweep"})
+SALARY_TYPES = frozenset({"salary"})
 
-# Categories counted as Essentials (#7). TODO confirm with S-Bank data.
-ESSENTIAL_CATEGORIES = frozenset(
-    {
-        "housing",
-        "rent",
-        "utilities",
-        "insurance",
-        "loans",
-        "loan",
-        "groceries",
-        "health",
-        "public_transport",
-        "public transport",
-        # Car repairs are the doc's own Surprise example, so vehicle upkeep
-        # is treated as essential. TODO confirm with S-Bank data.
-        "vehicle",
-    }
-)
+# Saver (#75): deposits count positive, withdrawals negative (#94).
+SAVER_DEPOSIT_TYPES = frozenset({"investment_deposit"})
+SAVER_WITHDRAWAL_TYPES = frozenset({"investment_withdrawal"})
+SAVER_TYPES = SAVER_DEPOSIT_TYPES | SAVER_WITHDRAWAL_TYPES
 
-# MCCs counted as Saver (#75): security brokers and other investment codes.
-# TODO confirm with S-Bank data.
-INVESTMENT_MCCS = frozenset({"6211", "6012"})
+# Own-account transfers: never spending and never income (#2, #41).
+OWN_TRANSFER_TYPES = NEUTRAL_TRANSFER_TYPES | SAVER_TYPES
 
-# Loan / credit categories and MCCs (#42, #76-#84). TODO confirm with S-Bank data.
+# Categories that are always Essentials (#7).
+ESSENTIAL_CATEGORIES = frozenset({"groceries", "housing", "utilities", "health"})
+
+# Categories split by MCC: only these MCCs are essential. A blank MCC counts
+# as essential. Transportation: public transport 4111/4112/4131, fuel
+# 5541/5542, parking 7523; taxis and ride-hailing (4121) are other spending.
+ESSENTIAL_MCCS_BY_CATEGORY = {
+    "transportation": frozenset({"", "4111", "4112", "4131", "5541", "5542", "7523"}),
+}
+
+# #58 possible travel goal.
+TRAVEL_CATEGORY = "travel"
+TRAVEL_GOAL_MIN_EUR = 300.0
+TRAVEL_LOOKBACK_MONTHS = 12
+
+# Loan / credit (#42, #76-#84). No real rows use these values: the loan alerts
+# only fire on the synthetic credit register and injected events, which must
+# use these labels.
 LOAN_CATEGORIES = frozenset({"loans", "loan", "credit", "mortgage", "bnpl"})
 LOAN_MCCS = frozenset({"6141", "6051"})
+
+# Coverage = salary_sweep / salary. Above this, most money lives at another
+# bank: the profile is a "partial view" and is excluded from peer benchmarks.
+PARTIAL_VIEW_COVERAGE = 0.5
 
 # --- Shared definitions --------------------------------------------------------
 

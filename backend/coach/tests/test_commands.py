@@ -14,6 +14,9 @@ pytestmark = pytest.mark.django_db
 BOM = "﻿"
 
 
+MONTHS = {7: "JUL", 8: "AUG", 9: "SEP", 10: "OCT"}
+
+
 def write_csvs(tmp_path):
     rows = [
         "customer_id,bank_account_id,tx_date,tx_timestamp,category,"
@@ -22,18 +25,20 @@ def write_csvs(tmp_path):
     bal = 1000.0
     for month in (7, 8, 9, 10):
         for day, amt, cat, ttype, merch, mcc in (
-            (25, 2000, "salary", "credit_transfer", "EMP", ""),
-            (1, -650, "housing", "debit_transfer", "RENT", "6513"),
-            (15, -12.99, "entertainment", "card", "NETFLIX", "4899.0"),
-            (26, -150, "savings", "own_transfer", "SELF", ""),
+            (25, 2000, "Salary", "salary", "EMP", ""),
+            (1, -650, "Housing", "housing_payment", "RENT", ""),
+            (15, -12.99, "Entertainment", "purchase", "NETFLIX", "4899.0"),
+            (26, -150, "Invest Deposit", "investment_deposit", "", ""),
         ):
             bal += amt
             rows.append(
-                f"C1,A1,2026-{month:02d}-{day:02d},2026-{month:02d}-{day:02d} "
+                f"C1,A1,2026-{month:02d}-{day:02d},{day:02d}{MONTHS[month]}26:"
                 f"12:00:00,{cat},{amt},{bal},{ttype},{merch},{mcc}"
             )
-    rows.append("C2,B1,2026-10-02,2026-10-02 10:00:00,food,-5,10,card,CAFE,5814")
-    rows.append("C2,B2,2026-10-03,2026-10-03 10:00:00,food,-5,5,card,CAFE,5814")
+    rows.append(
+        "C2,B1,2026-10-02,02OCT26:10:00:00,Restaurants,-5,10,purchase,CAFE,5814"
+    )
+    rows.append("C2,B2,2026-10-03,03OCT26:10:00:00,Restaurants,-5,5,purchase,CAFE,5814")
     (tmp_path / "tx_junction_transactions.csv").write_text(BOM + "\n".join(rows) + "\n")
     (tmp_path / "tx_customers_junction.csv").write_text(
         BOM

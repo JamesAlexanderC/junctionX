@@ -19,6 +19,7 @@ from .common import (
     merchant_name,
     month_key,
     monthly_totals,
+    neutral_mask,
     outflows,
     prepare,
     r2,
@@ -202,14 +203,37 @@ def possibly_unused(
     return out
 
 
+def sweep_view(df: pd.DataFrame, today, income: float) -> dict:
+    """P1.1: salary_sweep is neutral; budgeting maths uses retained income.
+
+    retained_income = #2 income - median monthly sweep (same 3 full months).
+    coverage = sweep / salary over those months; above 0.5 the profile is a
+    "partial view" (most money lives at another bank).
+    """
+    months = full_months(today, th.INCOME_MEDIAN_MONTHS, df)
+    sweeps = df[neutral_mask(df)].assign(amount=lambda f: -f["tx_amount_eur"])
+    salary = df[df["transaction_type"].str.lower().isin(th.SALARY_TYPES)]
+    sweep_m = monthly_totals(sweeps, months) if months else {}
+    salary_total = sum(monthly_totals(salary, months, col="tx_amount_eur").values())
+    sweep_median = float(np.median(list(sweep_m.values()))) if sweep_m else 0.0
+    coverage = sum(sweep_m.values()) / salary_total if salary_total > 0 else 0.0
+    return {
+        "retained_income": r2(max(0.0, income - sweep_median)),
+        "coverage": r2(coverage),
+        "partial_view": bool(coverage > th.PARTIAL_VIEW_COVERAGE),
+    }
+
+
 def compute_income(df: pd.DataFrame, today, opened_in_chat=None) -> dict:
     """profile["income"] (#1 to #6)."""
     df = prepare(df, today)
     bills = regular_bills(df, today) if len(df) else []
     subs = subscriptions(bills)
+    income = r2(monthly_income(df, today)) if len(df) else 0.0
     return {
         "payday": detect_payday(df, today),
-        "monthly_income": r2(monthly_income(df, today)) if len(df) else 0.0,
+        "monthly_income": income,
+        **sweep_view(df, today, income),
         "monthly_income_series": monthly_income_series(df, today),
         "stability": income_stability(df, today),
         "bills": bills,

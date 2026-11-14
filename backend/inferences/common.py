@@ -226,8 +226,37 @@ def buffer_amount(monthly_essentials) -> float:
     return max(th.BUFFER_MIN_EUR, th.BUFFER_ESSENTIALS_SHARE * me)
 
 
-def is_essential_category(cat: str) -> bool:
-    return str(cat).lower() in th.ESSENTIAL_CATEGORIES
+def is_essential(cat: str, mcc: str = "") -> bool:
+    """#7: always-essential category, or an essential MCC in a split category."""
+    cat = str(cat).lower()
+    if cat in th.ESSENTIAL_CATEGORIES:
+        return True
+    allowed = th.ESSENTIAL_MCCS_BY_CATEGORY.get(cat)
+    return allowed is not None and str(mcc or "") in allowed
+
+
+def essential_mask(df: pd.DataFrame) -> pd.Series:
+    """Rows that are Essentials (#7), with transportation split by MCC."""
+    cats = df["category"].astype(str).str.lower()
+    mask = cats.isin(th.ESSENTIAL_CATEGORIES)
+    mccs = df["mcc_code"].fillna("").astype(str)
+    for cat, allowed in th.ESSENTIAL_MCCS_BY_CATEGORY.items():
+        mask = mask | ((cats == cat) & mccs.isin(allowed))
+    return mask
+
+
+def _type_in(df: pd.DataFrame, types) -> pd.Series:
+    return df["transaction_type"].astype(str).str.lower().isin(types)
+
+
+def saver_mask(df: pd.DataFrame) -> pd.Series:
+    """Saver flows (#75): investment deposits and withdrawals."""
+    return _type_in(df, th.SAVER_TYPES)
+
+
+def neutral_mask(df: pd.DataFrame) -> pd.Series:
+    """Neutral own transfers (salary_sweep): neither spending nor Saver."""
+    return _type_in(df, th.NEUTRAL_TRANSFER_TYPES)
 
 
 def date_range(start: date, end: date):

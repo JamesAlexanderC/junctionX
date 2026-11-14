@@ -14,12 +14,15 @@ from . import models
 from . import thresholds as th
 from .common import (
     add_months,
+    essential_mask,
     full_months,
     internal_mask,
     month_key,
+    neutral_mask,
     outflows,
     prepare,
     r2,
+    saver_mask,
 )
 
 BASKETS = ("essential", "surprise", "leaky", "saver", "other")
@@ -36,27 +39,40 @@ def _is_surprise(amount: float, history: list[float]) -> bool:
     return amount > th.SURPRISE_NO_HISTORY_MIN_EUR
 
 
+def _basket_flows(df: pd.DataFrame) -> pd.DataFrame:
+    """Outflows minus neutral sweeps, plus Saver withdrawals as negative amounts.
+
+    salary_sweep is neutral (P1.1 decision). An investment withdrawal is a
+    negative Saver flow, so the Saver total is net of withdrawals (#94).
+    """
+    neutral = neutral_mask(df)
+    outs = outflows(df[~neutral])
+    back = df[(df["tx_amount_eur"] > 0) & saver_mask(df)].copy()
+    back["amount"] = -back["tx_amount_eur"]
+    return pd.concat([outs, back]).sort_values("tx_timestamp", kind="stable")
+
+
 def classify(df: pd.DataFrame, today, bills: list[dict] | None = None):
     """Outflows up to today with a `basket` column (#7, #8, #9, #75).
 
     bills: output of income.regular_bills; recurring bills are never Surprises.
     """
     df = prepare(df, today)
-    outs = outflows(df)
+    outs = _basket_flows(df)
     if not len(outs):
         outs["basket"] = pd.Series(dtype=str)
         return outs
-    own = internal_mask(df).loc[outs.index]
+    saver = (saver_mask(df) | internal_mask(df)).loc[outs.index]
     if bills is None:
         from .income import regular_bills
 
         bills = regular_bills(df, today)
     bill_merchants = {b["merchant_id"] for b in bills}
-    essential_cat = outs["category"].isin(th.ESSENTIAL_CATEGORIES)
+    essential_cat = essential_mask(outs)
     history: dict[str, list[float]] = {}
     labels = []
     for idx, row in outs.iterrows():
-        if own.loc[idx] or row["mcc_code"] in th.INVESTMENT_MCCS:
+        if saver.loc[idx]:
             labels.append("saver")  # #75
         elif essential_cat.loc[idx]:
             past = history.setdefault(row["category"], [])

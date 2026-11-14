@@ -9,7 +9,7 @@ import pandas as pd
 
 from . import models
 from . import thresholds as th
-from .common import full_months, prepare, r2, safe_div, spend
+from .common import essential_mask, full_months, prepare, r2, safe_div, spend
 
 
 def _window(df: pd.DataFrame, today):
@@ -36,11 +36,7 @@ def night(s: pd.DataFrame) -> dict:
 
 def _leaky(s: pd.DataFrame) -> pd.DataFrame:
     """Leaky purchases (#9): non-essential and under EUR 25."""
-    return s[
-        ~s["category"].isin(th.ESSENTIAL_CATEGORIES)
-        & ~s["mcc_code"].isin(th.INVESTMENT_MCCS)
-        & (s["amount"] < th.LEAKY_MAX_EUR)
-    ]
+    return s[~essential_mask(s) & (s["amount"] < th.LEAKY_MAX_EUR)]
 
 
 def impulse(df: pd.DataFrame, today, months: int | None = None) -> dict:
@@ -63,7 +59,7 @@ def payday_splurge(s: pd.DataFrame, payday_dates, start, end) -> dict:
     paydays = sorted(pd.to_datetime(list(payday_dates or [])))
     if not paydays:
         return {"ratio": None, "flag": False}
-    ne = s[~s["category"].isin(th.ESSENTIAL_CATEGORIES)]
+    ne = s[~essential_mask(s)]
     daily = ne.groupby("tx_date")["amount"].sum()
     days = pd.date_range(max(pd.Timestamp(start), paydays[0]), pd.Timestamp(end))
     near, rest = [], []

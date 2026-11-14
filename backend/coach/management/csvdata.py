@@ -9,6 +9,8 @@ MTG_HISTORY_FILE = "mtg_negotiation_history.csv"
 MTG_LINK_FILE = "mtg_tx_customer_link_and_final_mtg_infio.csv"
 ENCODING = "utf-8-sig"  # the CSVs start with a UTF-8 BOM
 CHUNK_ROWS = 500_000
+SAS_TIMESTAMP_FORMAT = "%d%b%y:%H:%M:%S"  # e.g. 03OCT24:09:04:04
+MAX_TIMESTAMP_FAILURE_SHARE = 0.01
 
 
 def data_path(name, data_dir=None):
@@ -67,13 +69,33 @@ def iter_transactions(data_dir=None, customers=None, chunksize=CHUNK_ROWS):
         yield clean(chunk)
 
 
+def parse_timestamps(raw):
+    """Parse SAS timestamps (03OCT24:09:04:04) as UTC.
+
+    Raises CommandError when more than 1% of non-empty values fail, so a
+    format change cannot silently turn every timestamp into midnight.
+    """
+    import pandas as pd
+
+    parsed = pd.to_datetime(raw, format=SAS_TIMESTAMP_FORMAT, errors="coerce")
+    present = raw.notna() & (raw.astype(str).str.strip() != "")
+    failed = int((parsed.isna() & present).sum())
+    if present.any() and failed / int(present.sum()) > MAX_TIMESTAMP_FAILURE_SHARE:
+        sample = raw[parsed.isna() & present].head(3).tolist()
+        raise CommandError(
+            f"{failed} of {int(present.sum())} tx_timestamp values do not match "
+            f"{SAS_TIMESTAMP_FORMAT}, e.g. {sample}"
+        )
+    return parsed.dt.tz_localize("UTC")
+
+
 def clean(df):
     import pandas as pd
 
     df = df.copy()
     df["tx_id"] = df["customer_id"].astype(str) + "-" + df["tx_id"].astype(str)
     df["tx_date"] = pd.to_datetime(df["tx_date"], errors="coerce")
-    ts = pd.to_datetime(df.get("tx_timestamp"), errors="coerce", utc=True)
+    ts = parse_timestamps(df["tx_timestamp"])
     df["tx_timestamp"] = ts.fillna(df["tx_date"].dt.tz_localize("UTC"))
     for col in ("tx_amount_eur", "balance_after_eur"):
         df[col] = pd.to_numeric(df[col], errors="coerce")

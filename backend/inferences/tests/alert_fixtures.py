@@ -142,7 +142,7 @@ def aino_rows():
                     "M_OWN",
                     "savings",
                     "0000",
-                    "own_transfer",
+                    "investment_deposit",
                 )
             )
     rows.append(tx("2026-09-12 12:00", -400, "M_GARAGE", "car_repair", "7538"))

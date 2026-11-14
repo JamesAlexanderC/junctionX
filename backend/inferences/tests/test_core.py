@@ -78,11 +78,11 @@ def test_savings_transfer_and_groceries_are_not_bills(inc):
 # --- Baskets ---------------------------------------------------------------------
 
 
-def test_car_repair_is_surprise():
+def test_one_off_dentist_bill_is_surprise():
     # #8: classified Surprise, not Essentials.
     df = aino_df()
     cls = baskets.classify(df, AINO_OCT_END)
-    repair = cls[cls["merchant_id"] == "M_GARAGE"].iloc[0]
+    repair = cls[cls["merchant_id"] == "M_DENTIST"].iloc[0]
     assert repair["basket"] == "surprise"
     groceries = cls[cls["merchant_id"] == "M_SMARKET"]
     assert set(groceries["basket"]) == {"essential"}

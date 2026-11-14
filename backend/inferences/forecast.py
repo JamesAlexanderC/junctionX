@@ -71,9 +71,15 @@ def _scheduled(income: dict, bills: list[dict], today, end):
     flows = [(b["date"], -b["amount"]) for b in scheduled_bills(bills, today, end)]
     payday = income.get("payday") or {}
     if payday.get("found"):
+        # P1.1: the salary_sweep leaves the day after payday, so project only
+        # the retained part of each salary (#17).
+        swept = (income.get("monthly_income") or 0.0) - income.get(
+            "retained_income", income.get("monthly_income") or 0.0
+        )
+        amount = max(0.0, payday["amount"] - swept)
         d = to_date(payday["next_payday"])
         while d <= to_date(end):
-            flows.append((iso(d), payday["amount"]))
+            flows.append((iso(d), amount))
             d = to_date(pd.Timestamp(d) + pd.DateOffset(months=1))
     return flows
 

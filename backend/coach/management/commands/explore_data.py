@@ -8,6 +8,26 @@ from django.core.management.base import BaseCommand
 
 from coach.management import csvdata
 
+MAPPING_NOTES = [
+    "",
+    "## Vocabulary mapping (inferences/thresholds.py)",
+    "",
+    "- Sign convention: inflow > 0 (salary 100% positive, purchases 100% negative).",
+    "- Essentials: groceries, housing, utilities, health; transportation only for",
+    "  MCC 4111/4112/4131 (public transport), 5541/5542 (fuel), 7523 (parking)",
+    "  or a blank MCC. Taxis (4121) are other spending.",
+    "- salary_sweep: neutral own-account transfer (not spending, not Saver).",
+    "  retained_income = salary - sweep drives budgeting maths (#10, #17, #88).",
+    "  coverage = sweep / salary; above 0.5 the profile is a partial view and is",
+    "  excluded from peer benchmarks.",
+    "- investment_deposit = Saver; investment_withdrawal = negative Saver (#94).",
+    "- #58 travel goal uses category == travel.",
+    "- The reference date is max(tx_date), not the wall-clock date.",
+    "- No loan, credit-card, fee or gambling values exist in the real data.",
+    "  #76-#84 and #86 run on the synthetic credit register and injected events",
+    "  only; those must use the labels in LOAN_CATEGORIES / FEE_CATEGORIES.",
+]
+
 
 class Command(BaseCommand):
     help = "Print counts, values and sign convention of the CSVs (chunked)."
@@ -80,6 +100,7 @@ class Command(BaseCommand):
             lines.append(f"| {k} | {v} | {sum(shares) / len(shares):.2f} |")
         lines += ["", "## top 30 mcc_code", "", "| mcc | count |", "|---|---|"]
         lines += [f"| {k} | {v} |" for k, v in mccs.most_common(30)]
+        lines += MAPPING_NOTES
         text = "\n".join(lines) + "\n"
         out = Path(opts["out"])
         out.parent.mkdir(parents=True, exist_ok=True)
