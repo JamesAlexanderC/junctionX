@@ -7,6 +7,7 @@ urlpatterns = [
     path("auth/logout/", auth_views.logout, name="auth-logout"),
     path("auth/me/", auth_views.me, name="auth-me"),
     path("customers/", views.customers, name="customers"),
+    path("customers/demo/", views.demo_customers, name="demo-customers"),
     path("home/<str:customer_id>/", views.home, name="home"),
     path("insights/<str:customer_id>/", views.insights, name="insights"),
     path("chat/", views.chat, name="chat"),

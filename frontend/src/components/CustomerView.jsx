@@ -100,10 +100,13 @@ export default function CustomerView({
       >
         <header className="topbar">
           <div className="topbar-inner">
-            <span className="logo" aria-hidden="true">
-              S
-            </span>
-            <h1>Saldo</h1>
+            {/* Logo and name go back to the demo landing page. */}
+            <a className="home" href="#/" aria-label="Saldo home">
+              <span className="logo" aria-hidden="true">
+                S
+              </span>
+              <h1>Saldo</h1>
+            </a>
             <span className="who">{customerId}</span>
             <button type="button" className="logout" onClick={onHelp}>
               Help

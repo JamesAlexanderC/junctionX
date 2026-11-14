@@ -82,10 +82,14 @@ async function request(path, { method = 'GET', body, signal } = {}) {
   return data
 }
 
-export async function getCustomers(q = '', { signal } = {}) {
-  const query = q ? `?q=${encodeURIComponent(q)}` : ''
-  const body = await request(`/api/customers/${query}`, { signal })
-  return Array.isArray(body) ? body : (body?.results ?? [])
+// {built, demos: [...], customers: [...]} for the landing page.
+export async function getDemoDirectory({ signal } = {}) {
+  const body = await request('/api/customers/demo/', { signal })
+  return {
+    built: Boolean(body?.built),
+    demos: Array.isArray(body?.demos) ? body.demos : [],
+    customers: Array.isArray(body?.customers) ? body.customers : [],
+  }
 }
 
 export async function getInsights(customerId, { signal } = {}) {
