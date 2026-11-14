@@ -335,3 +335,33 @@ def test_tool_respects_availability_flags(aino):
     out = call_tool(ToolContext(AINO), "get_mortgage_readiness", {})
     assert out["available"] is False and out["item"] == "mortgage.readiness"
     assert out["reason"]
+
+
+def test_demo_directory_lists_demos_and_every_customer(client, db, monkeypatch):
+    from inferences import thresholds as th
+    from inferences.tests.fixtures import aino_df
+
+    from .conftest import load_customer
+
+    monkeypatch.setattr(th, "DEMO_MIN_HISTORY_MONTHS", 3)  # Aino has ~4 months
+    base = aino_df()
+    for level in range(1, 6):
+        df = base.assign(tx_amount_eur=base["tx_amount_eur"] * level)
+        load_customer(df, f"C-L{level}", age=20 + level)
+    index, demos = services.build_customer_index(workers=1)
+    assert len(index) == 5
+
+    body = client.get("/api/customers/demo/").json()
+    assert body["built"] is True
+    rows = {c["customer_id"]: c for c in body["customers"]}
+    assert [rows[f"C-L{i}"]["income_level"] for i in range(1, 6)] == [1, 2, 3, 4, 5]
+    assert rows["C-L1"]["income_label"] == "Lowest income"
+    assert rows["C-L1"]["spender_type"]
+    # Same spending habits at every income level: one spender type, one demo.
+    assert len(body["demos"]) == 1
+    assert body["demos"][0]["demo"] == 1
+
+
+def test_demo_directory_not_built(client, db):
+    body = client.get("/api/customers/demo/").json()
+    assert body == {"built": False, "demos": [], "customers": []}

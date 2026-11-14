@@ -23,14 +23,9 @@ function Progress() {
     return () => clearInterval(id)
   }, [])
   const step = PROGRESS_STEPS.filter((s) => elapsed >= s.after).at(-1)
-  // Typing dots (PR #6) next to text that changes with the wait (F2).
+  // Text that changes with the wait (F2); no typing dots.
   return (
     <div className="msg coach progress" role="status" aria-live="polite">
-      <span className="typing" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </span>
       <span className="progress-text">{step.text}</span>
     </div>
   )
