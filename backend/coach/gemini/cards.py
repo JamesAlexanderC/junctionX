@@ -18,6 +18,10 @@ class _Card(BaseModel):
 class _Row(_Card):
     label: str
     value: float
+    # FC-2: the forecast chart's 80% band and day markers (danger first).
+    low: float | None = None
+    high: float | None = None
+    flag: Literal["danger", "bill", "payday"] | None = None
 
 
 class _SliderGoal(_Card):

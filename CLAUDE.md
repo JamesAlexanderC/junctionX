@@ -68,7 +68,8 @@ question, alert, plan, before_after. Max 3 chips. Depth 1 Quick, 2 Explain,
 
 Card payloads:
 - number `{label, value, unit?: "EUR"}`
-- chart `{kind: "bar"|"line", title, unit?, data: [{label, value}]}`
+- chart `{kind: "bar"|"line", title, unit?, data: [{label, value, low?, high?,
+  flag?: "danger"|"bill"|"payday"}]}` (low/high = 80% band; forecast chart only)
 - basket_bar `{essential, surprise, leaky, saver}`
 - slider `{category, monthly_spend, min_pct: 0, max_pct: 50, pct, goal?: {target,
   saved, monthly_rate}}` (frontend recomputes #24 / #26 locally)

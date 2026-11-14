@@ -14,6 +14,13 @@ const PAD = { top: 12, right: 8, bottom: 24, left: 46 }
 const PLOT_W = W - PAD.left - PAD.right
 const PLOT_H = H - PAD.top - PAD.bottom
 const MAX_BAR = 24
+// FC-2: what a flagged day means; the backend decides which days are which.
+const FLAG_TEXT = { danger: 'Tight day', bill: 'Bill due', payday: 'Payday' }
+
+const isNum = (v) => v != null && Number.isFinite(Number(v))
+const hasRange = (d) => isNum(d.low) && isNum(d.high)
+const rangeText = (d, unit) =>
+  `likely ${formatValue(d.low, unit)} to ${formatValue(d.high, unit)}`
 // Which x labels to print so they never collide (always the first and last).
 function labelIndexes(n) {
   if (n <= 6) return new Set([...Array(n).keys()])
@@ -43,8 +50,11 @@ export default function ChartCard({ card }) {
 
   const isLine = card.kind === 'line'
   const values = data.map((d) => Number(d.value))
-  let lo = Math.min(...values)
-  let hi = Math.max(...values)
+  // FC-2: points may carry the 80% band (low, high); the scale must fit it.
+  const bandIdx = isLine ? data.flatMap((d, i) => (hasRange(d) ? [i] : [])) : []
+  const bandValues = bandIdx.flatMap((i) => [Number(data[i].low), Number(data[i].high)])
+  let lo = Math.min(...values, ...bandValues)
+  let hi = Math.max(...values, ...bandValues)
   // Bars always grow from zero; a line keeps zero in view unless far away.
   if (!isLine || lo > 0 && lo < hi * 0.5) lo = Math.min(lo, 0)
   if (!isLine) hi = Math.max(hi, 0)
@@ -60,6 +70,12 @@ export default function ChartCard({ card }) {
 
   const linePath = values.map((v, i) => `${i ? 'L' : 'M'}${cx(i)},${y(v)}`).join('')
   const areaPath = `${linePath}L${cx(n - 1)},${yZero}L${cx(0)},${yZero}Z`
+  const bandPath = bandIdx.length
+    ? bandIdx.map((i, k) => `${k ? 'L' : 'M'}${cx(i)},${y(Number(data[i].high))}`).join('') +
+      [...bandIdx].reverse().map((i) => `L${cx(i)},${y(Number(data[i].low))}`).join('') +
+      'Z'
+    : ''
+  const lastBand = bandIdx[bandIdx.length - 1]
 
   // Edge labels on a dense line hug the plot so they never spill out.
   const xAnchor = (i) => {
@@ -82,8 +98,14 @@ export default function ChartCard({ card }) {
       <p className="chart-readout" aria-live="polite" data-testid="chart-readout">
         {picked ? (
           <>
-            <span>{longLabel(picked.label)}</span>
+            <span>
+              {longLabel(picked.label)}
+              {FLAG_TEXT[picked.flag] && ` · ${FLAG_TEXT[picked.flag]}`}
+            </span>
             <strong>{formatValue(picked.value, card.unit)}</strong>
+            {hasRange(picked) && (
+              <span className="muted">{rangeText(picked, card.unit)}</span>
+            )}
           </>
         ) : (
           <span className="muted">
@@ -123,8 +145,33 @@ export default function ChartCard({ card }) {
 
         {isLine ? (
           <>
-            <path className="area" d={areaPath} />
+            {bandPath ? (
+              <>
+                <path className="band" d={bandPath} />
+                <text
+                  className="band-label"
+                  x={cx(lastBand)}
+                  y={Math.max(PAD.top + 8, y(Number(data[lastBand].high)) - 4)}
+                  textAnchor="end"
+                >
+                  likely range
+                </text>
+              </>
+            ) : (
+              <path className="area" d={areaPath} />
+            )}
             <path className="line" d={linePath} />
+            {data.map((d, i) =>
+              FLAG_TEXT[d.flag] ? (
+                <circle
+                  key={`m${i}`}
+                  className={`marker ${d.flag}`}
+                  cx={cx(i)}
+                  cy={y(values[i])}
+                  r={3.5}
+                />
+              ) : null,
+            )}
             {sel != null && (
               <line
                 className="crosshair"
@@ -190,8 +237,14 @@ export default function ChartCard({ card }) {
         <tbody>
           {data.map((d, i) => (
             <tr key={i}>
-              <th scope="row">{longLabel(d.label)}</th>
-              <td>{formatValue(d.value, card.unit)}</td>
+              <th scope="row">
+                {longLabel(d.label)}
+                {FLAG_TEXT[d.flag] && ` (${FLAG_TEXT[d.flag]})`}
+              </th>
+              <td>
+                {formatValue(d.value, card.unit)}
+                {hasRange(d) && `, ${rangeText(d, card.unit)}`}
+              </td>
             </tr>
           ))}
         </tbody>

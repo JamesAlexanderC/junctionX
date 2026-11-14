@@ -27,6 +27,8 @@ class Chart:
     value_key: str | None = None
     title: str = ""  # chart card title (get_chart)
     unit: str | None = None  # "EUR", "%" or None for plain numbers
+    band: tuple[str, str] | None = None  # (low key, high key) per row (FC-2)
+    flags: bool = False  # mark danger, bill and payday days (FC-2)
 
 
 @dataclass(frozen=True)
@@ -189,7 +191,15 @@ _ENTRIES = [
         "forecast.daily_path",
         "Expected balance (with low and high) for each day until payday.",
         gate="forecast.end_of_month",
-        chart=Chart("line", "date", "expected", "Expected balance until payday", "EUR"),
+        chart=Chart(
+            "line",
+            "date",
+            "expected",
+            "Expected balance (likely range)",
+            "EUR",
+            band=("low", "high"),
+            flags=True,
+        ),
     ),
     Entry(
         "forecast.danger_days",

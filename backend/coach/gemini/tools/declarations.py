@@ -67,7 +67,13 @@ CARD_SCHEMA = {
             "type": "array",
             "items": {
                 "type": "object",
-                "properties": {"label": STR, "value": NUM},
+                "properties": {
+                    "label": STR,
+                    "value": NUM,
+                    "low": NUM,
+                    "high": NUM,
+                    "flag": {"type": "string", "enum": ["danger", "bill", "payday"]},
+                },
             },
         },
         "essential": NUM,

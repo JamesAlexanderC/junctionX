@@ -120,9 +120,16 @@ def test_get_inference_series_has_chart_data(aino):
     out = _call(aino, "get_inference", item="forecast.daily_path")
     path = profile["forecast"]["daily_path"]
     assert out["chart"] == {"kind": "line"}
-    assert out["chart_data"] == [
-        {"label": p["date"], "value": p["expected"]} for p in path
-    ]
+    # FC-2: forecast points also carry the band and, on marked days, a flag.
+    assert [
+        (d["label"], d["value"], d["low"], d["high"]) for d in out["chart_data"]
+    ] == [(p["date"], p["expected"], p["low"], p["high"]) for p in path]
+    assert {d.get("flag") for d in out["chart_data"]} <= {
+        None,
+        "danger",
+        "bill",
+        "payday",
+    }
 
 
 def test_get_inference_dict_has_chart_data(aino):
