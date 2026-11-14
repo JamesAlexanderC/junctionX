@@ -201,5 +201,5 @@ DATA_DIR = BASE_DIR.parent / os.environ.get("DATA_DIR", "data")
 AS_OF_DATE = os.environ.get("AS_OF_DATE", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
-GEMINI_ROUTER_MODEL = os.environ.get("GEMINI_ROUTER_MODEL", "gemini-2.5-flash-lite")
+GEMINI_ROUTER_MODEL = os.environ.get("GEMINI_ROUTER_MODEL", "gemini-3.5-flash-lite")
 DEMO_MODE = os.environ.get("DEMO_MODE", "0") == "1"
