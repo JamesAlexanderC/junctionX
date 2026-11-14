@@ -1,9 +1,7 @@
 """Alert unit tests from context.md ("Alert unit tests" plus edge cases)."""
 
 import copy
-import json
 from datetime import date
-from pathlib import Path
 
 import pytest
 
@@ -229,10 +227,8 @@ def test_registry_covers_every_alert():
     assert set(alerts.ALERT_RULES) == expected
 
 
-def test_run_all_on_demo_fixture_and_empty():
-    path = Path(__file__).resolve().parents[3] / "shared/fixtures/profile_demo.json"
-    demo = json.loads(path.read_text())
-    found = alerts.run_all_alerts(make_df([]), demo, TODAY)
+def test_run_all_on_profile_only_and_empty():
+    found = alerts.run_all_alerts(make_df([]), profile(balance=40.0), TODAY)
     assert found == sorted(found, key=lambda a: -a["priority"])
     assert {"id", "inference", "severity", "priority"} <= set(found[0])
     assert alerts.run_all_alerts(None, {}, TODAY) == []

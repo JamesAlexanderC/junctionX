@@ -3,7 +3,6 @@
 
 import json
 from datetime import date
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -14,8 +13,25 @@ from inferences.common import income_inflows, prepare
 from inferences.profile import build_profile, recompute_goals_and_levels
 from inferences.tests.fixtures import TODAY, aino_df, make_df
 
-DEMO = Path(__file__).resolve().parents[3] / "shared" / "fixtures"
-DEMO_PROFILE = json.loads((DEMO / "profile_demo.json").read_text())
+# The profile contract (the demo fixture file was removed: no demo data).
+PROFILE_KEYS = {
+    "customer_id": None,
+    "today": None,
+    "customer": {"age", "postal_code", "age_band", "area"},
+    "balance": None,
+    "income": {"payday", "monthly_income", "stability", "bills", "subscriptions"},
+    "baskets": {"month", "totals", "shares", "trend", "history"},
+    "habits": {"weekend", "night", "impulse", "payday_splurge", "spender_type"},
+    "forecast": {"safe_to_spend_week", "safe_to_save_today", "danger_days"},
+    "whatif": {"category_means", "subscription_savings", "habit_translation"},
+    "levels": {"current", "next", "progress", "euros_to_go", "ladder"},
+    "goals": {"recommended", "active", "detected", "clash"},
+    "mortgage": {"loan_payments_found", "dsti", "stress_test", "readiness"},
+    "benchmarks": {"age", "area"},
+    "multibank": {"accounts", "true_income", "hidden_loans"},
+    "alerts": None,
+    "availability": None,
+}
 AINO = {"customer_id": "C-AINO", "age": 24, "postal_code": "00510"}
 JAPAN = {
     "id": 1,
@@ -335,10 +351,10 @@ def test_relabel_account():
 def test_build_profile_on_aino_has_every_key_and_serialises():
     p = build_profile(aino_df(until=TODAY), AINO, TODAY, goals=[JAPAN])
     json.dumps(p, allow_nan=False)
-    assert set(DEMO_PROFILE) <= set(p)
-    for key, section in DEMO_PROFILE.items():
-        if isinstance(section, dict):
-            assert set(section) <= set(p[key]), key
+    assert set(PROFILE_KEYS) <= set(p)
+    for key, section in PROFILE_KEYS.items():
+        if section:
+            assert section <= set(p[key]), key
     assert p["customer"]["age_band"] == "18-24" and p["customer"]["area"] == "00"
     goal = p["goals"]["active"][0]
     assert goal["months_needed"] == 6 and goal["difficulty"] == "Stretch"
