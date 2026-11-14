@@ -1,13 +1,13 @@
-// Demo landing page (GET /api/customers/demo/): one demo customer per
-// spender type, then every customer to scroll through, tagged with their
-// income level and spender type. Tap one to open their view.
+// Demo landing page (GET /api/customers/demo/): one demo customer per app
+// level (#28 to #33), then every customer to scroll through, tagged with
+// their level, income level and spender type. Tap one to open their view.
 
 import { useEffect, useState } from 'react'
 import { getDemoDirectory, logout } from '../api.js'
 import Icon from './Icon.jsx'
 
 function CustomerRow({ c, onEnter }) {
-  const tags = [c.income_label, c.spender_type].filter(Boolean)
+  const tags = [c.level_name, c.income_label, c.spender_type].filter(Boolean)
   return (
     <li>
       <button type="button" className="customer-row" onClick={() => onEnter(c.customer_id)}>
@@ -77,8 +77,11 @@ export default function Landing({ onEnter }) {
                   >
                     <Icon name="customer" size={22} className="demo-icon" />
                     <span className="demo-label">Demo {d.demo}</span>
+                    <span className="demo-level">
+                      Level {d.level}: {d.level_name}
+                    </span>
                     <span className="demo-meta">
-                      {d.income_label} · {d.spender_type}
+                      {[d.income_label, d.spender_type].filter(Boolean).join(' · ')}
                     </span>
                   </button>
                 </li>

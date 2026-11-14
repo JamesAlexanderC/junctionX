@@ -57,8 +57,8 @@ python manage.py load_data      # all 5,100 customers, 3.6M rows (~3 min, COPY)
                                 # (#36/#37) and mortgage model (#34, AUC ~0.73)
 ```
 
-Then build the landing page index (~75 s on 8 cores): every customer's
-income level and spender type, and one demo per spender type:
+Then build the landing page index: every customer's income level, spender
+type and app level, and one demo per app level:
 
 ```
 python manage.py build_customer_index

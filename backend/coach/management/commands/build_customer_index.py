@@ -1,9 +1,9 @@
 """Build the landing page customer index and demo picks.
 
-Works out every customer's spender type (#16) with only the steps it needs
-(coach/customer_index.py, ~0.15 s each, in parallel), adds their income
-level, and picks one demo customer per spender type (inferences/demo.py).
-Run after load_data; ~2 min for 5,100 customers on 8 cores.
+Works out every customer's spender type (#16) and app level (#28 to #33)
+with only the steps they need (coach/customer_index.py, in parallel), adds
+their income level, and picks one demo customer per app level
+(inferences/demo.py). Run after load_data.
 """
 
 import time
@@ -37,7 +37,8 @@ class Command(BaseCommand):
         errors = sum(1 for c in index if c["spender_type"] is None)
         for d in demos:
             self.stdout.write(
-                f"Demo {d['demo']}: {d['customer_id']} {d['income_label']}, "
+                f"Demo {d['demo']}: {d['customer_id']} level {d['level']} "
+                f"{d['level_name']}, {d['income_label']}, "
                 f"{d['spender_type']} (clarity {d['clarity']})"
             )
         self.stdout.write(

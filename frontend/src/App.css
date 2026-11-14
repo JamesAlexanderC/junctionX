@@ -126,6 +126,12 @@
   font-weight: 700;
 }
 
+.demo-level {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--brand-green);
+}
+
 .demo-meta {
   font-size: 0.85rem;
   color: var(--muted);

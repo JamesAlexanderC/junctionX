@@ -38,7 +38,7 @@ def customers(request):
 
 @api_view(["GET"])
 def demo_customers(request):
-    """Demo picks (one per spender type) and every customer with their income
+    """Demo picks (one per app level) and every customer with their income
     level, app level and spender type (build_customer_index)."""
     return Response(services.demo_directory())
 
