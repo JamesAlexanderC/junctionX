@@ -9,11 +9,14 @@ const nextDepth = (d) => Math.min(4, (d ?? 1) + 1)
 function CoachMessage({ reply, onSend, isLast }) {
   return (
     <div className="msg coach">
-      {reply.depth && (
-        <span className="depth" data-testid="depth-badge">
-          {DEPTH_NAMES[reply.depth]}
-        </span>
-      )}
+      <div className="msg-head">
+        <span className="coach-name">Saldo coach</span>
+        {reply.depth && (
+          <span className="depth" data-testid="depth-badge">
+            {DEPTH_NAMES[reply.depth]}
+          </span>
+        )}
+      </div>
       <p className="text">{reply.text}</p>
       {(reply.cards ?? []).map((card, i) => (
         <ReplyCard key={i} card={card} onSend={onSend} />
@@ -42,6 +45,18 @@ export default function Chat({ messages, busy, onSend, disabled }) {
   return (
     <section className="chat">
       <div className="messages" aria-live="polite">
+        {messages.length === 0 && (
+          <div className="chat-empty">
+            <span className="logo big" aria-hidden="true">
+              S
+            </span>
+            <p>
+              {disabled
+                ? 'Pick a customer, then ask the coach anything about their money.'
+                : 'Ask about spending, saving, goals or alerts.'}
+            </p>
+          </div>
+        )}
         {messages.map((m, i) =>
           m.role === 'user' ? (
             <div key={i} className="msg user">
@@ -80,7 +95,7 @@ export default function Chat({ messages, busy, onSend, disabled }) {
           aria-label="Message"
           disabled={disabled}
         />
-        <button type="submit" disabled={busy || disabled || !draft.trim()}>
+        <button type="submit" className="send" disabled={busy || disabled || !draft.trim()}>
           Send
         </button>
       </form>
