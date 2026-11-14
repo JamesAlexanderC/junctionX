@@ -39,8 +39,17 @@ def _env(name, default=None):
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-0(6hz1jb!#d&nasyvdnd+$t^f@m6h4q^fbdn_4$xmw-vvlg1+c"
 
+TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def env_flag(name):
+    """True when the variable is set to 1 / true / yes / on; off by default."""
+    return os.environ.get(name, "").strip().lower() in TRUE_VALUES
+
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Off unless DJANGO_DEBUG=1 (.env): with it on, 404 pages list every route.
+DEBUG = env_flag("DJANGO_DEBUG")
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 

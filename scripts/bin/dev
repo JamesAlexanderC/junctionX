@@ -2,8 +2,10 @@
 # Run the whole app locally: Postgres (docker), migrations, Django on :8000
 # and the Vite dev server on :5173 (which proxies /api to Django).
 #
-# Usage: scripts/bin/dev [--sqlite] [--backend-only | --frontend-only]
+# Usage: scripts/bin/dev [--sqlite] [--demo] [--backend-only | --frontend-only]
 #   --sqlite          use backend/db.sqlite3 instead of Postgres (no docker)
+#   --demo            serve Django with gunicorn (several workers, no reload,
+#                     DEBUG off) instead of the single-threaded dev server
 #   --backend-only    only run Django
 #   --frontend-only   only run Vite (falls back to demo data without the API)
 #
@@ -14,16 +16,24 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
+# --demo: 4 workers x 2 threads served 50 customers loading at once; the
+# timeout covers slow Gemini turns (gunicorn's default of 30 s cuts them off).
+DEMO_WORKERS=4
+DEMO_THREADS=2
+DEMO_TIMEOUT_S=120
+
 SQLITE=0
+DEMO=0
 DO_BACKEND=1
 DO_FRONTEND=1
 for arg in "$@"; do
     case "${arg}" in
         --sqlite) SQLITE=1 ;;
+        --demo) DEMO=1 ;;
         --backend-only) DO_FRONTEND=0 ;;
         --frontend-only) DO_BACKEND=0 ;;
         -h|--help)
-            sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -57,8 +67,16 @@ if [ "${DO_BACKEND}" -eq 1 ]; then
     fi
     echo "==> Applying migrations"
     (cd "${REPO_ROOT}/backend" && "${PY}" manage.py migrate --noinput)
-    echo "==> Django on http://localhost:8000 (API docs at /api/docs/)"
-    (cd "${REPO_ROOT}/backend" && exec "${PY}" manage.py runserver 8000) &
+    if [ "${DEMO}" -eq 1 ]; then
+        echo "==> Django (gunicorn, ${DEMO_WORKERS} workers) on http://localhost:8000"
+        (cd "${REPO_ROOT}/backend" && DJANGO_DEBUG=0 exec "${PY}" -m gunicorn \
+            conf.wsgi:application --bind 127.0.0.1:8000 \
+            --workers "${DEMO_WORKERS}" --threads "${DEMO_THREADS}" \
+            --timeout "${DEMO_TIMEOUT_S}") &
+    else
+        echo "==> Django on http://localhost:8000 (API docs at /api/docs/)"
+        (cd "${REPO_ROOT}/backend" && exec "${PY}" manage.py runserver 8000) &
+    fi
     pids+=("$!")
 fi
 
