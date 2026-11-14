@@ -44,6 +44,55 @@
   border-radius: 999px;
 }
 
+/* Exit to the demo landing page */
+
+.exit {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.exit:hover,
+.exit:focus-visible {
+  background: rgb(255 255 255 / 15%);
+}
+
+.exit svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--on-brand);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* Demo landing page */
+
+.landing {
+  flex: 1;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 8px 16px 24px;
+}
+
+.enter-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 12px 12px;
+}
+
+.enter-row .send {
+  min-height: 44px;
+}
+
 .logo {
   display: inline-grid;
   place-items: center;

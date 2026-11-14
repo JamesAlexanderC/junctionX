@@ -5,7 +5,10 @@ import { ReplyCard } from '../components/Cards.jsx'
 import Chat from '../components/Chat.jsx'
 import Insights from '../components/Insights.jsx'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  window.location.hash = ''
+})
 
 describe('cards', () => {
   it('unknown card type renders nothing', () => {
@@ -104,10 +107,40 @@ describe('no fallbacks', () => {
     render(<App />)
     await screen.findByRole('option', { name: /CUST00001/ })
     fireEvent.change(screen.getByLabelText('Customer'), { target: { value: 'CUST00001' } })
-    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hi' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Open customer view' }))
+    const input = await screen.findByLabelText('Message')
+    fireEvent.change(input, { target: { value: 'Hi' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() =>
       expect((screen.getByRole('alert')).textContent).toContain('Gemini is not configured'),
     )
+  })
+})
+
+describe('demo landing page', () => {
+  const fetchOk = () =>
+    vi.fn(async (url) =>
+      url.startsWith('/api/customers/')
+        ? new Response(JSON.stringify([{ customer_id: 'CUST00001' }]))
+        : new Response('[]', { status: 200 }),
+    )
+
+  it('a #/c/<id> link opens the customer view directly', async () => {
+    vi.stubGlobal('fetch', fetchOk())
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    expect(await screen.findByText('CUST00001')).toBeTruthy()
+    expect(screen.getByLabelText('Message')).toBeTruthy()
+    expect(screen.queryByLabelText('Customer')).toBeNull()
+  })
+
+  it('the exit button returns to the landing page', async () => {
+    vi.stubGlobal('fetch', fetchOk())
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Exit to demo' }))
+    expect(await screen.findByLabelText('Customer')).toBeTruthy()
+    const open = screen.getByRole('button', { name: 'Open customer view' })
+    expect(open.disabled).toBe(true)
   })
 })
