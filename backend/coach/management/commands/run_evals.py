@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from coach.gemini import loop
-from coach.models import ChatTurn, Goal
+from coach.models import ChatTurn, DismissedSuggestion, Goal, LoanDetails
 
 # (question, expected depth or None, any-of tools that must be called,
 #  forbidden tools, extra check(reply, meta) -> bool)
@@ -28,8 +28,35 @@ EVALS = [
     ("Kuinka paljon käytin ruokaan?", 1, {"get_category_spend"}, set()),
     ("Help me clear my alerts", None, {"get_alerts"}, {"accept_plan"}),
     ("I'm always broke before payday, what do I do?", None, {""}, set()),
+    # Deeper inference access and write tools (proposed, never saved in one turn).
+    ("How steady is my income?", 2, {"get_inference"}, set()),
+    (
+        "Show my balance until payday as a chart",
+        None,
+        {"get_inference", "forecast_balance"},
+        set(),
+    ),
+    ("Pause my goal", None, {"list_goals", "manage_goal", "get_inference"}, set()),
+    (
+        "My mortgage is EUR 120,000 at 4% with 20 years left",
+        None,
+        {"save_loan_details"},
+        set(),
+    ),
 ]
 FINNISH_RE = re.compile(r"[äö]|\b(olet|käytit|euroa)\b", re.I)
+
+
+def _saved_state(cid):
+    """Everything a write tool can change; one turn must never change it."""
+    goals = list(
+        Goal.objects.filter(customer_id=cid)
+        .order_by("id")
+        .values_list("id", "name", "target", "saved", "paused", "status")
+    )
+    loans = LoanDetails.objects.filter(customer_id=cid).count()
+    hidden = DismissedSuggestion.objects.filter(customer_id=cid).count()
+    return goals, loans, hidden
 
 
 class Command(BaseCommand):
@@ -52,6 +79,7 @@ class Command(BaseCommand):
             for run in range(opts["runs"]):
                 ChatTurn.objects.filter(customer_id=cid).delete()
                 goals_before = Goal.objects.filter(customer_id=cid).count()
+                saved_before = _saved_state(cid)
                 reply, meta = loop.chat(cid, question)
                 tools = set(meta.get("tools", []))
                 ok, why = True, []
@@ -65,6 +93,8 @@ class Command(BaseCommand):
                     ok, why = False, why + [f"called {sorted(tools & forbidden)}"]
                 if Goal.objects.filter(customer_id=cid).count() != goals_before:
                     ok, why = False, why + ["created a goal"]
+                if _saved_state(cid) != saved_before:
+                    ok, why = False, why + ["saved a change without a yes"]
                 if "Kuinka" in question and not FINNISH_RE.search(reply["text"]):
                     ok, why = False, why + ["not Finnish"]
                 total += 1

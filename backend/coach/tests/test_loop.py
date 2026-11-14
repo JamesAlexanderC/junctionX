@@ -79,3 +79,53 @@ def test_profile_summary_counts_available_inferences(aino):
 @pytest.mark.parametrize("name", NEW_TOOLS)
 def test_system_prompt_explains_new_tools(name):
     assert name in SYSTEM_PROMPT
+
+
+# --- end to end: read an inference, chart it -----------------------------------
+
+
+def _daily_path_chart():
+    out = call_tool(ToolContext(AINO), "get_inference", {"item": "forecast.daily_path"})
+    return {
+        "type": "chart",
+        "kind": "line",
+        "title": "Balance until payday",
+        "unit": "EUR",
+        "data": out["chart_data"],
+    }
+
+
+def test_chat_lists_reads_and_charts_an_inference(client, aino, fake_gemini):
+    chart = _daily_path_chart()
+    fake_gemini(
+        response(("list_inferences", {"section": "forecast"})),
+        response(("get_inference", {"item": "forecast.daily_path"})),
+        response(
+            (
+                "send_reply",
+                {
+                    "text": "Here is your balance until payday.",
+                    "depth": 2,
+                    "cards": [chart],
+                },
+            )
+        ),
+    )
+    body = _chat(client, "Show my balance until payday").json()
+    assert body["cards"] == [chart]
+
+
+def test_chat_rejects_a_chart_with_invented_points(client, aino, fake_gemini):
+    chart = _daily_path_chart()
+    fake_point = {"label": "2099-01-01", "value": 123456.0}
+    bad = {**chart, "data": chart["data"] + [fake_point]}
+    reply = response(("send_reply", {"text": "Here.", "depth": 2, "cards": [bad]}))
+    fake = fake_gemini(
+        response(("get_inference", {"item": "forecast.daily_path"})), reply, reply
+    )
+    body = _chat(client, "Show my balance until payday").json()
+    assert body["cards"] == []  # fallback reply after one retry
+    errors = [
+        r for r in _function_results(fake.models.calls[-1]["contents"]) if "error" in r
+    ]
+    assert "123456" in errors[0]["error"]
