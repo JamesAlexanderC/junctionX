@@ -74,6 +74,7 @@ import numpy as np
 import pandas as pd
 
 from inferences import alert_thresholds as thresholds
+from inferences.thresholds import NO_PAYDAY_HORIZON_DAYS
 from inferences import models
 from inferences.common import buffer_amount, fill_pseudo_merchants, merchant_name
 
@@ -353,11 +354,15 @@ def rule_20_danger_days(df, profile, today, **ctx):
     if not dates:
         return None
     first = dates[0]
+    # FC-4: without a detected payday the forecast covers the next 30 days
+    # (NO_PAYDAY_HORIZON_DAYS), so do not mention a payday that is not there.
+    found = _get(profile, "income.payday.found") is True
+    when = "before payday" if found else f"in the next {NO_PAYDAY_HORIZON_DAYS} days"
     return _alert(
         20,
         "amber",
         "Tight days ahead",
-        f"Your balance could drop below EUR 50 around {first:%d %b}, before payday.",
+        f"Your balance could drop below EUR 50 around {first:%d %b}, {when}.",
         today,
         first,
         {"danger_days": [d.isoformat() for d in dates], "first": first.isoformat()},

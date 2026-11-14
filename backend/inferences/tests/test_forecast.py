@@ -54,3 +54,26 @@ def test_end_of_month_insight_names_the_date_on_the_last_day():
     (row,) = end_of_month_insight(profile)
     assert "31 Oct" in row["text"]
     assert "likely between" in row["text"]
+
+
+# --- FC-4: tight days alert wording without a payday (#20) -----------------------
+
+
+def _tight_days_alert(payday_found):
+    from inferences.alerts import rule_20_danger_days
+
+    profile = {
+        "forecast": {"danger_days": ["2026-10-05", "2026-10-06"]},
+        "income": {"payday": {"found": payday_found}},
+    }
+    return rule_20_danger_days(None, profile, date(2026, 9, 30))
+
+
+def test_tight_days_without_payday_says_next_30_days():
+    text = _tight_days_alert(payday_found=False)["text"]
+    assert "in the next 30 days" in text
+    assert "payday" not in text
+
+
+def test_tight_days_with_payday_still_says_before_payday():
+    assert "before payday" in _tight_days_alert(payday_found=True)["text"]
