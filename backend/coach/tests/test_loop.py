@@ -41,8 +41,13 @@ def _chat(client, message="Tell me more", depth=2):
     )
 
 
-def test_round_limit_allows_deeper_tool_chains():
-    assert loop.MAX_ROUNDS == 8
+def test_round_limit_is_five():
+    # F2 (handoff/Gemini_fix.md): back to the spec's 5 rounds for speed.
+    assert loop.MAX_ROUNDS == 5
+
+
+def test_system_prompt_asks_for_tools_in_one_round():
+    assert "in the same turn" in SYSTEM_PROMPT
 
 
 def test_tool_results_over_the_turn_budget_are_replaced(
@@ -129,3 +134,25 @@ def test_chat_rejects_a_chart_with_invented_points(client, aino, fake_gemini):
         r for r in _function_results(fake.models.calls[-1]["contents"]) if "error" in r
     ]
     assert "123456" in errors[0]["error"]
+
+
+# --- F2: where the time goes ---------------------------------------------------
+
+
+def test_meta_reports_time_per_step(aino, monkeypatch):
+    from .conftest import FakeClient
+
+    client = FakeClient(
+        response(("get_baskets", {})),
+        response(("send_reply", {"text": "Done.", "depth": 1, "cards": []})),
+    )
+    _, meta = loop.chat(AINO, "How much is in my baskets?", client=client)
+
+    steps = [t["step"] for t in meta["timings"]]
+    assert steps.count("gemini") == 2
+    assert "router" in steps and "tool" in steps and "validate" in steps
+    tool = next(t for t in meta["timings"] if t["step"] == "tool")
+    assert tool["name"] == "get_baskets"
+    totals = meta["time_ms"]
+    assert set(totals) == {"router", "gemini", "tool", "validate"}
+    assert sum(totals.values()) <= meta["latency_ms"] + 1

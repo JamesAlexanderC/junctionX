@@ -34,6 +34,11 @@ ACTION_SCHEMA = {
     "required": ["type"],
 }
 
+SNAPSHOT = {
+    "type": "object",
+    "properties": {"safe_to_spend": NUM, "buffer_months": NUM, "goal_date": STR},
+}
+
 CARD_SCHEMA = {
     "type": "object",
     "description": "A UI card; extra fields depend on type (see CLAUDE.md).",
@@ -74,7 +79,12 @@ CARD_SCHEMA = {
         "pct": NUM,
         "min_pct": NUM,
         "max_pct": NUM,
-        "goal": {"type": "object", "properties": {}},
+        # Nested fields are listed so Gemini can fill them (F4); keep them in
+        # line with coach/gemini/cards.py (test_validate checks it).
+        "goal": {
+            "type": "object",
+            "properties": {"target": NUM, "saved": NUM, "monthly_rate": NUM},
+        },
         "name": STR,
         "target": NUM,
         "saved": NUM,
@@ -98,9 +108,19 @@ CARD_SCHEMA = {
         "id": STR,
         "severity": STR,
         "text": STR,
-        "steps": {"type": "array", "items": {"type": "object", "properties": {}}},
-        "before": {"type": "object", "properties": {}},
-        "after": {"type": "object", "properties": {}},
+        "steps": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "text": STR,
+                    "monthly_impact": NUM,
+                    "clears": {"type": "array", "items": STR},
+                },
+            },
+        },
+        "before": SNAPSHOT,
+        "after": SNAPSHOT,
     },
     "required": ["type"],
 }

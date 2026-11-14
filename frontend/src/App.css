@@ -810,6 +810,21 @@ button {
   animation-delay: 0.3s;
 }
 
+/* Waiting indicator: typing dots (PR #6) beside progress text (F2). */
+.msg.progress {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  color: var(--muted);
+}
+
+.progress .typing {
+  display: inline-flex;
+  gap: 5px;
+}
+
 @keyframes typing {
   0%,
   60%,

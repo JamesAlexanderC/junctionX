@@ -112,3 +112,64 @@ def test_apply_action_does_not_mutate_input():
         },
     )
     assert profile == before
+
+
+# --- F4: explain alerts nothing can clear (handoff/Gemini_fix.md) -----------------
+
+
+def _stuck(profile):
+    """Every alert stays open whatever the planner tries."""
+    return planner.suggest_fixes(
+        profile, profile["alerts"], run_alerts=lambda d, p, t: profile["alerts"]
+    )
+
+
+def test_every_open_alert_gets_a_reason():
+    profile = base_profile()
+    plan = _stuck(profile)
+    reasons = {r["id"]: r for r in plan["unclearable"]}
+    assert set(reasons) == {a["id"] for a in profile["alerts"]}
+    for r in reasons.values():
+        assert "biggest saves EUR" in r["why"]
+        assert r["options"]
+
+
+def test_tight_days_reason_names_the_bill_and_the_balance():
+    profile = base_profile()
+    profile["balance"] = 2273.70
+    profile["forecast"]["upcoming_bills"] = [
+        {"date": "2026-10-05", "name": "Housing", "amount": 2266.98},
+        {"date": "2026-11-05", "name": "Later", "amount": 999.0},
+    ]
+    profile["alerts"] = [
+        {
+            "id": "a-20",
+            "inference": 20,
+            "severity": "amber",
+            "title": "Tight days ahead",
+            "impact_date": "2026-10-05",
+            "priority": None,
+        }
+    ]
+    (reason,) = _stuck(profile)["unclearable"]
+    assert "Housing of EUR 2,266.98 is due on 2026-10-05" in reason["why"]
+    assert "EUR 2,273.70" in reason["why"]
+    assert "Later" not in reason["why"]
+    assert any("Housing" in o for o in reason["options"])
+
+
+def test_reason_without_any_possible_change():
+    profile = base_profile()
+    profile["baskets"]["leaky_categories"] = []
+    profile["income"]["subscriptions"] = []
+    profile["income"]["possibly_unused"] = []
+    profile["goals"]["active"] = []
+    profile["baskets"]["totals"]["saver"] = 0
+    plan = planner.suggest_fixes(
+        profile, profile["alerts"], run_alerts=lambda d, p, t: profile["alerts"]
+    )
+    assert "nothing the coach can change" in plan["unclearable"][0]["why"]
+
+
+def test_cleared_alerts_need_no_reason():
+    assert run()["unclearable"] == []

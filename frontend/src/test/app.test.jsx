@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
 import { ReplyCard } from '../components/Cards.jsx'
@@ -115,6 +115,27 @@ describe('no fallbacks', () => {
     await waitFor(() =>
       expect((screen.getByRole('alert')).textContent).toContain('Gemini is not configured'),
     )
+  })
+})
+
+describe('waiting for a reply (F2)', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('shows progress text that changes the longer it takes', () => {
+    vi.useFakeTimers()
+    render(<Chat messages={[]} busy onSend={() => {}} />)
+    const status = screen.getByRole('status')
+    expect(status.querySelectorAll('.typing span')).toHaveLength(3)
+    expect(status.textContent).toBe('Checking your numbers…')
+    act(() => vi.advanceTimersByTime(5000))
+    expect(status.textContent).toBe('Looking deeper into your data…')
+    act(() => vi.advanceTimersByTime(7000))
+    expect(status.textContent).toBe('Putting your answer together…')
+  })
+
+  it('shows nothing when not waiting', () => {
+    render(<Chat messages={[]} busy={false} onSend={() => {}} />)
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })
 
