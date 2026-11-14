@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { login } from '../api.js'
+import Icon from './Icon.jsx'
 
 export default function Login() {
   const [username, setUsername] = useState('')
@@ -61,6 +62,7 @@ export default function Login() {
             )}
             <div className="enter-row flush">
               <button type="submit" className="send" disabled={busy}>
+                {!busy && <Icon name="login" size={16} />}
                 {busy ? 'Logging in…' : 'Log in'}
               </button>
             </div>

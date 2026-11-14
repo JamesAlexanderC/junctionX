@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { getDemoDirectory, logout } from '../api.js'
+import Icon from './Icon.jsx'
 
 function CustomerRow({ c, onEnter }) {
   const tags = [c.income_label, c.spender_type].filter(Boolean)
@@ -12,6 +13,7 @@ function CustomerRow({ c, onEnter }) {
       <button type="button" className="customer-row" onClick={() => onEnter(c.customer_id)}>
         <span className="customer-id">{c.customer_id}</span>
         <span className="customer-tags">{tags.join(' · ')}</span>
+        <Icon name="chevron" className="chevron" />
       </button>
     </li>
   )
@@ -41,6 +43,7 @@ export default function Landing({ onEnter }) {
           <h1>Saldo</h1>
           <div className="topbar-actions">
             <button type="button" className="logout" onClick={logout}>
+              <Icon name="logout" size={16} />
               Log out
             </button>
           </div>
@@ -50,6 +53,7 @@ export default function Landing({ onEnter }) {
       <main className="landing">
         {error && (
           <p className="error banner" role="alert">
+            <Icon name="error" />
             {error}
           </p>
         )}
@@ -71,6 +75,7 @@ export default function Landing({ onEnter }) {
                     className="demo-customer"
                     onClick={() => onEnter(d.customer_id)}
                   >
+                    <Icon name="customer" size={22} className="demo-icon" />
                     <span className="demo-label">Demo {d.demo}</span>
                     <span className="demo-meta">
                       {d.income_label} · {d.spender_type}

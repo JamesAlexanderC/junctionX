@@ -82,13 +82,8 @@
   background: rgb(255 255 255 / 15%);
 }
 
-.exit svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: var(--on-brand);
-  stroke-width: 2;
-  stroke-linecap: round;
+.exit {
+  color: var(--on-brand);
 }
 
 /* Demo landing page */
@@ -152,8 +147,10 @@
 }
 
 .customer-row {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 12px;
   width: 100%;
   min-height: 48px;
   padding: 8px 14px;
@@ -171,8 +168,19 @@
 }
 
 .customer-tags {
+  grid-column: 1;
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+.customer-row .chevron {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.demo-icon {
+  margin-bottom: 4px;
+  color: var(--brand-green);
 }
 
 .demo-customer:hover,
@@ -264,14 +272,8 @@
 }
 
 .help-icon {
-  width: 28px;
-  height: 28px;
   margin-bottom: 2px;
-  fill: none;
-  stroke: var(--brand-green);
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
+  color: var(--brand-green);
 }
 
 .help-try {
@@ -655,8 +657,6 @@
 
 .chevron {
   flex: none;
-  font-size: 1.4rem;
-  line-height: 1;
   color: var(--brand-green);
 }
 
@@ -722,6 +722,9 @@
 }
 
 .suggestions button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   padding: 10px 14px;
   text-align: left;
@@ -729,6 +732,10 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
+}
+
+.suggestions .icon {
+  color: var(--brand-green);
 }
 
 .suggestions button:hover,
@@ -1249,14 +1256,6 @@ button {
   border: 0;
 }
 
-.tabbar svg {
-  width: 24px;
-  height: 24px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linejoin: round;
-}
 
 .tabbar button.active {
   color: var(--brand-green);
@@ -1355,4 +1354,44 @@ button {
     color: var(--muted);
     animation: progress-pulse 2s ease-in-out infinite;
   }
+}
+
+/* Icons (components/Icon.jsx). Lucide draws in currentColor, so an icon takes
+   its parent's text colour. Anything holding an icon and a label lines them
+   up with the same gap. */
+
+.icon {
+  flex: none;
+  vertical-align: middle;
+}
+
+.logout,
+.send,
+.card .btn-primary,
+.section-title,
+.banner,
+.msg.error,
+.tag,
+.goal-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-title,
+.banner,
+.msg.error {
+  display: flex;
+}
+
+.tag {
+  gap: 4px;
+}
+
+.goal-status {
+  gap: 4px;
+}
+
+.goal-status.on-track .icon {
+  color: var(--brand-green);
 }

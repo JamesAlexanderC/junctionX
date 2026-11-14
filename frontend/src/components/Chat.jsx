@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { DEPTH_NAMES } from '../lib/format.js'
 import { SUGGESTIONS } from '../lib/suggestions.js'
 import { ReplyCard } from './Cards.jsx'
+import Icon from './Icon.jsx'
 
 const nextDepth = (d) => Math.min(4, (d ?? 1) + 1)
 
@@ -85,6 +86,7 @@ export default function Chat({ messages, busy, onSend, disabled }) {
                 {SUGGESTIONS.map(([feature, text, depth]) => (
                   <li key={feature}>
                     <button type="button" onClick={() => onSend(text, depth)}>
+                      <Icon name="suggest" size={16} />
                       {text}
                     </button>
                   </li>
@@ -100,6 +102,7 @@ export default function Chat({ messages, busy, onSend, disabled }) {
             </div>
           ) : m.error ? (
             <div key={i} className="msg error" role="alert">
+              <Icon name="error" />
               {m.error}
             </div>
           ) : (
@@ -132,6 +135,7 @@ export default function Chat({ messages, busy, onSend, disabled }) {
           disabled={disabled}
         />
         <button type="submit" className="send" disabled={busy || disabled || !draft.trim()}>
+          <Icon name="send" size={16} />
           Send
         </button>
       </form>
