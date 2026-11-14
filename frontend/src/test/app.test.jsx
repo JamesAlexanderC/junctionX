@@ -3,9 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
 import { ReplyCard } from '../components/Cards.jsx'
 import Chat from '../components/Chat.jsx'
+import Goals from '../components/Goals.jsx'
 import Insights from '../components/Insights.jsx'
 import { niceTicks, shortLabel } from '../lib/chart.js'
 import { SUGGESTIONS } from '../lib/suggestions.js'
+
+const NO_GOALS = { customer_id: 'CUST00001', active: [], completed: [], clash: null }
 
 // Every App test starts logged in unless it clears the token itself.
 beforeEach(() => localStorage.setItem('saldo.token', 'test-token'))
@@ -102,6 +105,100 @@ describe('insights panel', () => {
   })
 })
 
+describe('goals panel', () => {
+  const bike = {
+    id: 7,
+    name: 'Bike',
+    emoji: null,
+    target: 300,
+    saved: 60,
+    progress_pct: 20,
+    expected_pct: 10,
+    on_track: true,
+    paused: false,
+    target_date: '2027-03-01',
+    difficulty: 'Easy',
+    monthly_needed: 50,
+    realistic: true,
+    tip: null,
+  }
+  const goals = (active, extra = {}) => ({ ...NO_GOALS, active, ...extra })
+
+  it('shows the backend numbers for each goal', () => {
+    render(<Goals goals={goals([bike])} onAsk={() => {}} />)
+    expect(screen.getByText('Bike')).toBeTruthy()
+    expect(screen.getByText('20%')).toBeTruthy()
+    expect(screen.getByText(/€60 of €300 · by 1 March 2027/)).toBeTruthy()
+    expect(screen.getByText(/€50 a month needed · on track/)).toBeTruthy()
+  })
+
+  it('shows behind, the realistic amount, the tip and a clash', () => {
+    const late = {
+      ...bike,
+      on_track: false,
+      realistic: false,
+      suggested_monthly: 30,
+      suggested_date: '2027-09-01',
+      tip: { text: 'Cut takeaway by 20% to catch up', shortfall: 12 },
+    }
+    const clash = { clash: true, total_needed: 50, safe_to_save_monthly: 30 }
+    render(<Goals goals={goals([late], { clash })} onAsk={() => {}} />)
+    expect(screen.getByText(/· behind/)).toBeTruthy()
+    expect(screen.getByText(/Realistic: €30 a month, done by 1 September 2027/))
+      .toBeTruthy()
+    expect(screen.getByText('Cut takeaway by 20% to catch up')).toBeTruthy()
+    expect(screen.getByText(/need €50 a month/)).toBeTruthy()
+  })
+
+  it('empty state and tapping ask the coach', () => {
+    const onAsk = vi.fn()
+    const { rerender } = render(<Goals goals={goals([])} onAsk={onAsk} />)
+    fireEvent.click(screen.getByText('No goals yet'))
+    expect(onAsk).toHaveBeenCalledWith('Help me set a goal', 2)
+    rerender(<Goals goals={goals([bike])} onAsk={onAsk} />)
+    fireEvent.click(screen.getByText('Bike'))
+    expect(onAsk).toHaveBeenCalledWith('Tell me about my Bike goal', 2)
+  })
+
+  it('reloads goals after a chat reply', async () => {
+    let created = false
+    const fetch = vi.fn(async (url) => {
+      if (url.startsWith('/api/insights/')) return new Response('[]')
+      if (url.startsWith('/api/goals/')) {
+        return new Response(JSON.stringify(goals(created ? [bike] : [])))
+      }
+      created = true
+      return new Response(JSON.stringify({ text: 'Goal added', depth: 1 }))
+    })
+    vi.stubGlobal('fetch', fetch)
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    expect(await screen.findByText('No goals yet')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'yes' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByText('Bike')).toBeTruthy()
+    expect(screen.queryByText('No goals yet')).toBeNull()
+  })
+
+  it('a goals error is shown while insights still render', async () => {
+    const items = [
+      { key: 'payday', title: 'Next payday', value: null, text: 'Soon', section: 'income' },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) =>
+        url.startsWith('/api/goals/')
+          ? new Response(JSON.stringify({ detail: 'Goals broke' }), { status: 500 })
+          : new Response(JSON.stringify({ insights: items })),
+      ),
+    )
+    window.location.hash = '#/c/CUST00001'
+    render(<App />)
+    expect((await screen.findByRole('alert')).textContent).toContain('Goals broke')
+    expect(screen.getByText('Next payday')).toBeTruthy()
+  })
+})
+
 describe('no fallbacks', () => {
   it('API down shows "Backend not reachable" and no customers', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
@@ -119,6 +216,9 @@ describe('no fallbacks', () => {
       }
       if (url.startsWith('/api/insights/')) {
         return new Response('[]', { status: 200 })
+      }
+      if (url.startsWith('/api/goals/')) {
+        return new Response(JSON.stringify(NO_GOALS), { status: 200 })
       }
       return new Response(JSON.stringify({ error: 'Gemini is not configured' }), {
         status: 503,

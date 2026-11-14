@@ -8,11 +8,17 @@ import ChartCard from './Chart.jsx'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
-function Bar({ value }) {
-  const w = Math.max(0, Math.min(1, Number(value) || 0)) * 100
+const pct = (v) => Math.max(0, Math.min(1, Number(v) || 0)) * 100
+
+// Progress bar for a 0..1 share; `marker` (0..1) draws a tick, e.g. where the
+// goal should be by now (#52).
+export function Bar({ value, marker }) {
   return (
     <div className="bar">
-      <div style={{ width: `${w}%` }} />
+      <div style={{ width: `${pct(value)}%` }} />
+      {marker != null && (
+        <i className="bar-marker" style={{ left: `${pct(marker)}%` }} />
+      )}
     </div>
   )
 }

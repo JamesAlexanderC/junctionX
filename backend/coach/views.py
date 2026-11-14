@@ -81,8 +81,29 @@ def chat(request):
     return Response(reply)
 
 
-@api_view(["POST"])
+def _goal_list(request):
+    customer_id = request.query_params.get("customer_id")
+    if not customer_id:
+        return Response(
+            {"detail": "customer_id is required."}, status=status.HTTP_400_BAD_REQUEST
+        )
+    profile = services.get_profile(customer_id)
+    if profile is None:
+        return _not_found(customer_id)
+    return Response(
+        {
+            "customer_id": customer_id,
+            "as_of": profile.get("today"),
+            **insights_mod.goal_summary(profile),
+        }
+    )
+
+
+@api_view(["GET", "POST"])
 def goals(request):
+    """GET ?customer_id= lists goals for the Overview; POST creates one (#64)."""
+    if request.method == "GET":
+        return _goal_list(request)
     ser = GoalSerializer(data=request.data)
     ser.is_valid(raise_exception=True)
     if services.get_profile(ser.validated_data["customer_id"]) is None:

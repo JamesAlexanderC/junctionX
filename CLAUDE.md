@@ -51,6 +51,14 @@ Own-account transfers: `transaction_type` in `OWN_TRANSFER_TYPES`
   the data supports, alerts first.
 - `POST /api/chat/` `{customer_id, message, history, depth?}` -> send_reply JSON;
   503 `{"error": ...}` without `GEMINI_API_KEY`.
+- `GET /api/goals/?customer_id=` -> `{customer_id, as_of, active: [{id, name,
+  emoji, type, priority, paused, target, saved, progress_pct, expected_pct,
+  on_track, target_date, projected_date, months_needed, difficulty,
+  monthly_needed, realistic, suggested_monthly, suggested_date, tip: {text,
+  shortfall}|null, milestones_hit}], completed: [{id, name, type}], clash:
+  {clash, total_needed, safe_to_save_monthly}|null}` (`insights.goal_summary`,
+  fields as `profile["goals"]` computed them; 400 without `customer_id`, 404 if
+  unknown). Active goals are shown here, not in `/api/insights/`.
 - `POST /api/goals/`, `PATCH /api/goals/<id>/`, `POST /api/goals/<id>/rate/`.
 - `POST /api/loans/` `{customer_id, balance, interest_rate, years_left}`.
 - `GET /api/customers/?q=&limit=50` -> `[{customer_id, customer_age,

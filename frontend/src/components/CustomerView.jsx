@@ -2,9 +2,10 @@
 // coach. Layout follows S-mobiili: green top bar, white list sections on grey,
 // bottom tabs on phones (Overview / Coach), two columns on wide screens.
 
-import { useCallback, useEffect, useState } from 'react'
-import { getInsights, sendChat } from '../api.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { getGoals, getInsights, sendChat } from '../api.js'
 import Chat from './Chat.jsx'
+import Goals from './Goals.jsx'
 import Help from './Help.jsx'
 import Insights, { InsightsSkeleton } from './Insights.jsx'
 
@@ -32,30 +33,39 @@ export default function CustomerView({
 }) {
   const [insights, setInsights] = useState([])
   const [insightsError, setInsightsError] = useState(null)
-  const [insightsLoading, setInsightsLoading] = useState(true)
+  const [goals, setGoals] = useState(null)
+  const [goalsError, setGoalsError] = useState(null)
+  const [overviewLoading, setOverviewLoading] = useState(true)
   const [messages, setMessages] = useState([])
   const [busy, setBusy] = useState(false)
   const [tab, setTab] = useState('overview')
+  const overviewCtrl = useRef(null)
+
+  // Insights and goals load side by side, so one failing never hides the
+  // other. Called on open and after every chat reply: the coach may have
+  // added or changed a goal, and the backend has already rebuilt the profile.
+  const loadOverview = useCallback(async () => {
+    overviewCtrl.current?.abort()
+    const ctrl = new AbortController()
+    overviewCtrl.current = ctrl
+    const [ins, gls] = await Promise.allSettled([
+      getInsights(customerId, { signal: ctrl.signal }),
+      getGoals(customerId, { signal: ctrl.signal }),
+    ])
+    if (ctrl.signal.aborted) return
+    setInsights(ins.status === 'fulfilled' ? ins.value : [])
+    setInsightsError(ins.status === 'rejected' ? ins.reason.message : null)
+    setGoals(gls.status === 'fulfilled' ? gls.value : null)
+    setGoalsError(gls.status === 'rejected' ? gls.reason.message : null)
+    setOverviewLoading(false)
+  }, [customerId])
 
   // The view is keyed on customerId, so this runs once per customer and
-  // insightsLoading already starts true.
+  // overviewLoading already starts true.
   useEffect(() => {
-    const ctrl = new AbortController()
-    getInsights(customerId, { signal: ctrl.signal })
-      .then((items) => {
-        setInsights(items)
-        setInsightsError(null)
-      })
-      .catch((e) => {
-        if (e?.name === 'AbortError') return
-        setInsights([])
-        setInsightsError(e.message)
-      })
-      .finally(() => {
-        if (!ctrl.signal.aborted) setInsightsLoading(false)
-      })
-    return () => ctrl.abort()
-  }, [customerId])
+    loadOverview()
+    return () => overviewCtrl.current?.abort()
+  }, [loadOverview])
 
   const send = useCallback(
     async (text, depth) => {
@@ -66,13 +76,14 @@ export default function CustomerView({
       try {
         const reply = await sendChat({ customerId, message: text, history, depth })
         setMessages((m) => [...m, { role: 'assistant', reply }])
+        loadOverview()
       } catch (e) {
         setMessages((m) => [...m, { role: 'assistant', error: e.message }])
       } finally {
         setBusy(false)
       }
     },
-    [customerId, busy, messages],
+    [customerId, busy, messages, loadOverview],
   )
 
   // Tapping an insight asks the coach, so on phones jump to the Coach tab.
@@ -123,15 +134,20 @@ export default function CustomerView({
 
         <main className="layout">
           <section className="pane overview" aria-label="Overview">
-            {insightsError && (
-              <p className="error banner" role="alert">
-                {insightsError}
-              </p>
-            )}
-            {insightsLoading ? (
+            {[goalsError, insightsError]
+              .filter((e, i, all) => e && all.indexOf(e) === i)
+              .map((e) => (
+                <p key={e} className="error banner" role="alert">
+                  {e}
+                </p>
+              ))}
+            {overviewLoading ? (
               <InsightsSkeleton />
             ) : (
-              <Insights items={insights} onAsk={ask} />
+              <>
+                {goals && <Goals goals={goals} onAsk={ask} />}
+                <Insights items={insights} onAsk={ask} />
+              </>
             )}
           </section>
 

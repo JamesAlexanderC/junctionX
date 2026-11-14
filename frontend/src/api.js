@@ -3,6 +3,7 @@
 //   GET  /api/customers/?q=<search>   -> [{customer_id, customer_age, ...}]
 //   GET  /api/insights/<customer_id>/  -> [{key, inference, title, value,
 //                                          unit, text, section, severity?}]
+//   GET  /api/goals/?customer_id=<id> -> {active, completed, clash}
 //   POST /api/chat/ {customer_id, message, history, depth?} -> send_reply
 //   POST /api/auth/login/ {username, password} -> {token, user}
 //   POST /api/auth/logout/                      -> 204
@@ -95,6 +96,19 @@ export async function getInsights(customerId, { signal } = {}) {
   // Backend shape: {customer_id, as_of, insights: [...]} (CLAUDE.md "API").
   if (Array.isArray(body)) return body
   return Array.isArray(body?.insights) ? body.insights : []
+}
+
+// Backend shape: {customer_id, as_of, active: [...], completed: [...], clash}.
+export async function getGoals(customerId, { signal } = {}) {
+  const body = await request(
+    `/api/goals/?customer_id=${encodeURIComponent(customerId)}`,
+    { signal },
+  )
+  return {
+    active: Array.isArray(body?.active) ? body.active : [],
+    completed: Array.isArray(body?.completed) ? body.completed : [],
+    clash: body?.clash ?? null,
+  }
 }
 
 // Only the last 6 turns are sent (context.md "Controls").

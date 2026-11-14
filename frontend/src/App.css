@@ -827,10 +827,70 @@ table.card thead th {
   overflow: hidden;
 }
 
+.bar {
+  position: relative;
+}
+
 .bar > div {
   height: 100%;
   background: var(--brand-green);
   border-radius: 4px;
+}
+
+/* Where the goal should be by now (#52). */
+.bar-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--brand);
+  opacity: 0.45;
+}
+
+/* Goals panel (top of the Overview) */
+
+.goals.section {
+  margin-top: 20px;
+}
+
+.goal-row .row-main {
+  gap: 4px;
+}
+
+.goal-row .bar {
+  margin: 4px 0 2px;
+}
+
+.goal-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.goal-head .tag {
+  align-self: center;
+  font-weight: 400;
+}
+
+.goal-status.behind {
+  color: var(--error);
+}
+
+.goal-tip {
+  color: var(--text);
+}
+
+.goal-note {
+  margin: 8px 4px 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.goal-note ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
 }
 
 .chart {
