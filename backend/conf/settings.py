@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     # Local
     "finance",
+    "coach",
 ]
 
 MIDDLEWARE = [
@@ -168,6 +169,8 @@ DATASET_DIR = Path(
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "") or "gemini-2.5-flash"
+# Pause between streamed words from the offline coach (seconds).
+COACH_TOKEN_DELAY = float(os.environ.get("COACH_TOKEN_DELAY", "0.01"))
 
 
 # OpenAPI schema (drf-spectacular)
