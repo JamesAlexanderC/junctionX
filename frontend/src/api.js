@@ -102,11 +102,12 @@ export async function getInsights(customerId, { signal } = {}) {
 }
 
 // Only the last 6 turns are sent (context.md "Controls").
-export function sendChat({ customerId, message, history = [], depth }) {
+export function sendChat({ customerId, message, history = [], depth, conversationId }) {
   return request('/api/chat/', {
     method: 'POST',
     body: {
       customer_id: customerId,
+      ...(conversationId ? { conversation_id: conversationId } : {}),
       message,
       history: history.slice(-6),
       ...(depth ? { depth } : {}),

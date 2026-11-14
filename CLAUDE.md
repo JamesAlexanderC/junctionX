@@ -82,7 +82,8 @@ Card payloads:
 - chart `{kind: "bar"|"line", title, unit?, data: [{label, value}]}`
 - basket_bar `{essential, surprise, leaky, saver}`
 - slider `{category, monthly_spend, min_pct: 0, max_pct: 50, pct, goal?: {target,
-  saved, monthly_rate}}` (frontend recomputes #24 / #26 locally)
+  saved, monthly_rate}, as_of}` (server sets as_of from the profile; frontend
+  recomputes #24 / #26 locally using that date)
 - goal `{name, target, saved, target_date, difficulty, monthly_needed}`
 - level_progress `{level, name, progress, euros_to_go, next_step, ladder?:
   [{level, name, reached}]}` (`get_level` returns it ready as `card`)

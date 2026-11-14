@@ -71,6 +71,7 @@ class SliderCard(_Card):
     max_pct: float = 50
     pct: float
     goal: _SliderGoal | None = None
+    as_of: str | None = None
 
     @field_validator("pct")
     @classmethod
@@ -136,7 +137,7 @@ CARD_MODELS = {
 # question card, whose options are choices Gemini offers, not facts.
 ALWAYS_NOT_DATA = {"type", "id", "clears", "unit", "kind"}
 NOT_DATA = {
-    "slider": {"min_pct", "max_pct", "pct"},
+    "slider": {"min_pct", "max_pct", "pct", "as_of"},
     "question": {"question", "options", "quick_answer"},
 }
 
@@ -152,3 +153,11 @@ def data_fields(card: dict) -> dict:
     """The parts of a cleaned card whose numbers must come from tools."""
     skip = ALWAYS_NOT_DATA | NOT_DATA.get(card["type"], set())
     return {k: v for k, v in card.items() if k not in skip}
+
+
+def reference_dates(reply, today):
+    """Slider dates are trusted server metadata, never chosen by the model."""
+    for card in reply.get("cards", []):
+        if card.get("type") == "slider":
+            card["as_of"] = today.isoformat()
+    return reply

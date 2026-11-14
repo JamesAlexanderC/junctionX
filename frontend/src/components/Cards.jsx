@@ -6,8 +6,6 @@ import { eur, formatValue, longDate } from '../lib/format.js'
 import { cutSaving, goalWithCut } from '../lib/formulas.js'
 import ChartCard from './Chart.jsx'
 
-const TODAY = () => new Date().toISOString().slice(0, 10)
-
 function Bar({ value }) {
   const w = Math.max(0, Math.min(1, Number(value) || 0)) * 100
   return (
@@ -64,6 +62,7 @@ export function SliderCard({ card }) {
   const saving = cutSaving(card.monthly_spend, p / 100)
   const goal =
     card.goal &&
+    card.as_of &&
     goalWithCut(
       {
         target: card.goal.target,
@@ -71,7 +70,7 @@ export function SliderCard({ card }) {
         monthlyRate: card.goal.monthly_rate,
       },
       saving.monthly,
-      TODAY(),
+      card.as_of,
     )
   return (
     <div className="card">

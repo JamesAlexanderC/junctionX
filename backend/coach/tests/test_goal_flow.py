@@ -102,3 +102,127 @@ def test_system_prompt_says_to_call_the_tool_to_propose():
     from coach.gemini.system_prompt import SYSTEM_PROMPT
 
     assert "first call only records the proposal" in SYSTEM_PROMPT
+
+
+@pytest.mark.parametrize(
+    "message",
+    ["do not save it", "don't save it", "yes, but change the amount", "not okay"],
+)
+def test_negative_or_ambiguous_confirmation_saves_nothing(
+    client, aino, fake_gemini, message
+):
+    fake_gemini(response(("create_goal", GOAL)), _reply("Shall I save it?", CARD))
+    _chat(client, "Create a house deposit goal")
+    fake_gemini(response(("create_goal", GOAL)), _reply("Let us check first."))
+    _chat(client, message)
+    assert Goal.objects.count() == 0
+
+
+def test_repeated_tool_calls_consume_confirmation_once(client, aino, fake_gemini):
+    fake_gemini(response(("create_goal", GOAL)), _reply("Shall I save it?", CARD))
+    _chat(client, "Create a house deposit goal")
+    fake_gemini(
+        response(("create_goal", GOAL), ("create_goal", GOAL)),
+        _reply("Saved."),
+    )
+    _chat(client, "Yes, save it")
+    assert Goal.objects.count() == 1
+    from coach.models import ChatTurn
+
+    assert ChatTurn.objects.order_by("-id").first().pending == {}
+
+
+def test_stale_context_cannot_reuse_persisted_confirmation(aino):
+    from coach.gemini.tools import ToolContext, call_tool
+    from coach.models import ChatTurn
+
+    pending = {"create_goal": GOAL}
+    previous = ChatTurn.objects.create(
+        customer_id=AINO, message="Goal", pending=pending
+    )
+    contexts = [
+        ToolContext(AINO, "yes", previous_pending=pending, previous_turn_id=previous.id)
+        for _ in range(2)
+    ]
+    for ctx in contexts:
+        call_tool(ctx, "create_goal", GOAL)
+    assert Goal.objects.count() == 1
+    previous.refresh_from_db()
+    assert previous.pending == {}
+
+
+def test_failed_write_does_not_consume_confirmation(aino, monkeypatch):
+    from coach import services
+    from coach.gemini.tools import ToolContext, call_tool
+    from coach.models import ChatTurn
+
+    pending = {"create_goal": GOAL}
+    previous = ChatTurn.objects.create(
+        customer_id=AINO, message="Goal", pending=pending
+    )
+    ctx = ToolContext(
+        AINO, "yes", previous_pending=pending, previous_turn_id=previous.id
+    )
+
+    def failed_refresh(customer_id):
+        raise RuntimeError("Profile rebuild failed")
+
+    monkeypatch.setattr(services, "refresh_profile", failed_refresh)
+    assert "error" in call_tool(ctx, "create_goal", GOAL)
+    assert Goal.objects.count() == 0
+    previous.refresh_from_db()
+    assert previous.pending == pending
+    assert ctx.previous_pending == pending
+
+
+@pytest.mark.parametrize("message", ["Yes", "Yes, save it!", "Yes, go ahead", "joo"])
+def test_explicit_confirmations_are_accepted(message):
+    from coach.gemini.tools import ToolContext
+
+    assert ToolContext(AINO, message, {"create_goal": GOAL}).user_confirmed(
+        "create_goal"
+    )
+
+
+def test_slider_reference_date_is_set_by_server(client, aino, fake_gemini):
+    fake_gemini(
+        response(("simulate_cut", {"category": "takeaway", "pct": 0.2})),
+        _reply(
+            "Try it.",
+            {
+                "type": "slider",
+                "category": "takeaway",
+                "monthly_spend": 90,
+                "pct": 20,
+                "as_of": "2099-01-01",
+            },
+        ),
+    )
+    assert _chat(client, "Cut takeaway")["cards"][0]["as_of"] == "2026-10-18"
+
+
+def test_cached_sliders_receive_reference_date(client, aino, settings, user):
+    settings.DEMO_MODE = True
+    from coach.models import Conversation
+
+    conversation = Conversation.objects.create(owner=user, customer_id=AINO)
+    cached = DemoCache.objects.create(
+        conversation=conversation,
+        customer_id=AINO,
+        question="cut takeaway",
+        reply={
+            "text": "Try it.",
+            "depth": 3,
+            "cards": [
+                {
+                    "type": "slider",
+                    "category": "takeaway",
+                    "monthly_spend": 90,
+                    "pct": 20,
+                }
+            ],
+        },
+    )
+    assert _chat(client, "Cut takeaway")["cards"][0]["as_of"] == "2026-10-18"
+    cached.refresh_from_db()
+    assert "as_of" not in cached.reply["cards"][0]

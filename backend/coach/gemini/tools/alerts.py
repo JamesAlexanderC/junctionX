@@ -99,7 +99,7 @@ def simulate_plan(ctx, actions):
 def accept_plan(ctx, actions):
     """Saves the plan as a checklist goal; only after the user confirmed."""
     actions = _complete_actions(ctx, actions)
-    if not is_confirmed(ctx, "accept_plan"):
+    if not is_confirmed(ctx, "accept_plan", actions):
         return propose(
             ctx,
             "accept_plan",

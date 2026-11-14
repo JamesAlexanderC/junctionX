@@ -103,6 +103,19 @@ def test_accept_plan_after_proposal_and_yes(client, aino, fake_gemini):
     assert goal.type == "plan" and goal.checklist[0]["action"]["category"] == "takeaway"
 
 
+def test_accept_plan_cannot_substitute_different_actions(aino):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    action = {"type": "cut_category", "category": "takeaway", "pct": 0.1}
+    first = ToolContext(AINO, "Make a plan")
+    call_tool(first, "accept_plan", {"actions": [action]})
+    ctx = ToolContext(AINO, "yes", previous_pending=first.pending)
+    changed = {**action, "pct": 0.3}
+    out = call_tool(ctx, "accept_plan", {"actions": [changed]})
+    assert out["status"] == "needs_confirmation"
+    assert Goal.objects.count() == 0
+
+
 @pytest.mark.parametrize(
     "payload",
     [

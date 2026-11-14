@@ -9,7 +9,7 @@ from . import insights as insights_mod
 from . import services
 from .gemini import loop
 from .gemini.tools import ToolContext, rate_goal, snooze_alert
-from .models import Goal, LoanDetails
+from .models import Conversation, Goal, LoanDetails
 from .serializers import (
     ChatRequest,
     GoalSerializer,
@@ -74,18 +74,43 @@ def chat(request):
     req = ChatRequest(data=request.data)
     req.is_valid(raise_exception=True)
     data = req.validated_data
+    conversation_id = data.get("conversation_id")
+    if conversation_id:
+        conversation, _ = Conversation.objects.get_or_create(
+            pk=conversation_id,
+            defaults={"owner": request.user, "customer_id": data["customer_id"]},
+        )
+        if (
+            conversation.owner_id != request.user.pk
+            or conversation.customer_id != data["customer_id"]
+        ):
+            return Response({"detail": "Conversation not found"}, status=404)
+    else:
+        # Compatibility for clients predating conversation ids, scoped per user.
+        conversation = (
+            Conversation.objects.filter(
+                owner=request.user, customer_id=data["customer_id"]
+            )
+            .order_by("created_at")
+            .first()
+        )
+        if conversation is None:
+            conversation = Conversation.objects.create(
+                owner=request.user, customer_id=data["customer_id"]
+            )
     try:
         reply, _meta = loop.chat(
             data["customer_id"],
             data["message"],
-            history=data.get("history"),
+            history=None,
+            conversation=conversation,
             depth=data.get("depth"),
         )
     except LookupError:
         return _not_found(data["customer_id"])
     except loop.GeminiNotConfigured as exc:
         return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-    return Response(reply)
+    return Response({**reply, "conversation_id": str(conversation.id)})
 
 
 @api_view(["POST"])

@@ -37,6 +37,21 @@ afterEach(() => {
 })
 
 describe('cards', () => {
+  it('uses the backend reference date for slider goal projections', () => {
+    render(<ReplyCard card={{
+      type: 'slider', category: 'takeaway', monthly_spend: 100, pct: 20,
+      as_of: '2026-09-30', goal: { target: 100, saved: 0, monthly_rate: 80 },
+    }} />)
+    expect(screen.getByText(/Goal date: 30 October 2026/)).toBeTruthy()
+  })
+
+  it('does not invent a date for an older slider without a reference date', () => {
+    render(<ReplyCard card={{
+      type: 'slider', category: 'takeaway', monthly_spend: 100, pct: 20,
+      goal: { target: 100, saved: 0, monthly_rate: 80 },
+    }} />)
+    expect(screen.queryByText(/Goal date:/)).toBeNull()
+  })
   it('unknown card type renders nothing', () => {
     const { container } = render(<ReplyCard card={{ type: 'hologram' }} onSend={() => {}} />)
     expect(container.innerHTML).toBe('')

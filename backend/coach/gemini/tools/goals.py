@@ -63,6 +63,7 @@ def create_goal(ctx, name, amount, date, emoji="", priority="medium"):
         "emoji": emoji,
         "priority": priority,
     }
+    stored = ctx.previous_pending.get("create_goal")
     if not is_confirmed(ctx, "create_goal"):
         return propose(
             ctx,
@@ -72,7 +73,7 @@ def create_goal(ctx, name, amount, date, emoji="", priority="medium"):
             "say yes, call create_goal again.",
         )
     # F1: the yes confirms what the user saw, so save the stored proposal.
-    proposal = {**proposal, **ctx.previous_pending["create_goal"]}
+    proposal = {**proposal, **stored}
     goal = Goal.objects.create(
         customer_id=ctx.customer_id,
         name=proposal["name"],

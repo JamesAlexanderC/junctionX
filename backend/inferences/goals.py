@@ -7,8 +7,8 @@ creates a goal on its own: detected goals (#56 to #62) are suggestions only.
 
 Shared money values:
 - r (Saver rate) = baskets.monthly_saving: median monthly Saver (#26, #75).
-- safe-to-save per month (#50, #69, #70) = r + forecast.safe_to_save_today,
-  i.e. what already goes to savings plus what could safely go this cycle.
+- safe-to-save per month (#50, #69, #70) = r. Today's available cash is
+  a one-off contribution, shown separately and never assumed to recur.
 """
 
 from __future__ import annotations
@@ -47,8 +47,7 @@ def months_between(start, end) -> float:
 def safe_to_save_monthly(baskets: dict, forecast: dict) -> float:
     """Average monthly safe-to-save used by #50, #69 and #70 (see module doc)."""
     rate = (baskets or {}).get("monthly_saving") or 0.0
-    extra = (forecast or {}).get("safe_to_save_today") or 0.0
-    return float(rate) + float(extra)
+    return max(0.0, float(rate))
 
 
 def _leaky_means(baskets: dict) -> dict:
@@ -189,6 +188,18 @@ def evaluate_goal(goal: dict, today, baskets: dict, forecast: dict) -> dict:
         if diff["months_needed"] is not None
         else None
     )
+    # An optional scenario, not a transfer or an increase to recorded savings.
+    contribution = min(
+        max(0.0, target - saved),
+        max(0.0, float((forecast or {}).get("safe_to_save_today") or 0)),
+    )
+    months = models.months_to_goal(target, saved + contribution, rate)
+    out["one_off_scenario"] = {
+        "contribution": r2(contribution),
+        "monthly_rate": r2(rate),
+        "months_needed": months,
+        "projected_date": _add_months(today, months) if months is not None else None,
+    }
     end = goal.get("target_date")
     need = monthly_needed(target, saved, today, end) if end else 0.0
     out["monthly_needed"] = r2(need)

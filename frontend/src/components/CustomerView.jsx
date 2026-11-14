@@ -30,6 +30,8 @@ export default function CustomerView({
   onHelp,
   onCloseHelp,
 }) {
+  const [conversationId] = useState(() => crypto.randomUUID())
+  const [revision, setRevision] = useState(0)
   const [insights, setInsights] = useState([])
   const [insightsError, setInsightsError] = useState(null)
   const [insightsLoading, setInsightsLoading] = useState(true)
@@ -43,19 +45,19 @@ export default function CustomerView({
     const ctrl = new AbortController()
     getInsights(customerId, { signal: ctrl.signal })
       .then((items) => {
+        if (ctrl.signal.aborted) return
         setInsights(items)
         setInsightsError(null)
       })
       .catch((e) => {
         if (e?.name === 'AbortError') return
-        setInsights([])
         setInsightsError(e.message)
       })
       .finally(() => {
         if (!ctrl.signal.aborted) setInsightsLoading(false)
       })
     return () => ctrl.abort()
-  }, [customerId])
+  }, [customerId, revision])
 
   const send = useCallback(
     async (text, depth) => {
@@ -64,15 +66,18 @@ export default function CustomerView({
       setMessages((m) => [...m, { role: 'user', content: text }])
       setBusy(true)
       try {
-        const reply = await sendChat({ customerId, message: text, history, depth })
+        const reply = await sendChat({
+          customerId, message: text, history, depth, conversationId,
+        })
         setMessages((m) => [...m, { role: 'assistant', reply }])
+        if (reply.state_changed) setRevision((r) => r + 1)
       } catch (e) {
         setMessages((m) => [...m, { role: 'assistant', error: e.message }])
       } finally {
         setBusy(false)
       }
     },
-    [customerId, busy, messages],
+    [customerId, busy, messages, conversationId],
   )
 
   // Tapping an insight asks the coach, so on phones jump to the Coach tab.
@@ -128,7 +133,10 @@ export default function CustomerView({
           <section className="pane overview" aria-label="Overview">
             {insightsError && (
               <p className="error banner" role="alert">
-                {insightsError}
+                {insightsError}{' '}
+                <button type="button" onClick={() => setRevision((r) => r + 1)}>
+                  Retry Overview
+                </button>
               </p>
             )}
             {insightsLoading ? (

@@ -2,6 +2,9 @@
 
 import logging
 import traceback
+from copy import deepcopy
+
+from django.db import transaction
 
 from . import alerts, goals, inference, loans, read
 from .context import ToolError, unavailable
@@ -84,16 +87,32 @@ def call_tool(ctx, name, args):
     """
     ctx.tools_called.append(name)
     entry = {"tool": name, "args": args}
+    pending_before = deepcopy(ctx.previous_pending)
+    consumed_before = set(ctx.consumed)
     try:
         clean = validate_args(name, args)
-        result = check_available(ctx, name, clean) or TOOLS[name](ctx, **clean)
+        # A write and consumption of its confirmation succeed together.
+        with transaction.atomic():
+            result = check_available(ctx, name, clean) or TOOLS[name](ctx, **clean)
+        for kind in ctx.consumed:
+            ctx.pending.pop(kind, None)
     except ToolError as exc:
+        ctx.previous_pending = pending_before
+        ctx.consumed = consumed_before
         result = {"error": str(exc)}
     except Exception as exc:  # noqa: BLE001 - one broken tool must not end chat
+        ctx.previous_pending = pending_before
+        ctx.consumed = consumed_before
         log.exception("tool %s failed for %s", name, ctx.customer_id)
         entry["exception"] = repr(exc)
         entry["traceback"] = traceback.format_exc()
         result = {"error": TOOL_FAILED.format(name=name)}
+    if isinstance(result, dict) and (
+        result.get("status") in {"created", "updated", "saved", "accepted", "dismissed"}
+        or (name == "snooze_alert" and "snoozed_until" in result)
+        or (name == "rate_goal" and "weight" in result)
+    ):
+        ctx.state_changed = True
     entry["result"] = result
     ctx.trace.append(entry)
     ctx.results.append(result)

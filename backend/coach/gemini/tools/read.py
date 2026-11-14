@@ -1,7 +1,8 @@
 """Read-only tools: numbers from the profile and the transactions."""
 
-import math
 import re
+
+from inferences.models import months_to_goal
 
 from ...models import Transaction
 from ... import services
@@ -151,9 +152,8 @@ def simulate_cut(ctx, category, pct, goal_id=None):
         out["goal"] = {"found": False}
     elif goal is not None:
         rate = float(ctx.profile.get("baskets", {}).get("monthly_saving") or 0)
-        remaining = float(goal["target"]) - float(goal["saved"])
-        before = math.ceil(remaining / rate) if rate > 0 else None
-        after = math.ceil(remaining / (rate + monthly)) if rate + monthly > 0 else None
+        before = months_to_goal(goal["target"], goal["saved"], rate)
+        after = months_to_goal(goal["target"], goal["saved"], rate + monthly)
         out["goal"] = {
             "id": goal["id"],
             "name": goal["name"],

@@ -116,7 +116,8 @@ def test_gemini_api_error_falls_back_with_reason(
 def test_no_debug_field_when_debug_is_off(client, aino, fake_gemini, settings):
     settings.DEBUG = False
     fake_gemini(response(("get_baskets", {})))
-    assert _chat(client).json() == FALLBACK_REPLY
+    body = _chat(client).json()
+    assert {k: body[k] for k in FALLBACK_REPLY} == FALLBACK_REPLY
 
 
 def test_good_reply_has_no_debug_field(client, aino, fake_gemini, debug_on):

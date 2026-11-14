@@ -14,6 +14,7 @@ from google.genai import types
 from .. import services
 from ..models import ChatTurn, DemoCache
 from . import router
+from .cards import reference_dates
 from .system_prompt import FALLBACK_REPLY, SYSTEM_PROMPT
 from .tools import ToolContext, call_tool, tool_declarations
 from .tools.inference import list_inferences
@@ -102,11 +103,11 @@ def _call_within_budget(ctx, name, args, used):
     return result, used + size
 
 
-def _history_contents(customer_id, history):
+def _history_contents(customer_id, history, conversation=None):
     turns = list(
-        ChatTurn.objects.filter(customer_id=customer_id).order_by("-created_at", "-id")[
-            :HISTORY_TURNS
-        ]
+        ChatTurn.objects.filter(
+            customer_id=customer_id, conversation=conversation
+        ).order_by("-created_at", "-id")[:HISTORY_TURNS]
     )[::-1]
     contents = []
     if turns:
@@ -144,11 +145,11 @@ def _time_per_step(ctx):
     return totals
 
 
-def _earlier_user_messages(customer_id, history):
+def _earlier_user_messages(customer_id, history, conversation=None):
     """What the user said in the last HISTORY_TURNS turns (stored or sent)."""
-    stored = ChatTurn.objects.filter(customer_id=customer_id).order_by(
-        "-created_at", "-id"
-    )[:HISTORY_TURNS]
+    stored = ChatTurn.objects.filter(
+        customer_id=customer_id, conversation=conversation
+    ).order_by("-created_at", "-id")[:HISTORY_TURNS]
     said = [t.message for t in stored]
     if said:
         return said
@@ -168,39 +169,55 @@ class GeminiNotConfigured(RuntimeError):
 
 
 def chat(
-    customer_id, message, history=None, depth=None, client=None, alert_runner=None
+    customer_id,
+    message,
+    history=None,
+    depth=None,
+    client=None,
+    alert_runner=None,
+    conversation=None,
 ):
     """Answer one user message. Returns (reply, meta)."""
     started = time.monotonic()
     profile = services.get_profile(customer_id)
     if profile is None:
         raise LookupError(customer_id)
-    question = normalise_question(message)
-    if settings.DEMO_MODE:
-        cached = DemoCache.objects.filter(
-            customer_id=customer_id, question=question
-        ).first()
-        if cached:
-            ChatTurn.objects.create(
-                customer_id=customer_id, message=message, reply=cached.reply
-            )
-            return cached.reply, {"cached": True, "tools": []}
-
-    client = client if client is not None else get_client()
     previous = (
-        ChatTurn.objects.filter(customer_id=customer_id)
+        ChatTurn.objects.filter(customer_id=customer_id, conversation=conversation)
         .order_by("-created_at", "-id")
         .first()
     )
+    question = normalise_question(message)
+    if settings.DEMO_MODE and not (previous and previous.pending):
+        cached = DemoCache.objects.filter(
+            customer_id=customer_id, question=question, conversation=conversation
+        ).first()
+        if cached:
+            reply = reference_dates(
+                copy.deepcopy(cached.reply), services.profile_today(profile)
+            )
+            reply["state_changed"] = False
+            ChatTurn.objects.create(
+                customer_id=customer_id,
+                message=message,
+                reply=reply,
+                conversation=conversation,
+            )
+            return reply, {"cached": True, "tools": []}
+
+    client = client if client is not None else get_client()
     ctx = ToolContext(
-        customer_id, message, previous_pending=previous.pending if previous else {}
+        customer_id,
+        message,
+        previous_pending=previous.pending if previous else {},
+        previous_turn_id=previous.id if previous else None,
     )
     ctx.alert_runner = alert_runner
     # F1: numbers the user gave earlier, or that sit in the stored proposal,
     # may be repeated in the reply ("A 20,000 euro goal by 2028?").
     ctx.user_numbers = [
         ctx.previous_pending,
-        *_earlier_user_messages(customer_id, history),
+        *_earlier_user_messages(customer_id, history, conversation),
     ]
 
     if client is None:
@@ -213,7 +230,7 @@ def chat(
                 message, client=client, model=settings.GEMINI_ROUTER_MODEL
             )
 
-    contents = _history_contents(customer_id, history)
+    contents = _history_contents(customer_id, history, conversation)
     contents.append(
         _text(
             "user",
@@ -230,14 +247,23 @@ def chat(
         reply, rounds, reason, detail = None, 0, "gemini_error", str(exc)
     if reason:
         reply = copy.deepcopy(FALLBACK_REPLY)
+    reply = reference_dates(reply, ctx.today)
+    reply["state_changed"] = ctx.state_changed
     ChatTurn.objects.create(
-        customer_id=customer_id, message=message, reply=reply, pending=ctx.pending
+        customer_id=customer_id,
+        message=message,
+        reply=reply,
+        conversation=conversation,
+        pending=ctx.pending,
     )
     # A turn that left a proposal waiting is never cached: a replay would not
     # restore the proposal, so the user's "yes" could not confirm it (F1).
-    if settings.DEMO_MODE and not reason and not ctx.pending:
+    if settings.DEMO_MODE and not reason and not ctx.pending and not ctx.state_changed:
         DemoCache.objects.update_or_create(
-            customer_id=customer_id, question=question, defaults={"reply": reply}
+            customer_id=customer_id,
+            question=question,
+            conversation=conversation,
+            defaults={"reply": reply},
         )
     if reason:
         reply = _explain_fallback(ctx, reply, reason, detail, rounds)
