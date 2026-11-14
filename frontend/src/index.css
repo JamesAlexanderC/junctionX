@@ -47,11 +47,7 @@ body {
 }
 
 #root {
-  /* Mobile web view width; centred when opened on a desktop browser. */
-  max-width: 480px;
   height: 100dvh;
-  margin: 0 auto;
-  background: var(--bg);
 }
 
 button,

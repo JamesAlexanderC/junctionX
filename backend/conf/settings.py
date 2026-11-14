@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -41,7 +42,7 @@ SECRET_KEY = "django-insecure-0(6hz1jb!#d&nasyvdnd+$t^f@m6h4q^fbdn_4$xmw-vvlg1+c
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -56,9 +57,12 @@ INSTALLED_APPS = [
     # Third party
     "rest_framework",
     "drf_spectacular",
+    # Local
+    "coach",
 ]
 
 MIDDLEWARE = [
+    "coach.middleware.SimpleCorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -93,16 +97,27 @@ WSGI_APPLICATION = "conf.wsgi.application"
 
 # Credentials come from .env, the same file the docker-compose `db` service uses.
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": _env("POSTGRES_DB"),
-        "USER": _env("POSTGRES_USER"),
-        "PASSWORD": _env("POSTGRES_PASSWORD"),
-        "HOST": _env("POSTGRES_HOST", "localhost"),
-        "PORT": _env("POSTGRES_PORT", "5432"),
+# Tests (pytest) default to SQLite so they need no Postgres; USE_SQLITE=0
+# forces Postgres, USE_SQLITE=1 forces SQLite anywhere.
+_RUNNING_PYTEST = "pytest" in sys.modules
+if os.environ.get("USE_SQLITE", "1" if _RUNNING_PYTEST else "0") == "1":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": _env("POSTGRES_DB"),
+            "USER": _env("POSTGRES_USER"),
+            "PASSWORD": _env("POSTGRES_PASSWORD"),
+            "HOST": _env("POSTGRES_HOST", "localhost"),
+            "PORT": _env("POSTGRES_PORT", "5432"),
+        }
+    }
 
 
 # Password validation
@@ -174,3 +189,17 @@ SPECTACULAR_SETTINGS = {
     "VERSION": _project_version(),
     "SERVE_INCLUDE_SCHEMA": False,
 }
+
+
+# Saldo app settings
+# Customer ids suggested for the demo script (manage.py rank_demo_customers).
+DEMO_CUSTOMERS = [c for c in os.environ.get("DEMO_CUSTOMERS", "").split(",") if c]
+# Folder holding the four S-Bank CSVs. Relative paths resolve from the repo root.
+DATA_DIR = BASE_DIR.parent / os.environ.get("DATA_DIR", "data")
+# "Today" for every inference (YYYY-MM-DD). Empty = the date of the last
+# loaded transaction (the S-Bank data ends 2026-09-30).
+AS_OF_DATE = os.environ.get("AS_OF_DATE", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_ROUTER_MODEL = os.environ.get("GEMINI_ROUTER_MODEL", "gemini-2.5-flash-lite")
+DEMO_MODE = os.environ.get("DEMO_MODE", "0") == "1"
