@@ -4,6 +4,7 @@ from google.genai import types
 
 from ..catalogue import CATALOGUE, section
 from .context import ToolError
+from .goals import GOAL_ACTIONS
 
 STR = {"type": "string"}
 NUM = {"type": "number"}
@@ -154,7 +155,45 @@ DECLARATIONS = [
         {"goal_type": STR, "up": BOOL},
         ["goal_type", "up"],
     ),
+    _decl(
+        "manage_goal",
+        "Change a saved goal: edit (changes), pause, resume, complete, abandon, "
+        "add_saved (amount the user says they put in), check_step (plan step) "
+        "or undo the last add_saved. Proposed first; saved after the user "
+        "confirms. add_saved runs at once when the user's message states the "
+        "amount and the goal is clear.",
+        {
+            "goal_id": INT,
+            "action": {"type": "string", "enum": GOAL_ACTIONS},
+            "changes": {
+                "type": "object",
+                "properties": {
+                    "name": STR,
+                    "amount": NUM,
+                    "date": {"type": "string", "description": "YYYY-MM-DD"},
+                    "priority": {"type": "string", "enum": ["high", "medium", "low"]},
+                    "emoji": STR,
+                },
+            },
+            "amount": NUM,
+            "step": INT,
+        },
+        ["goal_id", "action"],
+    ),
     _decl("get_detected_goals", "Goals detected from the data, as suggestions."),
+    _decl(
+        "dismiss_suggestion",
+        "Hide a detected goal suggestion for good. Only after the user confirmed.",
+        {"suggestion_id": STR},
+        ["suggestion_id"],
+    ),
+    _decl(
+        "save_loan_details",
+        "Save the loan balance (EUR), interest rate (percent a year) and years "
+        "left the user told you. Only after the user confirmed.",
+        {"balance": NUM, "interest_rate": NUM, "years_left": INT},
+        ["balance", "interest_rate", "years_left"],
+    ),
     _decl(
         "get_mortgage_readiness",
         "Mortgage readiness score and gaps (#34-#35), loan burden (#76-#82).",
@@ -276,6 +315,8 @@ def validate_args(name, args):
                 raise ToolError(f"{key} must be one of {schema['enum']}")
         elif schema.get("type") == "array" and not isinstance(value, list):
             raise ToolError(f"{key} must be a list")
+        elif schema.get("type") == "object" and not isinstance(value, dict):
+            raise ToolError(f"{key} must be an object")
         clean[key] = value
     missing = [k for k in params["required"] if k not in clean]
     if missing:

@@ -12,6 +12,9 @@ CONFIRM_RE = re.compile(
 )
 
 
+UNDO_RE = re.compile(r"\b(undo|peru|peruuta|kumoa)\b", re.I)
+
+
 class ToolError(ValueError):
     """Bad tool arguments; returned to Gemini as an error result."""
 
@@ -45,6 +48,35 @@ class ToolContext:
         return kind in self.previous_pending and bool(
             CONFIRM_RE.search(self.message or "")
         )
+
+
+# --- propose, then confirm ---------------------------------------------------
+
+
+def is_confirmed(ctx, kind, proposal=None):
+    """The user said yes to the previous turn's ``kind`` proposal.
+
+    With ``proposal`` the yes only counts for that exact proposal, so a
+    changed request is proposed again instead of saved.
+    """
+    if not ctx.user_confirmed(kind):
+        return False
+    return proposal is None or ctx.previous_pending.get(kind) == proposal
+
+
+def propose(ctx, kind, proposal, instruction, key="proposal"):
+    """Remember ``proposal`` for the next turn; nothing is saved."""
+    ctx.pending[kind] = proposal
+    return {"status": "needs_confirmation", key: proposal, "instruction": instruction}
+
+
+def form_errors(errors):
+    """DRF serializer errors as one sentence for Gemini."""
+    parts = []
+    for field, messages in errors.items():
+        text = " ".join(str(m) for m in messages)
+        parts.append(text if field == "non_field_errors" else f"{field}: {text}")
+    return "; ".join(parts)
 
 
 # --- helpers ---------------------------------------------------------------

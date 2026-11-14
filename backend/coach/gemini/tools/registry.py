@@ -1,6 +1,6 @@
 """Tool registry, availability gating and dispatch (P2.2)."""
 
-from . import alerts, goals, inference, read
+from . import alerts, goals, inference, loans, read
 from .context import ToolError, unavailable
 from .declarations import validate_args
 
@@ -28,6 +28,9 @@ TOOLS = {
     "snooze_alert": alerts.snooze_alert,
     "list_inferences": inference.list_inferences,
     "get_inference": inference.get_inference,
+    "manage_goal": goals.manage_goal,
+    "dismiss_suggestion": goals.dismiss_suggestion,
+    "save_loan_details": loans.save_loan_details,
 }
 
 

@@ -5,7 +5,7 @@ from datetime import timedelta
 from ... import planner
 from ...models import AlertSnooze, Goal, Transaction
 from ... import services
-from .context import ToolError
+from .context import ToolError, is_confirmed, propose
 
 # --- alert coach -----------------------------------------------------------
 
@@ -99,13 +99,14 @@ def simulate_plan(ctx, actions):
 def accept_plan(ctx, actions):
     """Saves the plan as a checklist goal; only after the user confirmed."""
     actions = _complete_actions(ctx, actions)
-    if not ctx.user_confirmed("accept_plan"):
-        ctx.pending["accept_plan"] = actions
-        return {
-            "status": "needs_confirmation",
-            "actions": actions,
-            "instruction": "Ask the user to accept the plan. Nothing was saved.",
-        }
+    if not is_confirmed(ctx, "accept_plan"):
+        return propose(
+            ctx,
+            "accept_plan",
+            actions,
+            "Ask the user to accept the plan. Nothing was saved.",
+            key="actions",
+        )
     monthly = round(sum(a["monthly_impact"] for a in actions), 2)
     on = services.today()
     goal = Goal.objects.create(
