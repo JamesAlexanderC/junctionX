@@ -27,6 +27,8 @@ class ToolContext:
         self.pending = {}
         self.results = []
         self.tools_called = []
+        self.trace = []  # every tool call: args, result, exception (F3)
+        self.validation_errors = []  # rejected send_reply reasons (F3)
         self.alert_runner = None
         self._profile = None
 

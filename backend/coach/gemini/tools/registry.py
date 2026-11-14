@@ -1,8 +1,14 @@
 """Tool registry, availability gating and dispatch (P2.2)."""
 
+import logging
+import traceback
+
 from . import alerts, goals, inference, loans, read
 from .context import ToolError, unavailable
 from .declarations import validate_args
+
+log = logging.getLogger("coach.gemini")
+TOOL_FAILED = "The {name} tool failed. Tell the user you could not get that right now."
 
 TOOLS = {
     "get_category_spend": read.get_category_spend,
@@ -70,12 +76,24 @@ def check_available(ctx, name, args):
 
 
 def call_tool(ctx, name, args):
-    """Validate and run a tool; errors come back as a result for Gemini."""
+    """Validate and run a tool; errors come back as a result for Gemini.
+
+    Every call is recorded in ctx.trace (F3). A tool that crashes is logged
+    with its traceback and Gemini gets a plain error, never the internals.
+    """
     ctx.tools_called.append(name)
+    entry = {"tool": name, "args": args}
     try:
         clean = validate_args(name, args)
         result = check_available(ctx, name, clean) or TOOLS[name](ctx, **clean)
     except ToolError as exc:
         result = {"error": str(exc)}
+    except Exception as exc:  # noqa: BLE001 - one broken tool must not end chat
+        log.exception("tool %s failed for %s", name, ctx.customer_id)
+        entry["exception"] = repr(exc)
+        entry["traceback"] = traceback.format_exc()
+        result = {"error": TOOL_FAILED.format(name=name)}
+    entry["result"] = result
+    ctx.trace.append(entry)
     ctx.results.append(result)
     return result

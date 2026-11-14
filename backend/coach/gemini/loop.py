@@ -7,6 +7,7 @@ import re
 import time
 
 from django.conf import settings
+from google.genai import errors as genai_errors
 from google.genai import types
 
 from .. import services
@@ -94,6 +95,7 @@ def _call_within_budget(ctx, name, args, used):
     if used + size > MAX_TURN_RESULT_CHARS:
         result = {"error": BUDGET_ERROR}
         ctx.results[-1] = result
+        ctx.trace[-1] = {**ctx.trace[-1], "result": result, "over_budget": True}
         return result, used
     return result, used + size
 
@@ -172,31 +174,62 @@ def chat(
             f"Answer at depth {depth}.\nUser: {message}",
         )
     )
-    reply, rounds, fallback = _run(client, contents, ctx)
-    if fallback:
+    try:
+        reply, rounds, reason, detail = _run(client, contents, ctx)
+    except genai_errors.APIError as exc:
+        log.exception("Gemini call failed for %s", customer_id)
+        reply, rounds, reason, detail = None, 0, "gemini_error", str(exc)
+    if reason:
         reply = copy.deepcopy(FALLBACK_REPLY)
     ChatTurn.objects.create(
         customer_id=customer_id, message=message, reply=reply, pending=ctx.pending
     )
-    if settings.DEMO_MODE and not fallback:
+    if settings.DEMO_MODE and not reason:
         DemoCache.objects.update_or_create(
             customer_id=customer_id, question=question, defaults={"reply": reply}
         )
+    if reason:
+        reply = _explain_fallback(ctx, reply, reason, detail, rounds)
     meta = {
         "model": settings.GEMINI_MODEL,
         "depth": depth,
         "routed": routed,
         "tools": ctx.tools_called,
         "rounds": rounds,
-        "fallback": fallback,
+        "fallback": bool(reason),
+        "fallback_reason": reason,
         "latency_ms": round((time.monotonic() - started) * 1000),
     }
     log.info("chat %s", meta)
     return reply, meta
 
 
+def _explain_fallback(ctx, reply, reason, detail, rounds):
+    """F3: log why this turn fell back; add it to the reply when DEBUG."""
+    report = {
+        "reason": reason,
+        "detail": detail,
+        "rounds": rounds,
+        "tools": ctx.trace,
+        "validation_errors": ctx.validation_errors,
+    }
+    log.warning(
+        "chat fallback %s",
+        json.dumps(
+            {"customer_id": ctx.customer_id, "message": ctx.message, **report},
+            default=str,
+        ),
+    )
+    if settings.DEBUG:
+        return {**reply, "debug": report}
+    return reply
+
+
 def _run(client, contents, ctx):
-    """The tool loop: at most MAX_ROUNDS rounds, one retry on a bad reply."""
+    """The tool loop: at most MAX_ROUNDS rounds, one retry on a bad reply.
+
+    Returns (reply, rounds, fallback reason or None, detail).
+    """
     config = build_config()
     retried = False
     used = 0
@@ -211,11 +244,12 @@ def _run(client, contents, ctx):
             if call.name == "send_reply":
                 try:
                     reply = validate_reply(args, ctx.results, ctx.message)
-                    return reply, round_no, False
+                    return reply, round_no, None, None
                 except ReplyError as exc:
                     log.warning("send_reply rejected: %s", exc)
+                    ctx.validation_errors.append(str(exc))
                     if retried:
-                        return None, round_no, True
+                        return None, round_no, "invalid_reply", str(exc)
                     retried = True
                     result = {"error": str(exc), "instruction": "Fix and resend."}
             else:
@@ -228,4 +262,4 @@ def _run(client, contents, ctx):
         if not parts:
             parts.append(_text("user", "Call send_reply to answer.").parts[0])
         contents.append(types.Content(role="user", parts=parts))
-    return None, MAX_ROUNDS, True
+    return None, MAX_ROUNDS, "max_rounds", f"No send_reply after {MAX_ROUNDS} rounds."
