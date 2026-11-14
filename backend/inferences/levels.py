@@ -38,8 +38,9 @@ def _level_2(df, today, income_monthly):
         m = months[-1]
         spent = monthly_totals(s, [m])[m]
         earned = monthly_totals(inc, [m], col="tx_amount_eur")[m]
-        reached = earned - spent >= 0
-        gap = max(0.0, spent - earned)
+        # Needs income in that month: no data is not "in control".
+        reached = earned > 0 and earned - spent >= 0
+        gap = max(0.0, spent - earned) if earned > 0 else None
     current = month_key(today)
     dim = days_in_month(current)
     cur = s[s["month"] == current]

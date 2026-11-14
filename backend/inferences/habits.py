@@ -9,7 +9,7 @@ import pandas as pd
 
 from . import models
 from . import thresholds as th
-from .common import full_months, prepare, r2, safe_div, spend
+from .common import essential_mask, full_months, prepare, r2, safe_div, spend
 
 
 def _window(df: pd.DataFrame, today):
@@ -37,7 +37,7 @@ def night(s: pd.DataFrame) -> dict:
 def _leaky(s: pd.DataFrame) -> pd.DataFrame:
     """Leaky purchases (#9): non-essential and under EUR 25."""
     return s[
-        ~s["category"].isin(th.ESSENTIAL_CATEGORIES)
+        ~essential_mask(s)
         & ~s["mcc_code"].isin(th.INVESTMENT_MCCS)
         & (s["amount"] < th.LEAKY_MAX_EUR)
     ]
@@ -63,7 +63,7 @@ def payday_splurge(s: pd.DataFrame, payday_dates, start, end) -> dict:
     paydays = sorted(pd.to_datetime(list(payday_dates or [])))
     if not paydays:
         return {"ratio": None, "flag": False}
-    ne = s[~s["category"].isin(th.ESSENTIAL_CATEGORIES)]
+    ne = s[~essential_mask(s)]
     daily = ne.groupby("tx_date")["amount"].sum()
     days = pd.date_range(max(pd.Timestamp(start), paydays[0]), pd.Timestamp(end))
     near, rest = [], []
@@ -109,31 +109,68 @@ TRAIT_LABELS = {
 }
 
 
+def _excess(value, expected, flag) -> float:
+    """0 at the expected value, 1 at the flag threshold, capped to [0, 1]."""
+    if value is None or flag <= expected:
+        return 0.0
+    return min(1.0, max(0.0, (value - expected) / (flag - expected)))
+
+
 def spender_type(wk, nt, imp, pay, saver_share: float) -> dict:
-    """#16: each trait scored value / flag threshold, capped at 1. Label = the
-    highest trait; Steady Planner when all < 0.5 and Saver share > 10%."""
+    """#16: each trait scored 0 to 1, label = the highest trait; Steady
+    Planner when all < 0.5 and Saver share > 10%.
+
+    Calibration (docs/calibration.md): the doc scores value / flag threshold,
+    but an average customer then scores 0.67 on weekend (29% / 43%) and ~0.7
+    on payday (ratio 1.0 / 1.4), so nobody was ever a Steady Planner and 97%
+    were Weekend Treater or Payday Splurger. Scores now measure the excess
+    over the expected value (weekend 2/7, payday ratio 1.0, night and impulse
+    0): 0 = typical, 1 = at the flag threshold.
+    """
     scores = {
-        "weekend": min(1.0, safe_div(wk["share"] or 0, th.WEEKEND_FLAG_SHARE)),
-        "night": min(1.0, safe_div(nt["share"] or 0, th.NIGHT_FLAG_SHARE)),
-        "impulse": min(
-            1.0, safe_div(imp["bursts_per_month"] or 0, th.IMPULSE_FLAG_BURSTS)
+        "weekend": _excess(
+            wk["share"], th.WEEKEND_EXPECTED_SHARE, th.WEEKEND_FLAG_SHARE
         ),
-        "payday": min(1.0, safe_div(pay["ratio"] or 0, th.PAYDAY_SPLURGE_FLAG)),
+        "night": _excess(nt["share"], 0.0, th.NIGHT_FLAG_SHARE),
+        "impulse": _excess(imp["bursts_per_month"], 0.0, th.IMPULSE_FLAG_BURSTS),
+        "payday": _excess(pay["ratio"], 1.0, th.PAYDAY_SPLURGE_FLAG),
     }
     if (
         all(v < th.STEADY_PLANNER_MAX_SCORE for v in scores.values())
         and saver_share > th.STEADY_PLANNER_SAVER_SHARE
     ):
         label = "Steady Planner"
+    elif max(scores.values()) < th.STEADY_PLANNER_MAX_SCORE:
+        # No trait stands out and too little saving for Steady Planner.
+        label = "Balanced"
     else:
         label = TRAIT_LABELS[max(scores, key=scores.get)]
     return {"label": label, "scores": {k: r2(v) for k, v in scores.items()}}
+
+
+def _unavailable_habits() -> dict:
+    """No spending in the window: nothing to say about habits (#11 to #16)."""
+    return {
+        "weekend": {"share": None, "flag": False},
+        "night": {"share": None, "flag": False},
+        "impulse": {"bursts_per_month": None, "flag": False},
+        "payday_splurge": {"ratio": None, "flag": False},
+        "loyalty": {
+            "hhi": None,
+            "label": None,
+            "top3_share": None,
+            "unique_merchants_per_month": None,
+        },
+        "spender_type": {"label": None, "scores": {}},
+    }
 
 
 def compute_habits(df: pd.DataFrame, today, income: dict, baskets: dict) -> dict:
     """profile["habits"] (#11 to #16)."""
     df = prepare(df, today)
     s, months = _window(df, today)
+    if not len(s):
+        return _unavailable_habits()
     window_months = full_months(today, th.WINDOW_FULL_MONTHS, df)
     wk, nt = weekend(s), night(s)
     imp = impulse(df, today)

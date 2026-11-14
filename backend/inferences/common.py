@@ -121,6 +121,7 @@ def prepare(df: pd.DataFrame, today=None) -> pd.DataFrame:
             out[col] = ""
         out[col] = out[col].fillna("").astype(str)
     out["category"] = out["category"].str.lower()
+    out["merchant_id"] = fill_pseudo_merchants(out)
     if "bank_account_id" not in out.columns:
         out["bank_account_id"] = "A1"
     if today is not None:
@@ -130,8 +131,25 @@ def prepare(df: pd.DataFrame, today=None) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 
+def fill_pseudo_merchants(df: pd.DataFrame) -> pd.Series:
+    """merchant_id with "type:<transaction_type>" where it is empty.
+
+    Salary, housing and utilities rows carry no merchant_id in the S-Bank data
+    (docs/vocabulary.md); without a key they would all group under "" and
+    payday (#1) and bill detection (#4) would mix them up.
+    """
+    merchant = df["merchant_id"].fillna("").astype(str)
+    ttype = df["transaction_type"].fillna("").astype(str).str.lower()
+    empty = (merchant == "") & ttype.isin(list(th.PSEUDO_MERCHANT_NAMES))
+    return merchant.where(~empty, th.PSEUDO_MERCHANT_PREFIX + ttype)
+
+
 def merchant_name(df: pd.DataFrame, merchant_id: str) -> str:
     """Display name: optional merchant_name column, else the merchant id."""
+    merchant_id = str(merchant_id)
+    if merchant_id.startswith(th.PSEUDO_MERCHANT_PREFIX):
+        ttype = merchant_id[len(th.PSEUDO_MERCHANT_PREFIX) :]
+        return th.PSEUDO_MERCHANT_NAMES.get(ttype, ttype.replace("_", " ").title())
     if "merchant_name" in df.columns:
         names = df.loc[df["merchant_id"] == merchant_id, "merchant_name"].dropna()
         if len(names):
@@ -228,6 +246,13 @@ def buffer_amount(monthly_essentials) -> float:
 
 def is_essential_category(cat: str) -> bool:
     return str(cat).lower() in th.ESSENTIAL_CATEGORIES
+
+
+def essential_mask(df: pd.DataFrame) -> pd.Series:
+    """#7 essential by category, or by MCC (public transport, fuel, parking)."""
+    return df["category"].isin(th.ESSENTIAL_CATEGORIES) | df["mcc_code"].isin(
+        th.ESSENTIAL_MCCS
+    )
 
 
 def date_range(start: date, end: date):

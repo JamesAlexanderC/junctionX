@@ -1,5 +1,18 @@
 # Handoff: calibrate core inferences on the real S-Bank data
 
+> **Implemented on jamie-implementation.** Real vocabulary filled in
+> `thresholds.py` (see `docs/vocabulary.md`); calibrated on 200 real
+> customers (`docs/calibration.md`): pseudo merchants for salary / housing /
+> utilities (payday found 83.5% -> 98%, rent detected as a bill), Transportation
+> split by MCC, salary sweeps kept out of the baskets, forecast uses the
+> **mean** daily spend (median was EUR 0 for most customers), #6 only flags
+> on a price rise until chat opens are tracked, spender scores measure excess
+> over the expected value, and every profile item now carries an
+> `availability` flag (`inferences/availability.py`) so the app shows only
+> insights the data supports. Still needs a human: mentor answers to the
+> questions at the end of `docs/vocabulary.md`, and re-tuning on the final
+> demo customers once they are picked.
+
 ## What is missing
 The core inferences (#1-#33, `backend/inferences/`) are built and tested on
 the hand-made "Test Aino" customer only. The real CSVs are not in the repo

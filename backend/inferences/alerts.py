@@ -75,7 +75,7 @@ import pandas as pd
 
 from inferences import alert_thresholds as thresholds
 from inferences import models
-from inferences.common import buffer_amount
+from inferences.common import buffer_amount, fill_pseudo_merchants, merchant_name
 
 T = thresholds
 
@@ -139,12 +139,18 @@ def _prep(df):
     out["mcc_code"] = out["mcc_code"].astype(str)
     out["category"] = out["category"].astype(str).str.lower()
     out["transaction_type"] = out["transaction_type"].astype(str).str.lower()
+    out["merchant_id"] = fill_pseudo_merchants(out)
     out["tx_id"] = out["tx_id"].astype(str)
     return out.sort_values("tx_timestamp").reset_index(drop=True)
 
 
 def _own(df):
     return df["transaction_type"].isin(T.OWN_TRANSFER_TYPES)
+
+
+def _savings(df):
+    """Moves into or out of savings / investments (#94, #95), not sweeps."""
+    return df["transaction_type"].isin(T.SAVER_TYPES | T.SAVER_WITHDRAW_TYPES)
 
 
 def _outflows(df):
@@ -202,6 +208,11 @@ def _income(profile):
 
 def _cv(values):
     return models.cv(values)
+
+
+def _label(merchant):
+    """Display name; pseudo merchants ("type:housing_payment") -> "Housing"."""
+    return merchant_name(pd.DataFrame(), merchant)
 
 
 def _ids(frame, limit=5):
@@ -589,18 +600,25 @@ def rule_38_unusual_charge(df, profile, today, **ctx):
     found = []
     for _, row in out[out["tx_date"] >= cutoff].iterrows():
         amount = abs(row["tx_amount_eur"])
-        past = out[(out["merchant_id"] == row["merchant_id"])]
+        # Purchases without a merchant_id have no merchant history.
+        known = row["merchant_id"] not in ("", "None", "nan", "<NA>")
+        past = out[known & (out["merchant_id"] == row["merchant_id"])]
         past = past[past["tx_timestamp"] < row["tx_timestamp"]]["tx_amount_eur"].abs()
         z = None
         flagged = False
         if len(past) >= T.UNUSUAL_MIN_HISTORY:
             median = past.median()
             mad = (past - median).abs().median()
+            # Calibrated: also > 3 x median and > EUR 50 above it.
+            big = (
+                amount > T.UNUSUAL_MIN_MULT * median
+                and amount - median > T.UNUSUAL_MIN_EXCESS_EUR
+            )
             if mad > 0:
                 z = T.ROBUST_Z_CONST * (amount - median) / mad
-                flagged = z > T.ROBUST_Z_FLAG
+                flagged = z > T.ROBUST_Z_FLAG and big
             else:
-                flagged = amount > T.UNUSUAL_CATEGORY_MULT * median
+                flagged = big
         else:
             cat = out[
                 (out["category"] == row["category"]) & (out["tx_id"] != row["tx_id"])
@@ -613,7 +631,7 @@ def rule_38_unusual_charge(df, profile, today, **ctx):
                 38,
                 "amber",
                 "Unusual charge",
-                f"{_eur(amount)} at {row['merchant_id']} is much more than you "
+                f"{_eur(amount)} at {_label(row['merchant_id'])} is much more than you "
                 "usually pay there. Looks fine?",
                 today,
                 today,
@@ -646,7 +664,7 @@ def rule_39_duplicate_charge(df, profile, today, **ctx):
                         39,
                         "amber",
                         "Charged twice?",
-                        f"{merchant} charged {_eur(abs(amount))} twice within "
+                        f"{_label(merchant)} charged {_eur(abs(amount))} twice within "
                         f"{T.DUPLICATE_MINUTES} minutes.",
                         today,
                         today,
@@ -668,6 +686,10 @@ def rule_40_category_spike(df, profile, today, **ctx):
     for category, rows in out.groupby("category"):
         monthly = _monthly(rows)
         current = monthly.get(this, 0.0)
+        if T.SPIKE_REQUIRE_FULL_HISTORY and not all(
+            monthly.get(m, 0.0) > 0 for m in prev
+        ):
+            continue  # calibrated: needs spend in each of the previous 3 months
         mean_prev = sum(monthly.get(m, 0.0) for m in prev) / 3
         if mean_prev <= 0:
             continue
@@ -715,8 +737,8 @@ def rule_62_life_change(df, profile, today, **ctx):
                 62,
                 "amber",
                 "New big regular payment",
-                f"A new monthly payment of about {_eur(median)} to {merchant} started "
-                "recently. Want to re-plan your goals?",
+                f"A new monthly payment of about {_eur(median)} to "
+                f"{_label(merchant)} started recently. Want to re-plan your goals?",
                 today,
                 today + timedelta(days=7),
                 {"merchant_id": merchant, "amount": round(float(median), 2)},
@@ -1107,7 +1129,7 @@ def rule_91_free_trial(df, profile, today, **ctx):
                 91,
                 "blue",
                 "Free trial now paid",
-                f"{trial['merchant_id']} started charging "
+                f"{_label(trial['merchant_id'])} started charging "
                 f"{_eur(abs(first['tx_amount_eur']))} after a free trial. Keep it?",
                 today,
                 today + timedelta(days=30),
@@ -1142,8 +1164,8 @@ def rule_93_annual_bill(df, profile, today, **ctx):
                 93,
                 "amber",
                 "Yearly bill coming",
-                f"{merchant} charges about {_eur(amount)} once a year; next around "
-                f"{next_date:%d %b}.",
+                f"{_label(merchant)} charges about {_eur(amount)} once a year; "
+                f"next around {next_date:%d %b}.",
                 today,
                 next_date,
                 {"merchant_id": merchant, "amount": amount},
@@ -1155,7 +1177,7 @@ def rule_93_annual_bill(df, profile, today, **ctx):
 
 
 def rule_94_savings_withdrawn(df, profile, today, **ctx):
-    own = _this_month(df[_own(df)], today)
+    own = _this_month(df[_savings(df)], today)
     if own.empty:
         return None
     net_saved = float(-own["tx_amount_eur"].sum())
@@ -1177,7 +1199,7 @@ def rule_95_saving_streak(df, profile, today, **ctx):
     payday = _last_expected_payday(profile, today)
     if payday is None:
         return None
-    saves = df[_own(df) & (df["tx_amount_eur"] < 0)]
+    saves = df[_savings(df) & (df["tx_amount_eur"] < 0)]
     window = pd.Timestamp(today - timedelta(days=92))
     if len(saves[saves["tx_date"] >= window]) < T.SAVING_STREAK_MIN_TRANSFERS:
         return None
@@ -1311,6 +1333,10 @@ def rule_101_bill_went_up(df, profile, today, **ctx):
         if len(rows) < 4 or rows["tx_date"].iloc[-1] < recent:
             continue
         amounts = rows["tx_amount_eur"].abs().tolist()
+        # A bill is stable: restaurants visited about monthly are not bills
+        # (calibration: 25% of customers flagged before this check).
+        if _cv(amounts[-4:-1]) >= T.RECUR_CV_MAX:
+            continue
         base = float(np.median(amounts[-4:-1]))
         threshold = T.BILL_UP_RATIO * base
         if amounts[-1] <= threshold:
@@ -1320,7 +1346,7 @@ def rule_101_bill_went_up(df, profile, today, **ctx):
                 101,
                 "amber",
                 "Bill went up",
-                f"{merchant} went from {_eur(base)} to {_eur(amounts[-1])}.",
+                f"{_label(merchant)} went from {_eur(base)} to {_eur(amounts[-1])}.",
                 today,
                 today + timedelta(days=7),
                 {

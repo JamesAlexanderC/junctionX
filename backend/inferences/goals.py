@@ -435,15 +435,16 @@ def _detect_home(income, customer, mortgage):
         return None
     if score <= th.HOME_READINESS_MIN:
         return None
-    area = str((customer or {}).get("postal_code") or "")[:2]
-    price = th.TYPICAL_HOME_PRICE.get(area, th.TYPICAL_HOME_PRICE_DEFAULT)
+    # No home-price data exists, so no target is guessed: the deposit
+    # (HOME_DEPOSIT_SHARE x price) is computed once the user enters a price.
     return {
         "id": "det-59",
         "inference": 59,
         "type": "home",
         "text": "Thinking about your own home? Start a deposit goal.",
-        "target": r2(th.HOME_DEPOSIT_SHARE * price),
-        "typical_price": r2(price),
+        "target": None,
+        "deposit_share": th.HOME_DEPOSIT_SHARE,
+        "needs": "target_price",
         "editable": True,
     }
 

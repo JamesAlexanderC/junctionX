@@ -176,9 +176,11 @@ def possibly_unused(
     """#6 Possibly unused subscription ("check this", never fact).
 
     No other activity at the merchant or in its MCC within 90 days, and either
-    the amount rose or the user never opened it in chat. Chat opens are not
-    tracked yet, so by default every subscription counts as never opened.
+    the amount rose or the user never opened it in chat. When chat opens are
+    not tracked (opened_in_chat is None) only the "amount rose" evidence is
+    used: assuming "never opened" flagged every subscription (calibration).
     """
+    tracked = opened_in_chat is not None
     opened = set(opened_in_chat or [])
     start = pd.Timestamp(today) - pd.Timedelta(days=th.UNUSED_SUBSCRIPTION_DAYS)
     recent = df[(df["tx_date"] >= start) & (df["tx_amount_eur"] < 0)]
@@ -191,13 +193,18 @@ def possibly_unused(
             continue
         history = df[df["merchant_id"] == s["merchant_id"]]["tx_amount_eur"].abs()
         rose = len(history) >= 2 and history.iloc[-1] > history.iloc[:-1].median()
-        if rose or s["merchant_id"] not in opened:
+        never_opened = tracked and s["merchant_id"] not in opened
+        if rose or never_opened:
             out.append(
                 {
                     "merchant_id": s["merchant_id"],
                     "name": s["name"],
                     "amount": s["amount"],
-                    "reason": "no other activity in 90 days",
+                    "reason": (
+                        "price went up, no other activity in 90 days"
+                        if rose
+                        else "no other activity in 90 days, never asked about"
+                    ),
                 }
             )
     return out

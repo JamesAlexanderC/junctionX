@@ -14,6 +14,7 @@ from . import models
 from . import thresholds as th
 from .common import (
     add_months,
+    essential_mask,
     full_months,
     internal_mask,
     month_key,
@@ -43,6 +44,9 @@ def classify(df: pd.DataFrame, today, bills: list[dict] | None = None):
     """
     df = prepare(df, today)
     outs = outflows(df)
+    # Salary sweeps move money to another own account: neither spend nor
+    # saving, so they sit outside the baskets (docs/vocabulary.md).
+    outs = outs[~outs["transaction_type"].str.lower().isin(th.SWEEP_TYPES)]
     if not len(outs):
         outs["basket"] = pd.Series(dtype=str)
         return outs
@@ -52,7 +56,7 @@ def classify(df: pd.DataFrame, today, bills: list[dict] | None = None):
 
         bills = regular_bills(df, today)
     bill_merchants = {b["merchant_id"] for b in bills}
-    essential_cat = outs["category"].isin(th.ESSENTIAL_CATEGORIES)
+    essential_cat = essential_mask(outs)
     history: dict[str, list[float]] = {}
     labels = []
     for idx, row in outs.iterrows():

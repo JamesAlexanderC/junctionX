@@ -1,5 +1,18 @@
 # Handoff: alert category, MCC and transaction-type values
 
+> **Implemented on jamie-implementation.** The real data was profiled
+> (`docs/vocabulary.md`) and every set now lives once, in
+> `backend/inferences/thresholds.py` (`alert_thresholds.py` imports them):
+> `SAVER_TYPES` = investment_deposit, `SAVER_WITHDRAW_TYPES` =
+> investment_withdrawal, `SWEEP_TYPES` = salary_sweep, `OWN_TRANSFER_TYPES` =
+> their union. #94 and #95 now read savings types only (not sweeps). The data
+> has **no** loan, credit-card, fee, ATM or gambling transactions, so #76-#84
+> (without user loan details), #86, #96 and #98 stay silent by design; those
+> sets keep standard values marked "unconfirmed: ask S-Bank mentor".
+> Calibration of the noisy rules (#38, #40, #101) is in `docs/calibration.md`.
+> Still needs a human: mentor confirmation of the "unconfirmed" items, in
+> particular whether salary_sweep goes to the customer's own account.
+
 ## What is missing
 The alert rules in `backend/inferences/alerts.py` classify transactions using
 guessed sets in `backend/inferences/alert_thresholds.py`:

@@ -7,7 +7,8 @@ comes from here; Gemini only explains it.
 Order: income -> baskets -> habits, forecast, whatif -> mortgage -> active
 goals (#52 on track) -> levels (#31 needs goals, #32 needs readiness) ->
 goals section (#44 to #48 need the level) -> benchmarks, multibank -> alerts
-(they read the finished profile).
+(they read the finished profile) -> availability (which items the
+customer's data supports; see availability.py).
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from datetime import date
 import pandas as pd
 
 from . import alerts as alerts_mod
+from .availability import availability
 from . import goals as goals_mod
 from .baskets import compute_baskets
 from .benchmarks import age_band, area, compute_benchmarks
@@ -130,7 +132,7 @@ def build_profile(
         "generated_at": date.today().isoformat(),
         "today": iso(today),
         "customer": cust,
-        "balance": r2(latest_balance(prepared)) if len(prepared) else 0.0,
+        "balance": r2(latest_balance(prepared)) if len(prepared) else None,
         "income": income,
         "baskets": baskets,
         "habits": habits,
@@ -153,6 +155,8 @@ def build_profile(
         if len(prepared)
         else []
     )
+    # Which items the data supports, so the API shows only given insights.
+    profile["availability"] = availability(profile)
     return _jsonable(profile)
 
 
@@ -188,6 +192,7 @@ def recompute_goals_and_levels(
         loans=loans,
         snoozed=snoozed,
     )
+    out["availability"] = availability(out)
     return _jsonable(out)
 
 

@@ -142,7 +142,7 @@ def aino_rows():
                 name="Own savings",
                 category="transfer",
                 mcc="",
-                ttype="own_transfer",
+                ttype="investment_deposit",  # real S-Bank savings type
             )
         )
     rows.append(

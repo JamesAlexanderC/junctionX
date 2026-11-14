@@ -1,8 +1,8 @@
 """Thresholds and category/MCC sets for the alert rules (context.md #6 to #102).
 
 All values are starting points: tune them on the demo customers. Category and
-MCC sets are guesses until the S-Bank data scientist confirms the real values
-(see handoff/alert-category-values.md).
+MCC sets come from inferences/thresholds.py, profiled on the real data
+(docs/vocabulary.md).
 """
 
 # Priority weights: priority = weight / max(1, days until impact).
@@ -11,24 +11,31 @@ SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
 from inferences.thresholds import (  # noqa: F401  shared with the inferences
     BUFFER_ESSENTIALS_SHARE,
     BUFFER_MIN_EUR,
+    ATM_MCC,
+    FEE_CATEGORIES,
+    FEE_MCCS,
+    GAMBLING_MCC,
     LOAN_CATEGORIES,
     LOAN_MCCS,
     OWN_TRANSFER_TYPES,
+    SAVER_TYPES,
+    SAVER_WITHDRAW_TYPES,
     ROBUST_Z_CONST,
     ROBUST_Z_FLAG,
     STRESS_MONTHS,
+    SPIKE_MIN_DIFF_EUR,
+    SPIKE_MULT,
+    SPIKE_REQUIRE_FULL_HISTORY,
     UNUSUAL_CATEGORY_MULT,
+    UNUSUAL_MIN_EXCESS_EUR,
     UNUSUAL_MIN_HISTORY,
+    UNUSUAL_MIN_MULT,
 )
 
 # Buffer: max(EUR 50, 10% of monthly essentials) (#17, #99, #102) and the
 # own-transfer / loan sets live in inferences/thresholds.py.
 
-# Transaction classification (TODO: confirm with real category values).
-FEE_CATEGORIES = {"fee", "fees", "bank_fee", "late_fee", "collection"}
-FEE_MCCS = {"7322"}  # collection agencies
-ATM_MCC = "6011"
-GAMBLING_MCC = "7995"
+# Fee, ATM and gambling sets also live in thresholds.py (docs/vocabulary.md).
 GAMBLING_SUPPORT_URL = "https://www.peluuri.fi/en"
 
 # #38 unusual charge
@@ -38,8 +45,7 @@ RECENT_DAYS = 30
 DUPLICATE_MINUTES = 10
 
 # #40 category spike
-SPIKE_RATIO = 1.5
-SPIKE_MIN_DIFF_EUR = 20.0
+SPIKE_RATIO = SPIKE_MULT  # thresholds.py is the single source
 
 # #62 life change / #83 new credit: "new" = first seen in the last 2 months.
 NEW_RECURRING_DAYS = 62
