@@ -129,76 +129,41 @@ def income(p):
 
 
 def _basket_month(p):
-    """The latest month with spending: this month, else the last full month.
-
-    Returns (entry, is_current) where entry has month, totals and categories.
-    """
+    """The latest month with spending: this month, else the last full month."""
     b = p.get("baskets") or {}
     if any((b.get("totals") or {}).values()):
-        return b, True
+        return b.get("month"), b["totals"]
     for entry in reversed(b.get("history") or []):
         if any((entry.get("totals") or {}).values()):
-            return entry, False
-    return None, False
+            return entry.get("month"), entry["totals"]
+    return None, {}
 
 
-def _basket_shares(totals):
-    """#10 shares (% of total outflow, 1 dp) of the baskets with spending."""
+def baskets(p):
+    month, totals = _basket_month(p)
     total = sum(v for v in totals.values() if _num(v))
-    if total <= 0:
-        return total, {}
-    return total, {
+    if not month or total <= 0:
+        return []
+    shares = {
         k: round(v / total * 100, 1) for k, v in totals.items() if _num(v) and v > 0
     }
-
-
-def basket_summary(p):
-    """Spending buckets for the Overview panel (GET /api/baskets/, #7-#10, #75).
-
-    Like goal_summary, baskets get their own panel rather than an insight row.
-    Totals, trends and per-category amounts come from ``profile["baskets"]``
-    (inferences/baskets.py); only the shares of a fallback history month are
-    worked out here, with the same rule as basket_split.
-    """
-    b = p.get("baskets") or {}
-    empty = {
-        "month": None,
-        "total": 0,
-        "buckets": [],
-        "monthly_essentials": None,
-        "monthly_saving": None,
-    }
-    entry, current = _basket_month(p)
-    if entry is None or not _available(p, "baskets"):
-        return empty
-    totals = entry.get("totals") or {}
-    total, shares = _basket_shares(totals)
-    if not shares:
-        return empty
-    trend = (b.get("trend") or {}) if current else {}
-    categories = entry.get("categories") or {}
-    buckets = [
-        {
-            "key": k,
-            "name": BASKET_NAMES.get(k, k),
-            "total": round(totals[k], 2),
-            "share": share,
-            "trend": trend.get(k),
-            "categories": [
-                {"category": c["category"], "total": c["total"]}
-                for c in categories.get(k) or []
-            ],
-        }
-        for k, share in shares.items()
+    parts = [
+        f"{BASKET_NAMES.get(k, k)} {s:.0f}%"
+        for k, s in sorted(shares.items(), key=lambda kv: -kv[1])
     ]
-    buckets.sort(key=lambda r: -r["total"])
-    return {
-        "month": entry.get("month"),
-        "total": round(total, 2),
-        "buckets": buckets,
-        "monthly_essentials": b.get("monthly_essentials"),
-        "monthly_saving": b.get("monthly_saving"),
-    }
+    text = f"In {month} you spent {_eur(total)}: " + ", ".join(parts) + "."
+    value = {k: round(v, 2) for k, v in totals.items() if _num(v) and v > 0}
+    return [
+        _item(
+            "baskets",
+            10,
+            f"Where the money went ({month})",
+            value,
+            "EUR",
+            text,
+            "baskets",
+        )
+    ]
 
 
 def saver(p):
@@ -463,6 +428,28 @@ def goal_summary(p):
     }
 
 
+def spending_summary(p):
+    """Spending per data category for the Overview panel (GET /api/spending/).
+
+    Fields are picked from ``profile["spending"]`` as inferences/spending.py
+    computed them; nothing is calculated here.
+    """
+    sp = (p or {}).get("spending") or {}
+    cats = [
+        {k: c.get(k) for k in ("category", "total", "share", "count")}
+        for c in sp.get("categories") or []
+        if _num(c.get("total")) and c["total"] > 0
+    ]
+    if not cats:
+        return {"month": None, "is_current": None, "total": 0, "categories": []}
+    return {
+        "month": sp.get("month"),
+        "is_current": bool(sp.get("is_current")),
+        "total": sp.get("total"),
+        "categories": cats,
+    }
+
+
 def alerts(p):
     out = []
     rows = sorted(
@@ -554,6 +541,7 @@ BUILDERS = [
     payday,
     income,
     saver,
+    baskets,
     leaky,
     upcoming_bills,
     end_of_month,

@@ -108,9 +108,9 @@ def _panel(request, summary):
 
 
 @api_view(["GET"])
-def baskets(request):
-    """GET ?customer_id= lists spending buckets for the Overview (#7-#10, #75)."""
-    return _panel(request, insights_mod.basket_summary)
+def spending(request):
+    """GET ?customer_id= lists spending per data category for the Overview."""
+    return _panel(request, insights_mod.spending_summary)
 
 
 @api_view(["GET", "POST"])

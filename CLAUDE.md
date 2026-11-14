@@ -24,8 +24,8 @@ them in code comments). Everything below is binding for every teammate.
 - No demo data anywhere at runtime. Fixtures live only under `*/tests/`
   (`backend/coach/tests/fixtures/profile_demo.json` is a test sample).
 - Profile shape = whatever `build_profile` returns: top-level keys
-  `customer_id, today, customer, balance, income, baskets, habits, forecast,
-  whatif, mortgage, levels, goals, benchmarks, multibank, alerts,
+  `customer_id, today, customer, balance, income, baskets, spending, habits,
+  forecast, whatif, mortgage, levels, goals, benchmarks, multibank, alerts,
   availability` (`availability[item] = {available, reason, inferences}`).
   Profiles are built on demand from the DB as of `AS_OF_DATE` (default: date
   of the last transaction) and cached in the Profile table.
@@ -60,13 +60,13 @@ Own-account transfers: `transaction_type` in `OWN_TRANSFER_TYPES`
   fields as `profile["goals"]` computed them; 400 without `customer_id`, 404 if
   unknown). Active goals are shown here, not in `/api/insights/`.
 - `POST /api/goals/`, `PATCH /api/goals/<id>/`, `POST /api/goals/<id>/rate/`.
-- `GET /api/baskets/?customer_id=` -> `{customer_id, as_of, month, total,
-  buckets: [{key, name, total, share, trend, categories: [{category, total}]}],
-  monthly_essentials, monthly_saving}` (`insights.basket_summary`: this month,
-  else the last full month with spending; `trend` only for this month; 400
-  without `customer_id`, 404 if unknown). Totals and per-category amounts come
-  from `profile["baskets"]` (`categories`, also on each `history` entry).
-  Baskets are shown here, not in `/api/insights/`.
+- `GET /api/spending/?customer_id=` -> `{customer_id, as_of, month, is_current,
+  total, categories: [{category, total, share, count}]}`
+  (`insights.spending_summary` of `profile["spending"]`, built by
+  `inferences/spending.py`): spending per data `category`, names spelt as in
+  the data, this month else last month (`is_current`). Spending = outflows
+  minus own-account and Saver transfers (`common.spend`). 400 without
+  `customer_id`, 404 if unknown.
 - `POST /api/loans/` `{customer_id, balance, interest_rate, years_left}`.
 - `GET /api/customers/?q=&limit=50` -> `[{customer_id, customer_age,
   customer_postal_code}]` (real customers only).

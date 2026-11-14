@@ -116,11 +116,6 @@ _ENTRIES = [
         chart=Chart("bar", title="Share of spending by basket", unit="%"),
     ),
     Entry(
-        "baskets.categories",
-        "This month's spending per category inside each basket, in EUR.",
-        gate="baskets",
-    ),
-    Entry(
         "baskets.trend",
         "Change of each basket against earlier months, in percent.",
         gate="baskets.trend",
@@ -145,6 +140,12 @@ _ENTRIES = [
         "baskets.leaky_categories",
         "Categories with small everyday leaky spending.",
         gate="baskets",
+    ),
+    # --- spending per data category ---
+    Entry(
+        "spending.categories",
+        "Spending per transaction category for spending.month, in EUR, with "
+        "each category's share of the month's spending.",
     ),
     # --- habits (#11 to #16) ---
     Entry("habits.weekend", "Weekend share of spending.", gate="habits.weekend"),

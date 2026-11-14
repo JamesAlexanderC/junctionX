@@ -23,6 +23,7 @@ from . import alerts as alerts_mod
 from .availability import availability
 from . import goals as goals_mod
 from .baskets import compute_baskets
+from .spending import compute_spending
 from .benchmarks import age_band, area, compute_benchmarks
 from .common import COLUMNS, iso, latest_balance, prepare, r2, to_date
 from .forecast import compute_forecast
@@ -135,6 +136,7 @@ def build_profile(
         "balance": r2(latest_balance(prepared)) if len(prepared) else None,
         "income": income,
         "baskets": baskets,
+        "spending": compute_spending(df, today),
         "habits": habits,
         "forecast": forecast,
         "whatif": whatif,

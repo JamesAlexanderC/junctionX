@@ -3,8 +3,8 @@
 // bottom tabs on phones (Overview / Coach), two columns on wide screens.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getBaskets, getGoals, getInsights, sendChat } from '../api.js'
-import Baskets from './Baskets.jsx'
+import { getSpending, getGoals, getInsights, sendChat } from '../api.js'
+import Spending from './Spending.jsx'
 import Chat from './Chat.jsx'
 import Goals from './Goals.jsx'
 import Help from './Help.jsx'
@@ -36,33 +36,33 @@ export default function CustomerView({
   const [insightsError, setInsightsError] = useState(null)
   const [goals, setGoals] = useState(null)
   const [goalsError, setGoalsError] = useState(null)
-  const [baskets, setBaskets] = useState(null)
-  const [basketsError, setBasketsError] = useState(null)
+  const [spending, setSpending] = useState(null)
+  const [spendingError, setSpendingError] = useState(null)
   const [overviewLoading, setOverviewLoading] = useState(true)
   const [messages, setMessages] = useState([])
   const [busy, setBusy] = useState(false)
   const [tab, setTab] = useState('overview')
   const overviewCtrl = useRef(null)
 
-  // Insights, goals and baskets load side by side, so one failing never hides the
+  // Insights, goals and spending load side by side, so one failing never hides the
   // other. Called on open and after every chat reply: the coach may have
   // added or changed a goal, and the backend has already rebuilt the profile.
   const loadOverview = useCallback(async () => {
     overviewCtrl.current?.abort()
     const ctrl = new AbortController()
     overviewCtrl.current = ctrl
-    const [ins, gls, bsk] = await Promise.allSettled([
+    const [ins, gls, spd] = await Promise.allSettled([
       getInsights(customerId, { signal: ctrl.signal }),
       getGoals(customerId, { signal: ctrl.signal }),
-      getBaskets(customerId, { signal: ctrl.signal }),
+      getSpending(customerId, { signal: ctrl.signal }),
     ])
     if (ctrl.signal.aborted) return
     setInsights(ins.status === 'fulfilled' ? ins.value : [])
     setInsightsError(ins.status === 'rejected' ? ins.reason.message : null)
     setGoals(gls.status === 'fulfilled' ? gls.value : null)
     setGoalsError(gls.status === 'rejected' ? gls.reason.message : null)
-    setBaskets(bsk.status === 'fulfilled' ? bsk.value : null)
-    setBasketsError(bsk.status === 'rejected' ? bsk.reason.message : null)
+    setSpending(spd.status === 'fulfilled' ? spd.value : null)
+    setSpendingError(spd.status === 'rejected' ? spd.reason.message : null)
     setOverviewLoading(false)
   }, [customerId])
 
@@ -143,7 +143,7 @@ export default function CustomerView({
 
         <main className="layout">
           <section className="pane overview" aria-label="Overview">
-            {[goalsError, basketsError, insightsError]
+            {[goalsError, spendingError, insightsError]
               .filter((e, i, all) => e && all.indexOf(e) === i)
               .map((e) => (
                 <p key={e} className="error banner" role="alert">
@@ -155,7 +155,7 @@ export default function CustomerView({
             ) : (
               <>
                 {goals && <Goals goals={goals} onAsk={ask} />}
-                {baskets && <Baskets baskets={baskets} onAsk={ask} />}
+                {spending && <Spending spending={spending} onAsk={ask} />}
                 <Insights items={insights} onAsk={ask} />
               </>
             )}
