@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { DEPTH_NAMES } from '../lib/format.js'
+import { SUGGESTIONS } from '../lib/suggestions.js'
 import { ReplyCard } from './Cards.jsx'
 
 const nextDepth = (d) => Math.min(4, (d ?? 1) + 1)
@@ -82,8 +83,19 @@ export default function Chat({ messages, busy, onSend, disabled }) {
             <p>
               {disabled
                 ? 'Pick a customer, then ask the coach anything about their money.'
-                : 'Ask about spending, saving, goals or alerts.'}
+                : 'Ask about spending, saving, goals or alerts. Try one of these:'}
             </p>
+            {!disabled && (
+              <ul className="suggestions" aria-label="Suggested questions">
+                {SUGGESTIONS.map(([feature, text, depth]) => (
+                  <li key={feature}>
+                    <button type="button" onClick={() => onSend(text, depth)}>
+                      {text}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
         {messages.map((m, i) =>

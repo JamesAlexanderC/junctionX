@@ -18,6 +18,17 @@ export function shortLabel(label) {
   return s.length > 9 ? `${s.slice(0, 8)}…` : s
 }
 
+// Rough rendered width of an 11px axis label (Open Sans averages ~0.57em).
+export const labelWidth = (text) => String(text).length * 6.3
+
+// Shorten a label with "…" until it fits maxWidth (the readout shows it whole).
+export function fitLabel(text, maxWidth) {
+  const s = String(text)
+  if (labelWidth(s) <= maxWidth) return s
+  const chars = Math.max(1, Math.floor(maxWidth / 6.3) - 1)
+  return `${s.slice(0, chars)}…`
+}
+
 export function longLabel(label) {
   const s = String(label)
   const m = s.match(/^(\d{4})-(\d{2})$/)

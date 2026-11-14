@@ -76,7 +76,10 @@ CARD_SCHEMA = {
         "saver": NUM,
         "category": STR,
         "monthly_spend": NUM,
-        "pct": NUM,
+        "pct": {
+            "type": "number",
+            "description": "slider: start position in percent (20 = 20 %), 0-50",
+        },
         "min_pct": NUM,
         "max_pct": NUM,
         # Nested fields are listed so Gemini can fill them (F4); keep them in
