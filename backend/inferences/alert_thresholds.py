@@ -1,0 +1,126 @@
+"""Thresholds and category/MCC sets for the alert rules (context.md #6 to #102).
+
+All values are starting points: tune them on the demo customers. Category and
+MCC sets are guesses until the S-Bank data scientist confirms the real values
+(see handoff/alert-category-values.md).
+"""
+
+# Priority weights: priority = weight / max(1, days until impact).
+SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
+
+# Buffer: max(EUR 50, 10% of monthly essentials) (#17, #99, #102).
+BUFFER_MIN_EUR = 50.0
+BUFFER_ESSENTIALS_SHARE = 0.10
+
+# Transaction classification (TODO: confirm with real category values).
+OWN_TRANSFER_TYPES = {
+    "own_transfer",
+    "transfer_own",
+    "internal_transfer",
+    "savings_transfer",
+}
+LOAN_CATEGORIES = {
+    "loan",
+    "loans",
+    "loan_payment",
+    "mortgage",
+    "credit",
+    "credit_card",
+    "consumer_credit",
+    "bnpl",
+}
+LOAN_MCCS = {"6012", "6051", "6141"}
+FEE_CATEGORIES = {"fee", "fees", "bank_fee", "late_fee", "collection"}
+FEE_MCCS = {"7322"}  # collection agencies
+ATM_MCC = "6011"
+GAMBLING_MCC = "7995"
+GAMBLING_SUPPORT_URL = "https://www.peluuri.fi/en"
+
+# #38 unusual charge
+ROBUST_Z_CONST = 0.6745
+ROBUST_Z_FLAG = 3.5
+UNUSUAL_MIN_HISTORY = 3
+UNUSUAL_CATEGORY_MULT = 3.0
+RECENT_DAYS = 30
+
+# #39 duplicate charge
+DUPLICATE_MINUTES = 10
+
+# #40 category spike
+SPIKE_RATIO = 1.5
+SPIKE_MIN_DIFF_EUR = 20.0
+
+# #62 life change / #83 new credit: "new" = first seen in the last 2 months.
+NEW_RECURRING_DAYS = 62
+LIFE_CHANGE_INCOME_SHARE = 0.10
+
+# Recurrence (context.md model 1).
+RECUR_GAP_MIN = 25
+RECUR_GAP_MAX = 35
+RECUR_CV_MAX = 0.20
+
+# #76 loan burden (DSTI)
+DSTI_AMBER = 0.40
+DSTI_RED = 0.50
+
+# #77 / #82 FIN-FSA stress test
+STRESS_RATE = 0.06
+STRESS_MONTHS = 300
+STRESS_DSTI_MAX = 0.60
+AFFORD_FITS_MAX = 0.50
+
+# #79 payment changed, #80 missed payment
+PAYMENT_CHANGE_PCT = 0.05
+MISSED_PAYMENT_GRACE_DAYS = 5
+
+# #84 many lenders
+MANY_LENDERS_MIN = 3
+MANY_LENDERS_DAYS = 90
+
+# #87 income dropped
+INCOME_DROP_RATIO = 0.8
+INCOME_DROP_CHECK_DAYS = 5
+
+# #88 spending pace
+PACE_MIN_DAY = 7
+
+# #89 lifestyle creep: leaky share up this many months in a row.
+CREEP_MONTHS = 3
+
+# #90 subscription creep
+SUB_CREEP_RATIO = 1.20
+SUB_CREEP_MONTHS_BACK = 6
+
+# #91 free trial turned paid
+TRIAL_MAX_EUR = 1.0
+TRIAL_GAP_MIN = 25
+TRIAL_GAP_MAX = 35
+TRIAL_RECENT_DAYS = 45
+
+# #93 annual bill
+ANNUAL_GAP_MIN = 350
+ANNUAL_GAP_MAX = 380
+ANNUAL_LOOKAHEAD_DAYS = 30
+
+# #95 saving streak broken
+SAVING_STREAK_GRACE_DAYS = 5
+SAVING_STREAK_MIN_TRANSFERS = 2
+
+# #96 cash withdrawals up
+CASH_UP_RATIO = 1.5
+
+# #97 small leaks
+SMALL_LEAK_EUR = 3.0
+SMALL_LEAK_COUNT = 15
+
+# #100 payday missed
+PAYDAY_MISSED_DAYS = 3
+
+# #101 bill went up
+BILL_UP_RATIO = 1.10
+
+# #102 big bill coming
+BIG_BILL_DAYS = 3
+
+# #52 goal off track: re-check horizon used as its impact date.
+GOAL_REVIEW_DAYS = 30
