@@ -14,7 +14,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--customer", action="append", help="Only these ids")
         parser.add_argument(
-            "--today", help="YYYY-MM-DD (default: last transaction date)"
+            "--today", help="YYYY-MM-DD (default: reference date, max tx_date)"
         )
 
     def handle(self, *args, **opts):
@@ -38,9 +38,10 @@ class Command(BaseCommand):
             today = (
                 date.fromisoformat(opts["today"])
                 if opts["today"]
-                else df["tx_date"].max().date()
+                else services.today()  # P1.1 reference date = max(tx_date)
             )
             cust = Customer.objects.get(customer_id=cid)
+            goals = services.goal_dicts(cid)
             data = build_profile(
                 df,
                 {
@@ -49,8 +50,9 @@ class Command(BaseCommand):
                     "postal_code": cust.postal_code,
                 },
                 today,
-                goals=services.goal_dicts(cid),
+                goals=goals,
                 loans=services.latest_loan(cid),
             )
+            services.recompute_goals_locally(data, goals, today)
             services.save_profile(cid, data, write_file=True)
             self.stdout.write(self.style.SUCCESS(f"{cid}: profile saved ({today})"))

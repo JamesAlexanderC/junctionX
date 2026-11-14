@@ -225,8 +225,9 @@ def refresh_profile(customer_id):
             "postal_code": customer.postal_code if customer else "",
         }
         base = get_profile(customer_id) or {}
-        p_today = profile_today(base) if base else df["tx_date"].max().date()
+        p_today = profile_today(base) if base else today()
         data = build_profile(df, cust, p_today, goals=goals, loans=loans)
+        recompute_goals_locally(data, goals, p_today)
         save_profile(customer_id, data, write_file=True)
         return data
 

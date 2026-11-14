@@ -113,3 +113,53 @@ def test_run_evals_skips_without_key():
     buf = io.StringIO()
     call_command("run_evals", stdout=buf)
     assert "skipped" in buf.getvalue()
+
+
+def test_build_profiles_end_to_end_serves_home(tmp_path, client):
+    data = write_csvs(tmp_path)
+    call_command(
+        "load_data", "--customers", "C1", "--data-dir", str(data), stdout=io.StringIO()
+    )
+    call_command("build_profiles", stdout=io.StringIO())
+    resp = client.get("/api/home/C1/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["today"] == services.today().isoformat()
+    assert body["income"]["monthly_income"] == pytest.approx(2000)
+    assert body["baskets"]["monthly_saving"] == pytest.approx(150)
+
+
+def test_refresh_profile_includes_db_goals(tmp_path):
+    from coach.models import Goal
+
+    data = write_csvs(tmp_path)
+    call_command(
+        "load_data", "--customers", "C1", "--data-dir", str(data), stdout=io.StringIO()
+    )
+    Goal.objects.create(
+        customer_id="C1",
+        name="Trip",
+        target=600,
+        saved=100,
+        start_date="2026-09-01",
+        target_date="2027-03-01",
+    )
+    out = services.refresh_profile("C1")
+    names = [g["name"] for g in out["goals"]["active"]]
+    assert names == ["Trip"]
+
+
+def test_build_profiles_uses_the_shared_reference_date(tmp_path, client):
+    # P1.1: every customer is profiled as of max(tx_date) over all data, even
+    # when their own transactions stop earlier.
+    data = write_csvs(tmp_path)
+    call_command(
+        "load_data",
+        "--customers",
+        "C1,C2",
+        "--data-dir",
+        str(data),
+        stdout=io.StringIO(),
+    )
+    call_command("build_profiles", stdout=io.StringIO())
+    assert client.get("/api/home/C2/").json()["today"] == services.today().isoformat()

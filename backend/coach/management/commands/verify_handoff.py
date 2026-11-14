@@ -143,13 +143,13 @@ def check_loaded_and_served():
     if not ids:
         return False, "no DEMO_CUSTOMERS (step 4 first)"
     for cid, expected in _csv_counts(ids).items():
-        txs = Transaction.objects.filter(customer_id=cid)
+        txs = Transaction.objects.filter(customer_id=cid, is_synthetic=False)
         got = txs.count()
         if got != expected:
             return False, f"{cid}: {got} rows in DB, {expected} in CSV"
         if not txs.exclude(tx_timestamp__hour=0, tx_timestamp__minute=0).exists():
             return False, f"{cid}: every tx_timestamp is midnight (SAS parse failed)"
-    client = Client()
+    client = Client(HTTP_HOST=settings.ALLOWED_HOSTS[0])
     for cid in ids:
         resp = client.get(f"/api/home/{cid}/")
         if resp.status_code != 200:
