@@ -1,37 +1,117 @@
-// API client for the Django coach backend.
+// API client for the Django coach backend (contract: docs/design.md).
 //
-// Chat stream contract (SSE over POST /api/chat/). Each event is one line of
-// `data: <json>` followed by a blank line, where the JSON is one of:
-//   { "type": "token",   "text": "..." }                  streamed answer text
-//   { "type": "chart",   "chart": Chart }                 optional chart payload
-//   { "type": "concept", "title": "...", "text": "..." }  optional explainer
-//   { "type": "error",   "message": "..." }
-//   { "type": "done" }
+// On first use we probe GET /api/health/ once. If the backend answers with a
+// healthy JSON body we talk to it for the rest of the session; otherwise the
+// whole app switches to demo mode and every call is served by mock.js, so the
+// UI can always be clicked through. Add `?demo=1` to the URL to force demo
+// mode even when a backend is running.
 //
-// Chart = {
-//   kind: "bar" | "line" | "pie",
-//   title: string,
-//   unit?: string,                      // e.g. "€"
-//   data: [{ label: string, value: number }]
-// }
-//
-// If the backend can't be reached, the app falls back to demo mode and uses
-// canned answers from mock.js so the UI can still be developed and shown.
+// Chat is SSE over POST /api/chat/: one `data: <json>\n\n` per event, where the
+// JSON `type` is one of meta | tool | token | chart | concept | suggestions |
+// error | done.
 
-import { mockChat, MOCK_CUSTOMERS } from './mock.js'
+import {
+  MOCK_HEALTH,
+  mockChat,
+  mockCustomers,
+  mockFeatured,
+  mockOverview,
+} from './mock.js'
 
 const API = import.meta.env.VITE_API_URL ?? ''
+const HEALTH_TIMEOUT_MS = 3000
 
-export async function getCustomers() {
+let modePromise = null
+
+function forcedDemo() {
   try {
-    const res = await fetch(`${API}/api/customers/`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const body = await res.json()
-    const customers = Array.isArray(body) ? body : body.results ?? []
-    return { customers, demo: false }
+    return new URLSearchParams(window.location.search).has('demo')
   } catch {
-    return { customers: MOCK_CUSTOMERS, demo: true }
+    return false
   }
+}
+
+async function probeHealth() {
+  if (forcedDemo()) return { demo: true, health: MOCK_HEALTH }
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${API}/api/health/`, { signal: controller.signal })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const health = await res.json()
+    if (health?.status !== 'ok') throw new Error('Backend not healthy')
+    return { demo: false, health }
+  } catch {
+    return { demo: true, health: MOCK_HEALTH }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Resolves once to `{ demo: boolean, health }`; later calls reuse it. */
+export function getMode() {
+  modePromise ??= probeHealth()
+  return modePromise
+}
+
+async function getJSON(path, signal) {
+  const res = await fetch(`${API}${path}`, { signal })
+  if (!res.ok) {
+    let detail = ''
+    try {
+      detail = (await res.json())?.detail ?? ''
+    } catch {
+      // Body was not JSON; the status code is enough.
+    }
+    throw new Error(detail || `Request failed (HTTP ${res.status})`)
+  }
+  return res.json()
+}
+
+export async function getFeatured(signal) {
+  const { demo } = await getMode()
+  if (demo) return mockFeatured()
+  const body = await getJSON('/api/customers/featured/', signal)
+  return Array.isArray(body) ? body : (body.results ?? [])
+}
+
+export async function searchCustomers({ search = '', limit = 20, offset = 0 }, signal) {
+  const { demo } = await getMode()
+  if (demo) return mockCustomers({ search, limit, offset })
+  const qs = new URLSearchParams({ search, limit, offset })
+  const body = await getJSON(`/api/customers/?${qs}`, signal)
+  if (Array.isArray(body)) return { count: body.length, results: body }
+  return { count: body.count ?? 0, results: body.results ?? [] }
+}
+
+// Overviews are cached per customer so Home <-> Coach tab switches are instant.
+const overviewCache = new Map()
+const overviewResolved = new Map()
+
+/** Returns an already-loaded overview synchronously, or undefined. */
+export const peekOverview = (customerId) => overviewResolved.get(customerId)
+
+async function loadOverview(customerId) {
+  const { demo } = await getMode()
+  if (demo) return mockOverview(customerId)
+  return getJSON(`/api/customers/${encodeURIComponent(customerId)}/overview/`)
+}
+
+export function getOverview(customerId) {
+  if (!overviewCache.has(customerId)) {
+    const promise = loadOverview(customerId).then(
+      (data) => {
+        overviewResolved.set(customerId, data)
+        return data
+      },
+      (err) => {
+        overviewCache.delete(customerId)
+        throw err
+      },
+    )
+    overviewCache.set(customerId, promise)
+  }
+  return overviewCache.get(customerId)
 }
 
 function handleEvent(raw, onEvent) {
@@ -51,8 +131,9 @@ function handleEvent(raw, onEvent) {
   onEvent(event)
 }
 
-// Streams one coach reply. Calls onEvent for every event, resolves when done.
-export async function streamChat({ customerId, messages, demo, onEvent, signal }) {
+/** Streams one coach reply, calling onEvent per event; resolves when done. */
+export async function streamChat({ customerId, messages, onEvent, signal }) {
+  const { demo } = await getMode()
   if (demo) return mockChat({ customerId, messages, onEvent, signal })
 
   const res = await fetch(`${API}/api/chat/`, {

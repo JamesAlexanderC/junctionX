@@ -56,6 +56,8 @@ INSTALLED_APPS = [
     # Third party
     "rest_framework",
     "drf_spectacular",
+    # Local
+    "finance",
 ]
 
 MIDDLEWARE = [
@@ -152,6 +154,20 @@ MAILERS = {
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
+
+
+# Money Coach data + LLM
+# The S-Pankki CSV dataset lives next to the repo by default.
+
+DATASET_DIR = Path(
+    _env(
+        "DATASET_DIR",
+        str(BASE_DIR.parent.parent / "dataset" / "Junction-2026-S-pankki"),
+    )
+)
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "") or "gemini-2.5-flash"
 
 
 # OpenAPI schema (drf-spectacular)
