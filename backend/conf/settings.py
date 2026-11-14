@@ -41,7 +41,7 @@ SECRET_KEY = "django-insecure-0(6hz1jb!#d&nasyvdnd+$t^f@m6h4q^fbdn_4$xmw-vvlg1+c
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -56,6 +56,8 @@ INSTALLED_APPS = [
     # Third party
     "rest_framework",
     "drf_spectacular",
+    # Local
+    "coach",
 ]
 
 MIDDLEWARE = [
@@ -93,16 +95,24 @@ WSGI_APPLICATION = "conf.wsgi.application"
 
 # Credentials come from .env, the same file the docker-compose `db` service uses.
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": _env("POSTGRES_DB"),
-        "USER": _env("POSTGRES_USER"),
-        "PASSWORD": _env("POSTGRES_PASSWORD"),
-        "HOST": _env("POSTGRES_HOST", "localhost"),
-        "PORT": _env("POSTGRES_PORT", "5432"),
+if os.environ.get("USE_SQLITE") == "1":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": _env("POSTGRES_DB"),
+            "USER": _env("POSTGRES_USER"),
+            "PASSWORD": _env("POSTGRES_PASSWORD"),
+            "HOST": _env("POSTGRES_HOST", "localhost"),
+            "PORT": _env("POSTGRES_PORT", "5432"),
+        }
+    }
 
 
 # Password validation
@@ -174,3 +184,17 @@ SPECTACULAR_SETTINGS = {
     "VERSION": _project_version(),
     "SERVE_INCLUDE_SCHEMA": False,
 }
+
+
+# Saldo app settings
+# Customer ids kept by `manage.py load_data` (see context.md, P1.2).
+DEMO_CUSTOMERS = [
+    c for c in os.environ.get("DEMO_CUSTOMERS", "").split(",") if c
+]
+DATA_DIR = BASE_DIR.parent / "data"
+PROFILES_DIR = BASE_DIR / "profiles"
+SHARED_FIXTURES_DIR = BASE_DIR.parent / "shared" / "fixtures"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_ROUTER_MODEL = os.environ.get("GEMINI_ROUTER_MODEL", "gemini-2.5-flash-lite")
+DEMO_MODE = os.environ.get("DEMO_MODE", "0") == "1"
