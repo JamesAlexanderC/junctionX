@@ -14,7 +14,9 @@ const isEur = (unit) => unit === 'EUR' || unit === '€'
 
 // Value with its unit, exactly as the backend gave it.
 export function formatValue(value, unit) {
-  if (value == null) return ''
+  // Breakdowns (e.g. baskets) are objects; their text already spells them out.
+  if (value == null || typeof value === 'object') return ''
+  if (unit === 'date') return longDate(value)
   if (isEur(unit)) return eur(value)
   if (unit === '%') return `${value}%`
   return unit ? `${value} ${unit}` : String(value)

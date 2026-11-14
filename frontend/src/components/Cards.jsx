@@ -168,7 +168,11 @@ function AlertCard({ card, onSend }) {
         <i className={`dot sev-${card.severity}`} /> {card.title}
       </strong>
       <p>{card.text}</p>
-      <button type="button" onClick={() => onSend(`Help me fix the "${card.title}" alert`, 4)}>
+      <button
+        type="button"
+        className="btn-primary"
+        onClick={() => onSend(`Help me fix the "${card.title}" alert`, 4)}
+      >
         Fix this
       </button>
     </div>
@@ -190,7 +194,7 @@ export function PlanCard({ card, onSend }) {
           )
         })}
       </ol>
-      <button type="button" onClick={() => onSend('Accept plan', 4)}>
+      <button type="button" className="btn-primary" onClick={() => onSend('Accept plan', 4)}>
         Accept plan
       </button>
     </div>

@@ -55,7 +55,9 @@ export async function getInsights(customerId, { signal } = {}) {
   const body = await request(`/api/insights/${encodeURIComponent(customerId)}/`, {
     signal,
   })
-  return Array.isArray(body) ? body : []
+  // Backend shape: {customer_id, as_of, insights: [...]} (CLAUDE.md "API").
+  if (Array.isArray(body)) return body
+  return Array.isArray(body?.insights) ? body.insights : []
 }
 
 // Only the last 6 turns are sent (context.md "Controls").
