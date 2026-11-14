@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { eur, formatValue, longDate } from '../lib/format.js'
 import { cutSaving, goalWithCut } from '../lib/formulas.js'
+import ChartCard from './Chart.jsx'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
@@ -21,26 +22,6 @@ function NumberCard({ card }) {
     <div className="card">
       <small>{card.label}</small>
       <strong className="big">{formatValue(card.value, card.unit ?? 'EUR')}</strong>
-    </div>
-  )
-}
-
-function ChartCard({ card }) {
-  const data = card.data ?? []
-  if (!data.length) return null
-  const max = Math.max(...data.map((d) => Math.abs(Number(d.value) || 0)), 1)
-  return (
-    <div className="card">
-      {card.title && <small>{card.title}</small>}
-      <ul className="chart">
-        {data.map((d) => (
-          <li key={d.label}>
-            <span>{d.label}</span>
-            <Bar value={Math.abs(d.value) / max} />
-            <span>{formatValue(d.value, card.unit)}</span>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }
@@ -130,9 +111,33 @@ function GoalCard({ card }) {
   )
 }
 
+// Six-level ladder (#28-#33): reached levels filled, the target outlined.
+function Ladder({ ladder, target }) {
+  return (
+    <ol className="ladder" aria-label="Levels">
+      {ladder.map((r) => {
+        const state = r.reached ? 'reached' : r.level === target ? 'target' : 'ahead'
+        return (
+          <li
+            key={r.level}
+            className={state}
+            title={r.name}
+            aria-label={`Level ${r.level} ${r.name}, ${
+              r.reached ? 'reached' : r.level === target ? 'next' : 'not yet'
+            }`}
+          >
+            {r.level}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
 function LevelProgressCard({ card }) {
   return (
     <div className="card">
+      {card.ladder?.length > 0 && <Ladder ladder={card.ladder} target={card.level} />}
       <strong>
         Level {card.level}: {card.name}
       </strong>

@@ -85,6 +85,13 @@ CARD_SCHEMA = {
         "progress": NUM,
         "euros_to_go": NUM,
         "next_step": STR,
+        "ladder": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"level": INT, "name": STR, "reached": BOOL},
+            },
+        },
         "question": STR,
         "options": {"type": "array", "items": STR},
         "quick_answer": STR,
@@ -124,7 +131,11 @@ DECLARATIONS = [
     ),
     _decl("get_safe_to_save", "Safe to save today (#18) and danger days (#20)."),
     _decl("get_baskets", "Four-basket split for the month (#7-#10, #75)."),
-    _decl("get_level", "Current level, progress and easiest next step (#28-#33)."),
+    _decl(
+        "get_level",
+        "Current level, the next level, euros to go, the easiest next step "
+        "(#28-#33) and a ready level_progress card to attach as is.",
+    ),
     _decl(
         "simulate_cut",
         "What-if: cut a category by pct (0-1) (#24), optionally for a goal (#26).",
@@ -228,6 +239,18 @@ DECLARATIONS = [
         {
             "item": {"type": "string", "enum": list(CATALOGUE)},
             "detail": {"type": "string", "enum": ["summary", "full"]},
+        },
+        ["item"],
+    ),
+    _decl(
+        "get_chart",
+        "A ready chart card (kind, title, unit, data) for a chartable item. "
+        "Attach the returned card to send_reply unchanged; the app draws it.",
+        {
+            "item": {
+                "type": "string",
+                "enum": [i for i, e in CATALOGUE.items() if e.chart is not None],
+            }
         },
         ["item"],
     ),
