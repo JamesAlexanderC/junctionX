@@ -151,3 +151,14 @@ def test_end_of_month_hidden_on_the_last_day():
     p = sample()
     p["forecast"]["end_of_month"] = {"expected": 500.0, "low": 500.0, "high": 500.0}
     assert "end_of_month" not in {i["key"] for i in insights.insights(p)}
+
+
+def test_level_insight_says_what_is_still_to_do():
+    p = copy.deepcopy(sample())
+    p["levels"]["next_requirement"] = {
+        "text": "Have an active goal that is on track.",
+        "checks": [{"text": "No active goal yet", "met": False}],
+    }
+    item = next(i for i in insights.insights(p) if i["key"] == "level")
+    assert "To get there: Have an active goal that is on track." in item["text"]
+    assert "Still to do: No active goal yet." in item["text"]

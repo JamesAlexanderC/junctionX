@@ -50,6 +50,32 @@ def _check_actions(actions):
     return clean
 
 
+SLIDER_MAX_PCT = 0.5  # the slider card's max_pct (CLAUDE.md card payloads)
+
+
+def _slider_cut(ctx, a):
+    """A cut_category step from the slider card: any category with a #24
+    mean, any pct up to the slider's 50 %. monthly_impact = pct x mean (#24).
+    """
+    if a.get("type") != "cut_category" or a.get("pct") is None:
+        return None
+    pct = float(a["pct"])
+    pct = pct / 100 if pct > 1 else pct
+    means = (ctx.profile.get("whatif") or {}).get("category_means") or {}
+    cat = str(a.get("category") or "").lower()
+    if cat not in means or not 0 < pct <= SLIDER_MAX_PCT:
+        return None
+    effort = min(planner.CUT_EFFORT.items(), key=lambda kv: abs(kv[0] - pct))[1]
+    return {
+        "type": "cut_category",
+        "category": cat,
+        "pct": round(pct, 2),
+        "effort": effort,
+        "monthly_impact": round(pct * means[cat], 2),
+        "text": f"Cut {cat} by {round(pct * 100)}%",
+    }
+
+
 def _complete_actions(ctx, actions):
     """Fill effort / impact / text from the planner's candidate list."""
     alerts = _open_alerts(ctx)
@@ -65,6 +91,8 @@ def _complete_actions(ctx, actions):
             ),
             None,
         )
+        if match is None:
+            match = _slider_cut(ctx, a)
         if match is None:
             raise ToolError(f"Action not available: {a}")
         out.append(match)
@@ -96,9 +124,31 @@ def simulate_plan(ctx, actions):
     return result
 
 
+def _active_plan_with(customer_id, actions):
+    """The active plan goal whose checklist has exactly these steps, if any."""
+    wanted = sorted(a["text"] for a in actions)
+    plans = Goal.objects.filter(customer_id=customer_id, type="plan", status="active")
+    for goal in plans:
+        if sorted(c.get("text") for c in goal.checklist or []) == wanted:
+            return goal
+    return None
+
+
 def accept_plan(ctx, actions):
-    """Saves the plan as a checklist goal; only after the user confirmed."""
+    """Saves the plan as a checklist goal; only after the user confirmed.
+
+    A plan with the same steps as an active plan goal is not saved again, so
+    accepting the same plan twice does not create a second goal.
+    """
     actions = _complete_actions(ctx, actions)
+    existing = _active_plan_with(ctx.customer_id, actions)
+    if existing is not None:
+        return {
+            "status": "already_accepted",
+            "goal_id": existing.id,
+            "instruction": "Tell the user this plan is already saved as their "
+            f"'{existing.name}' goal. Nothing new was saved.",
+        }
     if not is_confirmed(ctx, "accept_plan"):
         return propose(
             ctx,

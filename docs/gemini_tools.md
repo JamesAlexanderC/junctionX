@@ -93,7 +93,7 @@ catalogue path is missing from a built profile, or when an item in
 | `manage_goal` | `edit`, `pause`, `resume`, `complete`, `abandon`, `add_saved`, `check_step`, `undo` | `GoalSerializer` (`PATCH /api/goals/<id>/`) |
 | `save_loan_details` | Loan balance, rate, years left | `LoanSerializer` (`POST /api/loans/`) |
 | `dismiss_suggestion` | Hide a detected goal (`det-*`) for good | `DismissedSuggestion` model |
-| `accept_plan` | Save an alert-coach plan as a checklist goal | |
+| `accept_plan` | Save an alert-coach plan (or a slider cut) as a checklist goal; a plan matching an active plan goal returns `already_accepted` | Planner candidates; `cut_category` also for any #24 category, pct <= 50 % |
 
 **Propose, then confirm.** A write first returns
 `{"status": "needs_confirmation", "proposal": ...}` and stores the proposal on

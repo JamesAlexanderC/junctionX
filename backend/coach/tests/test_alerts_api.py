@@ -103,6 +103,69 @@ def test_accept_plan_after_proposal_and_yes(client, aino, fake_gemini):
     assert goal.type == "plan" and goal.checklist[0]["action"]["category"] == "takeaway"
 
 
+def test_accepting_the_same_plan_twice_saves_one_goal(client, aino, fake_gemini):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    action = {"type": "cut_category", "category": "takeaway", "pct": 0.2}
+    body = {"customer_id": AINO, "depth": 4}
+    for message in ("Make that a plan", "Yes, accept plan") * 2:
+        fake_gemini(
+            response(("accept_plan", {"actions": [action]})),
+            response(("send_reply", {"text": "Ok.", "depth": 4, "cards": []})),
+        )
+        client.post(
+            "/api/chat/", {**body, "message": message}, content_type="application/json"
+        )
+    goal = Goal.objects.get()
+    # Asked again, the tool says it is saved instead of proposing it again.
+    out = call_tool(
+        ToolContext(AINO, "Accept plan"), "accept_plan", {"actions": [action]}
+    )
+    assert out["status"] == "already_accepted" and out["goal_id"] == goal.id
+    assert Goal.objects.count() == 1
+
+
+def test_a_different_plan_is_still_proposed(client, aino, fake_gemini):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    takeaway = {"type": "cut_category", "category": "takeaway", "pct": 0.2}
+    ctx = ToolContext(AINO, "Accept plan", previous_pending={"accept_plan": []})
+    assert call_tool(ctx, "accept_plan", {"actions": [takeaway]})["status"] == (
+        "accepted"
+    )
+    other = {"type": "cut_category", "category": "coffee", "pct": 0.2}
+    out = call_tool(ToolContext(AINO, "Plan"), "accept_plan", {"actions": [other]})
+    assert out["status"] == "needs_confirmation"
+
+
+def test_a_slider_cut_can_be_saved_as_a_plan(client, aino):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    # 25 % is between the planner's steps; groceries is not a leaky category.
+    cut = {"type": "cut_category", "category": "groceries", "pct": 25}
+    ctx = ToolContext(AINO, "Yes", previous_pending={"accept_plan": []})
+    out = call_tool(ctx, "accept_plan", {"actions": [cut]})
+    assert out["status"] == "accepted"
+    [step] = Goal.objects.get().checklist
+    means = services.get_profile(AINO)["whatif"]["category_means"]
+    assert step["action"]["pct"] == 0.25
+    assert step["action"]["monthly_impact"] == round(0.25 * means["groceries"], 2)
+
+
+@pytest.mark.parametrize(
+    "cut",
+    [
+        {"type": "cut_category", "category": "groceries", "pct": 0.6},
+        {"type": "cut_category", "category": "no such thing", "pct": 0.2},
+    ],
+)
+def test_slider_cuts_outside_the_slider_are_refused(aino, cut):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    out = call_tool(ToolContext(AINO, "Plan"), "accept_plan", {"actions": [cut]})
+    assert "error" in out and Goal.objects.count() == 0
+
+
 @pytest.mark.parametrize(
     "payload",
     [

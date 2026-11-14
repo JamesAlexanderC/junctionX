@@ -167,6 +167,38 @@ def test_safety_net_progress(df_today, inc, bsk):
     assert lv["easiest_next_step"]["category"] == "takeaway"
 
 
+def test_next_requirement_says_what_level_3_needs(df_today, inc, bsk):
+    # #30 with Aino's numbers: lowest balance 445 of 890 (1 month essentials).
+    req = levels.compute_levels(df_today, TODAY, inc, bsk)["next_requirement"]
+    assert "1 month of essential spending" in req["text"]
+    [check] = req["checks"]
+    assert check == {
+        "text": "Lowest balance in the last 30 days: EUR 445 of EUR 890 needed",
+        "met": False,
+    }
+
+
+@pytest.mark.parametrize("lv", [1, 2, 3, 4, 5, 6])
+def test_every_level_has_a_requirement(lv):
+    facts = {
+        "payday": True,
+        "bills": False,
+        "last_month": {"month": "2026-09", "spent": 1200.0, "earned": 1000.0},
+        "essentials": 890.0,
+        "low": 445.0,
+        "l3": False,
+        "goals_active": 1,
+        "goals_on_track": 0,
+        "readiness": 0.5,
+        "l5": False,
+        "buffer_months": 0.5,
+        "saver_months": (1, 3),
+    }
+    req = levels._requirement(lv, facts)
+    assert req["text"] and req["checks"]
+    assert not all(c["met"] for c in req["checks"])
+
+
 def test_level_4_with_goal_on_track(df_today, inc, bsk):
     goals = [{"on_track": True, "paused": False}]
     lv = levels.compute_levels(df_today, TODAY, inc, bsk, goals=goals)

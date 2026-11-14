@@ -103,13 +103,20 @@ Card payloads:
 - chart `{kind: "bar"|"line", title, unit?, data: [{label, value}]}`
 - basket_bar `{essential, surprise, leaky, saver}`
 - slider `{category, monthly_spend, min_pct: 0, max_pct: 50, pct, goal?: {target,
-  saved, monthly_rate}}` (frontend recomputes #24 / #26 locally)
+  saved, monthly_rate}}` (frontend recomputes #24 / #26 locally; its button
+  asks the coach to save the cut as a plan, and `accept_plan` takes a
+  `cut_category` step for any category with a #24 mean, pct up to 50 %)
 - goal `{name, target, saved, target_date, difficulty, monthly_needed}`
-- level_progress `{level, name, progress, euros_to_go, next_step, ladder?:
-  [{level, name, reached}]}` (`get_level` returns it ready as `card`)
+- level_progress `{level, name, progress, euros_to_go, next_step, requirement?:
+  {text, checks: [{text, met}]}, ladder?: [{level, name, reached}]}`
+  (`get_level` returns it ready as `card`; `requirement` is
+  `levels.next_requirement`: what the next level needs, in the customer's
+  numbers)
 - question `{question, options: [str], quick_answer?: str}`
 - alert `{id, severity, title, text}`
-- plan `{steps: [{text, monthly_impact, clears: [alert_id]}]}`
+- plan `{steps: [{text, monthly_impact, clears: [alert_id]}]}` (Accept works
+  once; `accept_plan` returns `already_accepted` for a plan that matches an
+  active plan goal)
 - before_after `{before: {safe_to_spend, buffer_months, goal_date}, after: {...}}`
 
 ## Gemini tools

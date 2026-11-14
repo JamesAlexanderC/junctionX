@@ -38,6 +38,16 @@ class _Rung(_Card):
     reached: bool
 
 
+class _Check(_Card):
+    text: str
+    met: bool
+
+
+class _Requirement(_Card):
+    text: str
+    checks: list[_Check] = []
+
+
 class _Snapshot(_Card):
     safe_to_spend: float | None = None
     buffer_months: float | None = None
@@ -94,6 +104,7 @@ class LevelProgressCard(_Card):
     progress: float
     euros_to_go: float | None = None
     next_step: str | None = None
+    requirement: _Requirement | None = None
     ladder: list[_Rung] | None = None
 
 
