@@ -26,6 +26,10 @@ MAX_ROUNDS = 5
 HISTORY_TURNS = 6
 # Total size of tool results per turn, so the context stays small (~15k tokens).
 MAX_TURN_RESULT_CHARS = 60_000
+LAST_ROUND_NOTE = (
+    "Last step: answer now with send_reply, using only the tool results you "
+    "already have. If they do not cover everything, say what you can and why."
+)
 BUDGET_ERROR = (
     "The tool result budget for this turn is used up. Answer with the results "
     "you already have and call send_reply."
@@ -41,13 +45,21 @@ def get_client():
     return genai.Client(api_key=settings.GEMINI_API_KEY)
 
 
-def build_config():
+def build_config(final=False):
+    """Gemini config; on the final round only send_reply may be called, so a
+    turn always ends with an answer built from the tools already used (FC-3:
+    Gemini kept looking for more data until the rounds ran out)."""
+    calling = types.FunctionCallingConfig(
+        mode="ANY", allowed_function_names=["send_reply"] if final else None
+    )
+    declarations = tool_declarations()
+    if final:
+        # Live, Gemini ignored allowed_function_names, so declare only this.
+        declarations = [d for d in declarations if d.name == "send_reply"]
     return types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
-        tools=[types.Tool(function_declarations=tool_declarations())],
-        tool_config=types.ToolConfig(
-            function_calling_config=types.FunctionCallingConfig(mode="ANY")
-        ),
+        tools=[types.Tool(function_declarations=declarations)],
+        tool_config=types.ToolConfig(function_calling_config=calling),
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
 
@@ -283,13 +295,15 @@ def _run(client, contents, ctx):
 
     Returns (reply, rounds, fallback reason or None, detail).
     """
-    config = build_config()
+    config, final_config = build_config(), build_config(final=True)
     retried = False
     used = 0
     for round_no in range(1, MAX_ROUNDS + 1):
         with _timed(ctx, "gemini", round=round_no):
             resp = client.models.generate_content(
-                model=settings.GEMINI_MODEL, contents=contents, config=config
+                model=settings.GEMINI_MODEL,
+                contents=contents,
+                config=final_config if round_no == MAX_ROUNDS else config,
             )
         contents.append(resp.candidates[0].content)
         parts = []
@@ -318,5 +332,7 @@ def _run(client, contents, ctx):
             )
         if not parts:
             parts.append(_text("user", "Call send_reply to answer.").parts[0])
+        if round_no == MAX_ROUNDS - 1:
+            parts.append(_text("user", LAST_ROUND_NOTE).parts[0])
         contents.append(types.Content(role="user", parts=parts))
     return None, MAX_ROUNDS, "max_rounds", f"No send_reply after {MAX_ROUNDS} rounds."
