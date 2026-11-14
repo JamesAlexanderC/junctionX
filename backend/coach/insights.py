@@ -129,41 +129,76 @@ def income(p):
 
 
 def _basket_month(p):
-    """The latest month with spending: this month, else the last full month."""
+    """The latest month with spending: this month, else the last full month.
+
+    Returns (entry, is_current) where entry has month, totals and categories.
+    """
     b = p.get("baskets") or {}
     if any((b.get("totals") or {}).values()):
-        return b.get("month"), b["totals"]
+        return b, True
     for entry in reversed(b.get("history") or []):
         if any((entry.get("totals") or {}).values()):
-            return entry.get("month"), entry["totals"]
-    return None, {}
+            return entry, False
+    return None, False
 
 
-def baskets(p):
-    month, totals = _basket_month(p)
+def _basket_shares(totals):
+    """#10 shares (% of total outflow, 1 dp) of the baskets with spending."""
     total = sum(v for v in totals.values() if _num(v))
-    if not month or total <= 0:
-        return []
-    shares = {
+    if total <= 0:
+        return total, {}
+    return total, {
         k: round(v / total * 100, 1) for k, v in totals.items() if _num(v) and v > 0
     }
-    parts = [
-        f"{BASKET_NAMES.get(k, k)} {s:.0f}%"
-        for k, s in sorted(shares.items(), key=lambda kv: -kv[1])
+
+
+def basket_summary(p):
+    """Spending buckets for the Overview panel (GET /api/baskets/, #7-#10, #75).
+
+    Like goal_summary, baskets get their own panel rather than an insight row.
+    Totals, trends and per-category amounts come from ``profile["baskets"]``
+    (inferences/baskets.py); only the shares of a fallback history month are
+    worked out here, with the same rule as basket_split.
+    """
+    b = p.get("baskets") or {}
+    empty = {
+        "month": None,
+        "total": 0,
+        "buckets": [],
+        "monthly_essentials": None,
+        "monthly_saving": None,
+    }
+    entry, current = _basket_month(p)
+    if entry is None or not _available(p, "baskets"):
+        return empty
+    totals = entry.get("totals") or {}
+    total, shares = _basket_shares(totals)
+    if not shares:
+        return empty
+    trend = (b.get("trend") or {}) if current else {}
+    categories = entry.get("categories") or {}
+    buckets = [
+        {
+            "key": k,
+            "name": BASKET_NAMES.get(k, k),
+            "total": round(totals[k], 2),
+            "share": share,
+            "trend": trend.get(k),
+            "categories": [
+                {"category": c["category"], "total": c["total"]}
+                for c in categories.get(k) or []
+            ],
+        }
+        for k, share in shares.items()
     ]
-    text = f"In {month} you spent {_eur(total)}: " + ", ".join(parts) + "."
-    value = {k: round(v, 2) for k, v in totals.items() if _num(v) and v > 0}
-    return [
-        _item(
-            "baskets",
-            10,
-            f"Where the money went ({month})",
-            value,
-            "EUR",
-            text,
-            "baskets",
-        )
-    ]
+    buckets.sort(key=lambda r: -r["total"])
+    return {
+        "month": entry.get("month"),
+        "total": round(total, 2),
+        "buckets": buckets,
+        "monthly_essentials": b.get("monthly_essentials"),
+        "monthly_saving": b.get("monthly_saving"),
+    }
 
 
 def saver(p):
@@ -519,7 +554,6 @@ BUILDERS = [
     payday,
     income,
     saver,
-    baskets,
     leaky,
     upcoming_bills,
     end_of_month,

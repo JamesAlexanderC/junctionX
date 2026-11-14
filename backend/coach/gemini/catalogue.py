@@ -116,6 +116,11 @@ _ENTRIES = [
         chart=Chart("bar", title="Share of spending by basket", unit="%"),
     ),
     Entry(
+        "baskets.categories",
+        "This month's spending per category inside each basket, in EUR.",
+        gate="baskets",
+    ),
+    Entry(
         "baskets.trend",
         "Change of each basket against earlier months, in percent.",
         gate="baskets.trend",

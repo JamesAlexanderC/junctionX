@@ -1356,3 +1356,11 @@ button {
     animation: progress-pulse 2s ease-in-out infinite;
   }
 }
+
+.basket-cats {
+  overflow-wrap: anywhere;
+}
+
+.basket-all {
+  margin: 0 16px 8px;
+}

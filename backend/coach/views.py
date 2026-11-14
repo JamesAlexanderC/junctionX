@@ -88,7 +88,8 @@ def chat(request):
     return Response(reply)
 
 
-def _goal_list(request):
+def _panel(request, summary):
+    """GET ?customer_id= -> {customer_id, as_of, **summary(profile)}."""
     customer_id = request.query_params.get("customer_id")
     if not customer_id:
         return Response(
@@ -101,16 +102,22 @@ def _goal_list(request):
         {
             "customer_id": customer_id,
             "as_of": profile.get("today"),
-            **insights_mod.goal_summary(profile),
+            **summary(profile),
         }
     )
+
+
+@api_view(["GET"])
+def baskets(request):
+    """GET ?customer_id= lists spending buckets for the Overview (#7-#10, #75)."""
+    return _panel(request, insights_mod.basket_summary)
 
 
 @api_view(["GET", "POST"])
 def goals(request):
     """GET ?customer_id= lists goals for the Overview; POST creates one (#64)."""
     if request.method == "GET":
-        return _goal_list(request)
+        return _panel(request, insights_mod.goal_summary)
     ser = GoalSerializer(data=request.data)
     ser.is_valid(raise_exception=True)
     if services.get_profile(ser.validated_data["customer_id"]) is None:
