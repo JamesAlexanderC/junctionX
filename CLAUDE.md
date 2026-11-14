@@ -40,6 +40,11 @@ Own-account transfers: `transaction_type` in `OWN_TRANSFER_TYPES`
 (thresholds.py), to be confirmed against real data.
 
 ## API
+- Auth: every endpoint needs `Authorization: Token <key>` (DRF TokenAuthentication,
+  401 without). `POST /api/auth/login/ {username, password}` -> `{token, user}`
+  (400 on wrong credentials), `POST /api/auth/logout/` deletes the token,
+  `GET /api/auth/me/` -> `{user}`. Users are Django users (`createsuperuser`);
+  any logged-in user may open any customer. `/api/schema/` and docs stay public.
 - `GET /api/home/<customer_id>/` -> full profile JSON (404 if unknown).
 - `GET /api/insights/<customer_id>/` -> `{customer_id, as_of, insights: [{key,
   inference, title, value, unit, text, section, severity?}]}`: only insights
@@ -73,7 +78,8 @@ Card payloads:
 - slider `{category, monthly_spend, min_pct: 0, max_pct: 50, pct, goal?: {target,
   saved, monthly_rate}}` (frontend recomputes #24 / #26 locally)
 - goal `{name, target, saved, target_date, difficulty, monthly_needed}`
-- level_progress `{level, name, progress, euros_to_go, next_step}`
+- level_progress `{level, name, progress, euros_to_go, next_step, ladder?:
+  [{level, name, reached}]}` (`get_level` returns it ready as `card`)
 - question `{question, options: [str], quick_answer?: str}`
 - alert `{id, severity, title, text}`
 - plan `{steps: [{text, monthly_impact, clears: [alert_id]}]}`
@@ -84,7 +90,7 @@ get_category_spend, get_safe_to_spend, get_safe_to_save, get_baskets, get_level,
 simulate_cut, forecast_balance, get_spender_type, list_goals, create_goal,
 rate_goal, get_detected_goals, get_mortgage_readiness, get_explainer,
 get_benchmark, get_alerts, explain_alert, suggest_fixes, simulate_plan,
-accept_plan, snooze_alert, list_inferences, get_inference, manage_goal,
+accept_plan, snooze_alert, list_inferences, get_inference, get_chart, manage_goal,
 save_loan_details, dismiss_suggestion, send_reply.
 - Code in `coach/gemini/tools/` (one module per area, `registry.py` maps
   names). Every profile item Gemini can read is one entry in

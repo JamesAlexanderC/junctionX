@@ -1,6 +1,7 @@
 // Demo landing page: pick a real customer, then open their view.
 
 import { useState } from 'react'
+import { logout } from '../api.js'
 import CustomerPicker from './CustomerPicker.jsx'
 
 export default function Landing({ onEnter }) {
@@ -14,6 +15,9 @@ export default function Landing({ onEnter }) {
             S
           </span>
           <h1>Saldo</h1>
+          <button type="button" className="logout" onClick={logout}>
+            Log out
+          </button>
         </div>
       </header>
 

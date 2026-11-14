@@ -11,6 +11,8 @@ Items are dotted paths into the profile (e.g. "income.payday").
 
 from __future__ import annotations
 
+from . import thresholds as th
+
 
 def _get(profile: dict, path: str, default=None):
     node = profile
@@ -49,6 +51,23 @@ def _payday(profile) -> bool:
     return _get(profile, "income.payday.found") is True
 
 
+PAYDAY_REASONS = {
+    "no_income": "No income in the data, so no payday to find.",
+    "not_recurring": "No regular salary found (needs one in 3 of the last 4 months).",
+    "amount_varies": (
+        "Your income arrives regularly, but the amount changes too much from "
+        f"month to month (more than {th.SALARY_CV_MAX:.0%}) to tell which "
+        "payment is your salary."
+    ),
+}
+
+
+def _payday_reason(profile) -> str:
+    """#1: say which check detect_payday failed."""
+    code = _get(profile, "income.payday.reason")
+    return PAYDAY_REASONS.get(code, PAYDAY_REASONS["not_recurring"])
+
+
 def _balance(profile) -> bool:
     return _get(profile, "balance") is not None
 
@@ -58,14 +77,11 @@ def _real_accounts(profile) -> int:
     return len(accounts)
 
 
-# item -> (inference numbers, check(profile) -> bool, reason when False)
+# item -> (inference numbers, check(profile) -> bool, reason when False);
+# the reason may be a function of the profile when it depends on why.
 RULES = {
     "balance": ([17], _balance, "No balance in the data."),
-    "income.payday": (
-        [1],
-        _payday,
-        "No regular salary found (needs one in 3 of the last 4 months).",
-    ),
+    "income.payday": ([1], _payday, _payday_reason),
     "income.monthly_income": (
         [2],
         lambda p: (_get(p, "income.monthly_income") or 0) > 0,
@@ -263,6 +279,8 @@ def availability(profile: dict) -> dict:
             ok = bool(check(profile))
         except (TypeError, ValueError):
             ok = False
+        if not ok and callable(reason):
+            reason = reason(profile)
         out[item] = {
             "available": ok,
             "reason": None if ok else reason,

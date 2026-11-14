@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third party
     "rest_framework",
+    "rest_framework.authtoken",
     "drf_spectacular",
     # Local
     "coach",
@@ -173,6 +174,15 @@ MAILERS = {
 
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Every API call needs "Authorization: Token <key>" from POST
+    # /api/auth/login/. Token only (no session auth), so a Django admin login
+    # in the same browser never turns on CSRF checks for the SPA.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
 }
 
 
@@ -195,6 +205,9 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Backend API for the three musketeers project.",
     "VERSION": _project_version(),
     "SERVE_INCLUDE_SCHEMA": False,
+    # The schema and docs stay public; "Authorize" in Swagger takes a token.
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
+    "SERVE_AUTHENTICATION": [],
 }
 
 

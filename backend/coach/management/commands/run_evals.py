@@ -59,6 +59,17 @@ def _saved_state(cid):
     return goals, loans, hidden
 
 
+# F1: multi-turn goal flows; exactly one goal must be saved, on the last turn.
+GOAL_FLOWS = [
+    ["Create a goal: Eval trip, 1500 euros by June 2027", "Yes, save it"],
+    [
+        "I want to save 1500 euros for an eval trip by June 2027",
+        "Medium",
+        "Yes, save it",
+    ],
+]
+
+
 class Command(BaseCommand):
     help = "Run the Gemini eval set 3x per question and report the pass rate."
 
@@ -101,6 +112,32 @@ class Command(BaseCommand):
                 passed += ok
                 mark = "PASS" if ok else "FAIL"
                 self.stdout.write(f"[{mark}] {question} #{run + 1} {why or ''}")
+        for messages in GOAL_FLOWS:
+            for run in range(opts["runs"]):
+                ok, why = self._goal_flow(cid, messages)
+                total += 1
+                passed += ok
+                mark = "PASS" if ok else "FAIL"
+                self.stdout.write(f"[{mark}] flow {messages} #{run + 1} {why or ''}")
         rate = passed / total if total else 0
         style = self.style.SUCCESS if rate >= 0.9 else self.style.ERROR
         self.stdout.write(style(f"Pass rate: {passed}/{total} = {rate:.0%}"))
+
+    def _goal_flow(self, cid, messages):
+        """Play one flow; only goals created by it are deleted afterwards."""
+        ChatTurn.objects.filter(customer_id=cid).delete()
+        before = set(Goal.objects.filter(customer_id=cid).values_list("id", flat=True))
+        why = []
+        for i, message in enumerate(messages):
+            reply, meta = loop.chat(cid, message)
+            if meta.get("fallback"):
+                why.append(f"turn {i + 1} fell back: {meta.get('fallback_reason')}")
+            new = Goal.objects.filter(customer_id=cid).exclude(id__in=before)
+            last = i == len(messages) - 1
+            if not last and new.exists():
+                why.append(f"saved before the yes (turn {i + 1})")
+        created = Goal.objects.filter(customer_id=cid).exclude(id__in=before)
+        if created.count() != 1:
+            why.append(f"{created.count()} goals saved, expected 1")
+        created.delete()
+        return not why, why

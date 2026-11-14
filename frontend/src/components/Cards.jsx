@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { eur, formatValue, longDate } from '../lib/format.js'
 import { cutSaving, goalWithCut } from '../lib/formulas.js'
+import ChartCard from './Chart.jsx'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
@@ -21,26 +22,6 @@ function NumberCard({ card }) {
     <div className="card">
       <small>{card.label}</small>
       <strong className="big">{formatValue(card.value, card.unit ?? 'EUR')}</strong>
-    </div>
-  )
-}
-
-function ChartCard({ card }) {
-  const data = card.data ?? []
-  if (!data.length) return null
-  const max = Math.max(...data.map((d) => Math.abs(Number(d.value) || 0)), 1)
-  return (
-    <div className="card">
-      {card.title && <small>{card.title}</small>}
-      <ul className="chart">
-        {data.map((d) => (
-          <li key={d.label}>
-            <span>{d.label}</span>
-            <Bar value={Math.abs(d.value) / max} />
-            <span>{formatValue(d.value, card.unit)}</span>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }
@@ -71,8 +52,15 @@ function BasketBarCard({ card }) {
 }
 
 // What-if slider: #24 and #26 recalculated locally, no API call.
+// The slider works in whole percent on 5 % steps. A fraction (0.2) is read as
+// 20 %, in case a card still carries simulate_cut's 0-1 value.
+const sliderStart = (pct) => {
+  const p = pct > 0 && pct <= 1 ? pct * 100 : (pct ?? 20)
+  return Math.round(p / 5) * 5
+}
+
 export function SliderCard({ card }) {
-  const [p, setP] = useState(card.pct ?? 20)
+  const [p, setP] = useState(() => sliderStart(card.pct))
   const saving = cutSaving(card.monthly_spend, p / 100)
   const goal =
     card.goal &&
@@ -87,8 +75,10 @@ export function SliderCard({ card }) {
     )
   return (
     <div className="card">
-      <label>
-        Cut {card.category} by {p}%
+      <label className="slider">
+        <span>
+          Cut {card.category} by <strong>{p}%</strong>
+        </span>
         <input
           type="range"
           min={card.min_pct ?? 0}
@@ -130,9 +120,33 @@ function GoalCard({ card }) {
   )
 }
 
+// Six-level ladder (#28-#33): reached levels filled, the target outlined.
+function Ladder({ ladder, target }) {
+  return (
+    <ol className="ladder" aria-label="Levels">
+      {ladder.map((r) => {
+        const state = r.reached ? 'reached' : r.level === target ? 'target' : 'ahead'
+        return (
+          <li
+            key={r.level}
+            className={state}
+            title={r.name}
+            aria-label={`Level ${r.level} ${r.name}, ${
+              r.reached ? 'reached' : r.level === target ? 'next' : 'not yet'
+            }`}
+          >
+            {r.level}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
 function LevelProgressCard({ card }) {
   return (
     <div className="card">
+      {card.ladder?.length > 0 && <Ladder ladder={card.ladder} target={card.level} />}
       <strong>
         Level {card.level}: {card.name}
       </strong>

@@ -137,3 +137,60 @@ def test_unknown_fields_are_dropped_from_cards():
 def test_unknown_card_types_are_still_dropped_quietly():
     out = validate_reply(_reply({"type": "hologram", "value": 4242}), [])
     assert out["cards"] == []
+
+
+def test_card_declaration_lists_every_nested_field():
+    """F4: Gemini can only fill nested card fields it is told about."""
+    from coach.gemini import cards
+    from coach.gemini.tools.declarations import CARD_SCHEMA
+
+    props = CARD_SCHEMA["properties"]
+    nested = {
+        "steps": cards._PlanStep,
+        "before": cards._Snapshot,
+        "after": cards._Snapshot,
+        "goal": cards._SliderGoal,
+        "data": cards._Row,
+    }
+    for field, model in nested.items():
+        schema = props[field]
+        listed = schema.get("items", schema).get("properties", {})
+        assert set(model.model_fields) <= set(listed), field
+
+
+def test_plan_card_built_from_suggest_fixes_passes():
+    step = {"text": "Cut takeaway by 20%", "monthly_impact": 24.6, "clears": ["a-1"]}
+    tool = [{"steps": [{**step, "effort": 2, "score": 0.25, "action": {}}]}]
+    card = {"type": "plan", "steps": [step]}
+    out = validate_reply(_reply(card, text="Two easy steps."), tool)
+    assert out["cards"][0]["steps"][0]["monthly_impact"] == 24.6
+
+
+def test_chips_repeating_question_options_are_dropped():
+    card = {
+        "type": "question",
+        "question": "When would you like to achieve this goal?",
+        "options": ["July 2027", "October 2027", "December 2027"],
+    }
+    args = {
+        "text": "When?",
+        "depth": 4,
+        "cards": [card],
+        "chips": ["July 2027", "october 2027 ", "Different goal"],
+    }
+    reply = validate_reply(args, [], "")
+    assert reply["chips"] == ["Different goal"]
+
+
+@pytest.mark.parametrize("given,shown", [(0.2, 20), (20, 20), (0, 0)])
+def test_slider_pct_is_shown_in_percent(given, shown):
+    card = {
+        "type": "slider",
+        "category": "restaurants",
+        "monthly_spend": 370.95,
+        "pct": given,
+    }
+    reply = validate_reply(
+        {"text": "Try it.", "depth": 3, "cards": [card]}, [{"spend": 370.95}], ""
+    )
+    assert reply["cards"][0]["pct"] == shown

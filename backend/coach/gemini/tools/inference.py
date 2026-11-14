@@ -66,6 +66,22 @@ def chart_data(entry: Entry, value) -> list[dict]:
     return points[-MAX_CHART_POINTS:]
 
 
+def chart_card(entry: Entry, value) -> dict | None:
+    """A complete chart card for a chartable entry, or None without data."""
+    data = chart_data(entry, value)
+    if not data:
+        return None
+    card = {
+        "type": "chart",
+        "kind": entry.chart.kind,
+        "title": entry.chart.title or entry.about,
+        "data": data,
+    }
+    if entry.chart.unit:
+        card["unit"] = entry.chart.unit
+    return card
+
+
 def _status(profile: dict, entry: Entry):
     """(available, reason, inference numbers) for one entry."""
     value = get_path(profile, entry.path)
@@ -128,3 +144,24 @@ def get_inference(ctx, item, detail="summary"):
         out["chart"] = {"kind": entry.chart.kind}
         out["chart_data"] = chart_data(entry, raw)
     return out
+
+
+CHARTABLE = [item for item, entry in CATALOGUE.items() if entry.chart is not None]
+
+
+def get_chart(ctx, item):
+    """A ready chart card for one chartable item: attach it to send_reply as is.
+
+    Python picks the chart kind, title, unit and points, so every charted
+    number comes straight from the profile.
+    """
+    entry = CATALOGUE.get(item)
+    if entry is None or entry.chart is None:
+        raise ToolError(f"{item} cannot be charted; chartable items: {CHARTABLE}")
+    ok, reason, numbers = _status(ctx.profile, entry)
+    if not ok:
+        return unavailable(reason, item=item)
+    card = chart_card(entry, get_path(ctx.profile, entry.path))
+    if card is None:
+        return unavailable("There are no numbers to chart yet.", item=item)
+    return {"available": True, "item": item, "inferences": numbers, "card": card}

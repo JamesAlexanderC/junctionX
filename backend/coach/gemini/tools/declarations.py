@@ -34,6 +34,11 @@ ACTION_SCHEMA = {
     "required": ["type"],
 }
 
+SNAPSHOT = {
+    "type": "object",
+    "properties": {"safe_to_spend": NUM, "buffer_months": NUM, "goal_date": STR},
+}
+
 CARD_SCHEMA = {
     "type": "object",
     "description": "A UI card; extra fields depend on type (see CLAUDE.md).",
@@ -71,10 +76,18 @@ CARD_SCHEMA = {
         "saver": NUM,
         "category": STR,
         "monthly_spend": NUM,
-        "pct": NUM,
+        "pct": {
+            "type": "number",
+            "description": "slider: start position in percent (20 = 20 %), 0-50",
+        },
         "min_pct": NUM,
         "max_pct": NUM,
-        "goal": {"type": "object", "properties": {}},
+        # Nested fields are listed so Gemini can fill them (F4); keep them in
+        # line with coach/gemini/cards.py (test_validate checks it).
+        "goal": {
+            "type": "object",
+            "properties": {"target": NUM, "saved": NUM, "monthly_rate": NUM},
+        },
         "name": STR,
         "target": NUM,
         "saved": NUM,
@@ -85,15 +98,32 @@ CARD_SCHEMA = {
         "progress": NUM,
         "euros_to_go": NUM,
         "next_step": STR,
+        "ladder": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"level": INT, "name": STR, "reached": BOOL},
+            },
+        },
         "question": STR,
         "options": {"type": "array", "items": STR},
         "quick_answer": STR,
         "id": STR,
         "severity": STR,
         "text": STR,
-        "steps": {"type": "array", "items": {"type": "object", "properties": {}}},
-        "before": {"type": "object", "properties": {}},
-        "after": {"type": "object", "properties": {}},
+        "steps": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "text": STR,
+                    "monthly_impact": NUM,
+                    "clears": {"type": "array", "items": STR},
+                },
+            },
+        },
+        "before": SNAPSHOT,
+        "after": SNAPSHOT,
     },
     "required": ["type"],
 }
@@ -124,7 +154,11 @@ DECLARATIONS = [
     ),
     _decl("get_safe_to_save", "Safe to save today (#18) and danger days (#20)."),
     _decl("get_baskets", "Four-basket split for the month (#7-#10, #75)."),
-    _decl("get_level", "Current level, progress and easiest next step (#28-#33)."),
+    _decl(
+        "get_level",
+        "Current level, the next level, euros to go, the easiest next step "
+        "(#28-#33) and a ready level_progress card to attach as is.",
+    ),
     _decl(
         "simulate_cut",
         "What-if: cut a category by pct (0-1) (#24), optionally for a goal (#26).",
@@ -228,6 +262,18 @@ DECLARATIONS = [
         {
             "item": {"type": "string", "enum": list(CATALOGUE)},
             "detail": {"type": "string", "enum": ["summary", "full"]},
+        },
+        ["item"],
+    ),
+    _decl(
+        "get_chart",
+        "A ready chart card (kind, title, unit, data) for a chartable item. "
+        "Attach the returned card to send_reply unchanged; the app draws it.",
+        {
+            "item": {
+                "type": "string",
+                "enum": [i for i, e in CATALOGUE.items() if e.chart is not None],
+            }
         },
         ["item"],
     ),

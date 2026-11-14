@@ -5,8 +5,10 @@ import json
 import logging
 import re
 import time
+from contextlib import contextmanager
 
 from django.conf import settings
+from google.genai import errors as genai_errors
 from google.genai import types
 
 from .. import services
@@ -19,8 +21,8 @@ from .validate import ReplyError, validate_reply
 
 log = logging.getLogger("coach.gemini")
 
-# Deeper questions chain tools (list_inferences -> get_inference -> ...).
-MAX_ROUNDS = 8
+# The spec's 5 rounds (F2: speed); call tools together to fit deeper answers.
+MAX_ROUNDS = 5
 HISTORY_TURNS = 6
 # Total size of tool results per turn, so the context stays small (~15k tokens).
 MAX_TURN_RESULT_CHARS = 60_000
@@ -89,11 +91,13 @@ def _call_within_budget(ctx, name, args, used):
     """Run a tool; past the turn's budget its result is replaced by an error,
     also in ctx.results so its numbers cannot be quoted. Returns (result,
     chars used so far)."""
-    result = call_tool(ctx, name, args)
+    with _timed(ctx, "tool", name=name):
+        result = call_tool(ctx, name, args)
     size = len(json.dumps(result, default=str))
     if used + size > MAX_TURN_RESULT_CHARS:
         result = {"error": BUDGET_ERROR}
         ctx.results[-1] = result
+        ctx.trace[-1] = {**ctx.trace[-1], "result": result, "over_budget": True}
         return result, used
     return result, used + size
 
@@ -117,6 +121,42 @@ def _history_contents(customer_id, history):
         if text:
             contents.append(_text(role, text))
     return contents
+
+
+TIMED_STEPS = ("router", "gemini", "tool", "validate")
+
+
+@contextmanager
+def _timed(ctx, step, **extra):
+    """F2: record how long one step of the turn took, in ms."""
+    start = time.monotonic()
+    try:
+        yield
+    finally:
+        took = round((time.monotonic() - start) * 1000, 1)
+        ctx.timings.append({"step": step, **extra, "ms": took})
+
+
+def _time_per_step(ctx):
+    totals = dict.fromkeys(TIMED_STEPS, 0.0)
+    for t in ctx.timings:
+        totals[t["step"]] = round(totals[t["step"]] + t["ms"], 1)
+    return totals
+
+
+def _earlier_user_messages(customer_id, history):
+    """What the user said in the last HISTORY_TURNS turns (stored or sent)."""
+    stored = ChatTurn.objects.filter(customer_id=customer_id).order_by(
+        "-created_at", "-id"
+    )[:HISTORY_TURNS]
+    said = [t.message for t in stored]
+    if said:
+        return said
+    return [
+        item.get("text") or item.get("content") or ""
+        for item in (history or [])[-HISTORY_TURNS * 2 :]
+        if item.get("role") not in ("assistant", "model")
+    ]
 
 
 def _text(role, text):
@@ -156,66 +196,117 @@ def chat(
         customer_id, message, previous_pending=previous.pending if previous else {}
     )
     ctx.alert_runner = alert_runner
+    # F1: numbers the user gave earlier, or that sit in the stored proposal,
+    # may be repeated in the reply ("A 20,000 euro goal by 2028?").
+    ctx.user_numbers = [
+        ctx.previous_pending,
+        *_earlier_user_messages(customer_id, history),
+    ]
 
     if client is None:
         raise GeminiNotConfigured("Gemini is not configured: set GEMINI_API_KEY")
 
     routed = depth is None
     if routed:
-        depth = router.route(message, client=client, model=settings.GEMINI_ROUTER_MODEL)
+        with _timed(ctx, "router"):
+            depth = router.route(
+                message, client=client, model=settings.GEMINI_ROUTER_MODEL
+            )
 
     contents = _history_contents(customer_id, history)
     contents.append(
         _text(
             "user",
             f"Profile summary: {profile_summary(profile)}\n"
-            f"Answer at depth {depth}.\nUser: {message}",
+            f"Answer at depth {depth}.\n"
+            + (f"{router.LEVELS_HINT}\n" if router.wants_levels(message) else "")
+            + f"User: {message}",
         )
     )
-    reply, rounds, fallback = _run(client, contents, ctx)
-    if fallback:
+    try:
+        reply, rounds, reason, detail = _run(client, contents, ctx)
+    except genai_errors.APIError as exc:
+        log.exception("Gemini call failed for %s", customer_id)
+        reply, rounds, reason, detail = None, 0, "gemini_error", str(exc)
+    if reason:
         reply = copy.deepcopy(FALLBACK_REPLY)
     ChatTurn.objects.create(
         customer_id=customer_id, message=message, reply=reply, pending=ctx.pending
     )
-    if settings.DEMO_MODE and not fallback:
+    # A turn that left a proposal waiting is never cached: a replay would not
+    # restore the proposal, so the user's "yes" could not confirm it (F1).
+    if settings.DEMO_MODE and not reason and not ctx.pending:
         DemoCache.objects.update_or_create(
             customer_id=customer_id, question=question, defaults={"reply": reply}
         )
+    if reason:
+        reply = _explain_fallback(ctx, reply, reason, detail, rounds)
     meta = {
         "model": settings.GEMINI_MODEL,
         "depth": depth,
         "routed": routed,
         "tools": ctx.tools_called,
         "rounds": rounds,
-        "fallback": fallback,
+        "fallback": bool(reason),
+        "fallback_reason": reason,
         "latency_ms": round((time.monotonic() - started) * 1000),
+        "time_ms": _time_per_step(ctx),
+        "timings": ctx.timings,
     }
     log.info("chat %s", meta)
     return reply, meta
 
 
+def _explain_fallback(ctx, reply, reason, detail, rounds):
+    """F3: log why this turn fell back; add it to the reply when DEBUG."""
+    report = {
+        "reason": reason,
+        "detail": detail,
+        "rounds": rounds,
+        "tools": ctx.trace,
+        "validation_errors": ctx.validation_errors,
+    }
+    log.warning(
+        "chat fallback %s",
+        json.dumps(
+            {"customer_id": ctx.customer_id, "message": ctx.message, **report},
+            default=str,
+        ),
+    )
+    if settings.DEBUG:
+        return {**reply, "debug": report}
+    return reply
+
+
 def _run(client, contents, ctx):
-    """The tool loop: at most MAX_ROUNDS rounds, one retry on a bad reply."""
+    """The tool loop: at most MAX_ROUNDS rounds, one retry on a bad reply.
+
+    Returns (reply, rounds, fallback reason or None, detail).
+    """
     config = build_config()
     retried = False
     used = 0
     for round_no in range(1, MAX_ROUNDS + 1):
-        resp = client.models.generate_content(
-            model=settings.GEMINI_MODEL, contents=contents, config=config
-        )
+        with _timed(ctx, "gemini", round=round_no):
+            resp = client.models.generate_content(
+                model=settings.GEMINI_MODEL, contents=contents, config=config
+            )
         contents.append(resp.candidates[0].content)
         parts = []
         for call in resp.function_calls or []:
             args = dict(call.args or {})
             if call.name == "send_reply":
                 try:
-                    reply = validate_reply(args, ctx.results, ctx.message)
-                    return reply, round_no, False
+                    with _timed(ctx, "validate"):
+                        reply = validate_reply(
+                            args, ctx.results + ctx.user_numbers, ctx.message
+                        )
+                    return reply, round_no, None, None
                 except ReplyError as exc:
                     log.warning("send_reply rejected: %s", exc)
+                    ctx.validation_errors.append(str(exc))
                     if retried:
-                        return None, round_no, True
+                        return None, round_no, "invalid_reply", str(exc)
                     retried = True
                     result = {"error": str(exc), "instruction": "Fix and resend."}
             else:
@@ -228,4 +319,4 @@ def _run(client, contents, ctx):
         if not parts:
             parts.append(_text("user", "Call send_reply to answer.").parts[0])
         contents.append(types.Content(role="user", parts=parts))
-    return None, MAX_ROUNDS, True
+    return None, MAX_ROUNDS, "max_rounds", f"No send_reply after {MAX_ROUNDS} rounds."
