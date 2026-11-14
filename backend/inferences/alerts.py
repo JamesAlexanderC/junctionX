@@ -222,6 +222,11 @@ def _label(merchant):
     return merchant_name(pd.DataFrame(), merchant)
 
 
+def _capitalised(text):
+    """'a lifestyle shop' -> 'A lifestyle shop' at the start of a sentence."""
+    return text[:1].upper() + text[1:]
+
+
 def _ids(frame, limit=5):
     return [str(i) for i in frame["tx_id"].tolist()[-limit:]]
 
@@ -966,7 +971,7 @@ def rule_83_new_credit(df, profile, today, **ctx):
                 83,
                 "amber",
                 "New credit",
-                f"A new loan or credit payment to {m['merchant_id']} "
+                f"A new loan or credit payment to {_label(m['merchant_id'])} "
                 f"({_eur(m['payment'])}) started recently.",
                 today,
                 m["next_date"],
@@ -1145,7 +1150,7 @@ def rule_91_free_trial(df, profile, today, **ctx):
                 91,
                 "blue",
                 "Free trial now paid",
-                f"{_label(trial['merchant_id'])} started charging "
+                f"{_capitalised(_label(trial['merchant_id']))} started charging "
                 f"{_eur(abs(first['tx_amount_eur']))} after a free trial. Keep it?",
                 today,
                 today + timedelta(days=30),
@@ -1341,7 +1346,11 @@ def rule_101_bill_went_up(df, profile, today, **ctx):
     ids |= {
         s.get("merchant_id") for s in _get(profile, "income.subscriptions", []) or []
     }
-    ids |= {m for m, _ in _recurring_groups(out, min_count=4)}
+    ids |= {
+        m
+        for m, rows in _recurring_groups(out, min_count=4)
+        if str(rows["category"].mode().iloc[0]).lower() not in T.NOT_BILL_CATEGORIES
+    }
     found = []
     recent = pd.Timestamp(today - timedelta(days=T.RECUR_GAP_MAX))
     for merchant in sorted(i for i in ids if i):
@@ -1362,7 +1371,8 @@ def rule_101_bill_went_up(df, profile, today, **ctx):
                 101,
                 "amber",
                 "Bill went up",
-                f"{_label(merchant)} went from {_eur(base)} to {_eur(amounts[-1])}.",
+                f"Your payments to {_label(merchant)} went from {_eur(base)} to "
+                f"{_eur(amounts[-1])}.",
                 today,
                 today + timedelta(days=7),
                 {

@@ -30,6 +30,21 @@ OWN_TRANSFER_TYPES = NEUTRAL_TRANSFER_TYPES | SAVER_TYPES
 # payday (#1) and bill detection (#4) can group them (salary, rent and
 # utilities have no merchant_id in the data).
 PSEUDO_MERCHANT_PREFIX = "type:"
+# Real merchant ids look like "MRC-GRO-0016"; the middle code is the category
+# (checked on all 3.6M rows: one category per code). Users never see the id.
+MERCHANT_ID_RE = r"\bMRC-([A-Z]{3})-\d+\b"
+MERCHANT_CODE_NAMES = {
+    "ENT": "an entertainment merchant",
+    "GRO": "a grocery shop",
+    "HEA": "a health provider",
+    "HMT": "a home and tech shop",
+    "LIF": "a lifestyle shop",
+    "RES": "a restaurant",
+    "TRN": "a transport provider",
+    "TRV": "a travel company",
+}
+UNKNOWN_MERCHANT_NAME = "a shop"
+
 PSEUDO_MERCHANT_NAMES = {
     "salary": "Salary",
     "other_income": "Other income",

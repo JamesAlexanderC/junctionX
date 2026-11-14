@@ -2,6 +2,10 @@
 
 from datetime import timedelta
 
+import pandas as pd
+
+from inferences.common import merchant_name
+
 from ... import planner
 from ...models import AlertSnooze, Goal, Transaction
 from ... import services
@@ -61,7 +65,8 @@ def explain_alert(ctx, alert_id):
             "date": t.tx_date.isoformat(),
             "amount": t.tx_amount_eur,
             "category": t.category,
-            "merchant_id": t.merchant_id,
+            # #24: a friendly name ("a grocery shop"), never the raw MRC id.
+            "merchant": merchant_name(pd.DataFrame(), t.merchant_id),
         }
         for t in Transaction.objects.filter(tx_id__in=ids[:5])
     ]

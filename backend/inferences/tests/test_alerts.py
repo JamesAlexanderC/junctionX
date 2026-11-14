@@ -295,3 +295,45 @@ def test_simulated_profile_clears_alerts():
     sim["baskets"]["totals"]["leaky"] = 128  # takeaways cut 20%
     after = {a["inference"] for a in alerts.run_all_alerts(make_df([]), sim, TODAY)}
     assert not {20, 52, 89} & after
+
+
+# --- #24 (live tests): bill wording and what counts as a bill ------------------------
+
+
+def _monthly(merchant, category, amounts, mcc="5411"):
+    months = (7, 8, 9, 10)
+    return [
+        tx(f"2026-{m:02d}-15 09:00", -a, merchant, category, mcc)
+        for m, a in zip(months, amounts)
+    ]
+
+
+def test_a_monthly_grocery_shop_is_not_a_bill():
+    rows = _monthly("MRC-GRO-0016", "groceries", [62.0, 62.5, 62.34, 90.17])
+    assert alerts.rule_101_bill_went_up(make_df(rows), profile(), TODAY) == []
+
+
+def test_a_real_bill_still_triggers_with_a_friendly_name():
+    rows = _monthly("MRC-ENT-0007", "entertainment", [12.99, 12.99, 12.99, 15.99])
+    (found,) = alerts.rule_101_bill_went_up(make_df(rows), profile(), TODAY)
+    assert "MRC-" not in found["text"]
+    assert found["text"].startswith("Your payments to an entertainment merchant")
+
+
+@pytest.mark.parametrize(
+    "merchant, label",
+    [
+        ("MRC-GRO-0016", "a grocery shop"),
+        ("MRC-RES-0022", "a restaurant"),
+        ("MRC-LIF-0062", "a lifestyle shop"),
+        ("MRC-HMT-0044", "a home and tech shop"),
+        ("MRC-XYZ-0001", "a shop"),
+        ("M_NETFLIX", "M_NETFLIX"),
+    ],
+)
+def test_merchant_ids_become_friendly_names(merchant, label):
+    import pandas as pd
+
+    from inferences.common import merchant_name
+
+    assert merchant_name(pd.DataFrame(), merchant) == label

@@ -2,6 +2,7 @@
 
 import copy
 import json
+import re
 
 import pytest
 from pathlib import Path
@@ -130,7 +131,9 @@ def test_every_open_alert_gets_a_reason():
     reasons = {r["id"]: r for r in plan["unclearable"]}
     assert set(reasons) == {a["id"] for a in profile["alerts"]}
     for r in reasons.values():
-        assert "biggest saves EUR" in r["why"]
+        # #24: plain words, no planner internals ("none of the 9 changes").
+        assert "the most any of them saves is EUR" in r["why"]
+        assert not re.search(r"\b\d+ changes\b", r["why"])
         assert r["options"]
 
 

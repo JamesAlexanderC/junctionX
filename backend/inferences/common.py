@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import math
+import re
 from datetime import date, timedelta
 
 import pandas as pd
@@ -166,6 +167,9 @@ def merchant_name(df: pd.DataFrame, merchant_id: str) -> str:
         names = df.loc[df["merchant_id"] == merchant_id, "merchant_name"].dropna()
         if len(names):
             return str(names.iloc[-1])
+    coded = re.fullmatch(th.MERCHANT_ID_RE, merchant_id)
+    if coded:  # never show a raw "MRC-GRO-0016" to the user (#24, F11)
+        return th.MERCHANT_CODE_NAMES.get(coded.group(1), th.UNKNOWN_MERCHANT_NAME)
     return str(merchant_id)
 
 

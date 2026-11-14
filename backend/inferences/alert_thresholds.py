@@ -117,6 +117,10 @@ PAYDAY_MISSED_DAYS = 3
 
 # #101 bill went up
 BILL_UP_RATIO = 1.10
+# #101 (#24 live test): shops visited about monthly are not bills, even when
+# their amounts are steady (a grocery shop was flagged as "Bill went up").
+# Entertainment and transport stay: they can be subscriptions or passes.
+NOT_BILL_CATEGORIES = frozenset({"groceries", "restaurants", "lifestyle", "travel"})
 
 # #102 big bill coming
 BIG_BILL_DAYS = 3

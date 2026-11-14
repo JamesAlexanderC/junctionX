@@ -5,8 +5,14 @@ tool result of this turn or the user's message. Each known card must match
 its payload (cards.py); unknown card types are dropped.
 """
 
+import json
 import re
 from typing import Any
+
+import pandas as pd
+
+from inferences.common import merchant_name
+from inferences.thresholds import MERCHANT_ID_RE
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
@@ -117,12 +123,28 @@ def _check_card_numbers(cards, allowed):
             )
 
 
+MERCHANT_RE = re.compile(MERCHANT_ID_RE)
+
+
+def _check_merchant_ids(text, cards):
+    """#24: users never see raw merchant ids; name the friendly version."""
+    found = MERCHANT_RE.search(f"{text} {json.dumps(cards)}")
+    if found:
+        raw = found.group(0)
+        friendly = merchant_name(pd.DataFrame(), raw)
+        raise ReplyError(
+            f"Do not show raw merchant ids like {raw}; say '{friendly}' instead."
+        )
+
+
 def validate_reply(args, tool_results, message=""):
     """Return a clean reply dict or raise ReplyError with a reason for Gemini."""
     try:
         reply = SendReply.model_validate(dict(args or {}))
     except ValidationError as exc:
         raise ReplyError(f"send_reply schema error: {exc.errors()}") from exc
+    # First: its digits ("0016") would otherwise fail as an unknown number.
+    _check_merchant_ids(reply.text, reply.cards)
     bad = unmatched_numbers(reply.text, tool_results, message)
     if bad:
         raise ReplyError(

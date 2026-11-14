@@ -180,3 +180,8 @@ def test_chips_repeating_question_options_are_dropped():
     }
     reply = validate_reply(args, [], "")
     assert reply["chips"] == ["Different goal"]
+
+
+def test_raw_merchant_ids_are_rejected_with_the_friendly_name():
+    with pytest.raises(ReplyError, match="a grocery shop"):
+        validate_reply({"text": "MRC-GRO-0016 went up.", "depth": 1}, [])
