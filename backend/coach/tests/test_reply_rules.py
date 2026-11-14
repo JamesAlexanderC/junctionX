@@ -47,3 +47,22 @@ def test_prompt_refuses_other_peoples_data_plainly():
 
 def test_prompt_redirects_off_topic_questions():
     assert "off-topic" in SYSTEM_PROMPT.lower()
+
+
+# --- #8 (live test 00005): unexpected costs = surprises, not unusual charges ------
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("term", ["unexpected costs", "surprises"])
+def test_explainer_separates_surprises_from_unusual_charges(aino, term):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    from .conftest import AINO
+
+    out = call_tool(ToolContext(AINO), "get_explainer", {"term": term})
+    assert out["found"] is True
+    assert "irregular" in out["text"] and "unusual charge" in out["text"]
+
+
+def test_prompt_answers_unexpected_costs_with_the_surprises_basket():
+    assert "unexpected costs" in SYSTEM_PROMPT

@@ -210,6 +210,12 @@ TIGHT_DAYS_TEXT = (
     "in the next 30 days when no payday is found."
 )
 
+SURPRISES_TEXT = (
+    "Surprises are must-pay costs that come irregularly, like a car repair or "
+    "the dentist. They are not the same as an unusual charge, which is one "
+    "payment much bigger than usual at a shop."
+)
+
 EXPLAINERS = {
     # FC-7: tight days are below EUR 50, not below the buffer.
     "danger days": (
@@ -239,8 +245,13 @@ EXPLAINERS = {
         "Must-pay regular costs: rent, utilities, insurance, loans, groceries.",
         lambda p: {"value": p.get("baskets", {}).get("monthly_essentials")},
     ),
+    # #8 (live test): "unexpected costs" got the unusual-charge alert instead.
+    "unexpected costs": (
+        SURPRISES_TEXT,
+        lambda p: {"value": p.get("forecast", {}).get("surprise_fund_monthly")},
+    ),
     "surprises": (
-        "Must-pay costs that come irregularly, like a car repair or the dentist.",
+        SURPRISES_TEXT,
         lambda p: {"value": p.get("forecast", {}).get("surprise_fund_monthly")},
     ),
     "saver": (

@@ -1089,12 +1089,21 @@ def rule_88_spending_pace(df, profile, today, **ctx):
     if income <= 0 or projected <= income:
         return None
     end = date(today.year, today.month, days_in_month)
+    # Live test (CUST00009): 93% of the salary moves out the next day, so the
+    # income compared is what stays here; say so instead of "your income".
+    if _get(profile, "income.partial_view") is True:
+        compared = (
+            f"the {_eur(income)} of your income that stays in this account (most "
+            "of your salary moves to another account)"
+        )
+    else:
+        compared = f"your {_eur(income)} income"
     return _alert(
         88,
         "amber",
         "Spending pace",
         f"At this pace you'll spend about {_eur(projected)} this month, more than "
-        f"your {_eur(income)} income.",
+        f"{compared}.",
         today,
         end,
         {"spent": round(spent, 2), "projected": round(projected, 2), "income": income},

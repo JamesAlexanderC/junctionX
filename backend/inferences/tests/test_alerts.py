@@ -360,3 +360,27 @@ def test_a_real_yearly_bill_still_triggers_in_plain_words():
     df = _yearly("MRC-HEA-0003", "health")
     (found,) = alerts.rule_93_annual_bill(df, profile(), TODAY)
     assert found["text"].startswith("A health provider charges about EUR 90")
+
+
+# --- #88 (live test 00009): partial view, most of the salary leaves --------------
+
+
+def _pace(partial_view):
+    rows = [tx("2026-10-05 12:00", -500.0, "M_SHOP", "shopping")]
+    p = profile(
+        income__retained_income=386.03,
+        income__partial_view=partial_view,
+        income__coverage=0.93 if partial_view else 0.0,
+    )
+    return alerts.rule_88_spending_pace(make_df(rows), p, TODAY)
+
+
+def test_spending_pace_partial_view_says_what_stays_in_the_account():
+    text = _pace(partial_view=True)["text"]
+    assert "EUR 386.03 of your income that stays in this account" in text
+    assert "moves to another account" in text
+
+
+def test_spending_pace_full_view_keeps_the_plain_wording():
+    text = _pace(partial_view=False)["text"]
+    assert "more than your EUR 386.03 income" in text
