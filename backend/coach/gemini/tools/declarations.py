@@ -98,6 +98,8 @@ CARD_SCHEMA = {
         "difficulty": STR,
         "monthly_needed": NUM,
         "level": INT,
+        "current_level": INT,
+        "current_name": STR,
         "progress": NUM,
         "euros_to_go": NUM,
         "next_step": STR,

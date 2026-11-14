@@ -138,9 +138,17 @@ function LevelProgressCard({ card }) {
   return (
     <div className="card">
       {card.ladder?.length > 0 && <Ladder ladder={card.ladder} target={card.level} />}
-      <strong>
-        Level {card.level}: {card.name}
-      </strong>
+      {/* FC-7: lead with where the user is; the bar is progress to the next. */}
+      {card.current_level != null && card.current_level !== card.level ? (
+        <>
+          <strong>{`Level ${card.current_level}: ${card.current_name}`}</strong>
+          <small className="muted">{`Next: Level ${card.level} ${card.name}`}</small>
+        </>
+      ) : (
+        <strong>
+          Level {card.level}: {card.name}
+        </strong>
+      )}
       <Bar value={card.progress} />
       <small>
         {card.euros_to_go != null && `${eur(card.euros_to_go)} to go`}

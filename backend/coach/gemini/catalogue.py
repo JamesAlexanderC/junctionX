@@ -203,7 +203,8 @@ _ENTRIES = [
     ),
     Entry(
         "forecast.danger_days",
-        "Days the balance may drop below the buffer.",
+        "Days the balance may drop below EUR 50 (before payday, or in the next "
+        "30 days without one).",
         gate="forecast.danger_days",
     ),
     Entry(

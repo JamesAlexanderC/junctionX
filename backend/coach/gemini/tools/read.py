@@ -92,11 +92,15 @@ def level_card(levels):
     current = levels["current"]
     nxt = levels.get("next")
     step = levels.get("easiest_next_step") or {}
+    # FC-7: show where the user is, and clamp progress (it can come out < 0).
+    progress = min(1.0, max(0.0, float(levels.get("progress", 1.0) or 0.0)))
     card = {
         "type": "level_progress",
         "level": nxt or current,
         "name": levels.get("next_name") or levels.get("current_name"),
-        "progress": levels.get("progress", 1.0),
+        "current_level": current,
+        "current_name": levels.get("current_name"),
+        "progress": progress,
         "euros_to_go": levels.get("euros_to_go"),
         "next_step": step.get("text"),
         "ladder": [
@@ -199,7 +203,21 @@ def get_mortgage_readiness(ctx):
     return m
 
 
+TIGHT_DAYS_TEXT = (
+    "Days when your balance could drop below EUR 50: before your next payday, or "
+    "in the next 30 days when no payday is found."
+)
+
 EXPLAINERS = {
+    # FC-7: tight days are below EUR 50, not below the buffer.
+    "danger days": (
+        TIGHT_DAYS_TEXT,
+        lambda p: {"value": len(p.get("forecast", {}).get("danger_days") or [])},
+    ),
+    "tight days": (
+        TIGHT_DAYS_TEXT,
+        lambda p: {"value": len(p.get("forecast", {}).get("danger_days") or [])},
+    ),
     "safe to spend": (
         "What you can spend this week without touching bills, savings or your "
         "buffer.",

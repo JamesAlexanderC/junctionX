@@ -295,3 +295,19 @@ describe('level card', () => {
     expect(screen.getByText(/€445 to go/)).toBeTruthy()
   })
 })
+
+describe('level card (FC-7)', () => {
+  it('shows the current level and the next one', () => {
+    const card = {
+      type: 'level_progress',
+      level: 3,
+      name: 'Safety net',
+      current_level: 2,
+      current_name: 'In control',
+      progress: 0,
+    }
+    render(<ReplyCard card={card} onSend={() => {}} />)
+    expect(screen.getByText('Level 2: In control')).toBeTruthy()
+    expect(screen.getByText('Next: Level 3 Safety net')).toBeTruthy()
+  })
+})

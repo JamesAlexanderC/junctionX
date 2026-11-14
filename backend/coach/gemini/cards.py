@@ -8,7 +8,7 @@ money; every other number in a card must come from a tool result.
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class _Card(BaseModel):
@@ -87,9 +87,18 @@ class GoalCard(_Card):
 
 
 class LevelProgressCard(_Card):
-    level: int
+    level: int  # the level the user is working towards
     name: str
+    current_level: int | None = None  # FC-7: where the user is now
+    current_name: str | None = None
     progress: float
+
+    @field_validator("progress")
+    @classmethod
+    def clamp_progress(cls, value):
+        """FC-7: a bar between 0 and 1; clamp rather than fail the reply."""
+        return min(1.0, max(0.0, value))
+
     euros_to_go: float | None = None
     next_step: str | None = None
     ladder: list[_Rung] | None = None

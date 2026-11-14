@@ -86,3 +86,50 @@ def test_card_rejects_an_unknown_flag():
     }
     with pytest.raises(ValidationError):
         clean_card(card)
+
+
+# --- FC-7: wording, level card and charts for tight days ----------------------------
+
+
+def test_danger_days_are_described_as_below_eur_50():
+    from coach.gemini.catalogue import CATALOGUE
+
+    about = CATALOGUE["forecast.danger_days"].about
+    assert "EUR 50" in about and "buffer" not in about
+
+
+@pytest.mark.parametrize("term", ["danger days", "tight days"])
+def test_explainer_knows_tight_days(aino, term):
+    out = call_tool(ToolContext(AINO), "get_explainer", {"term": term})
+    assert out["found"] is True and "EUR 50" in out["text"]
+
+
+def test_level_card_shows_current_level_and_clamps_progress():
+    from coach.gemini.tools.read import level_card
+
+    levels = {
+        "current": 2,
+        "current_name": "In control",
+        "next": 3,
+        "next_name": "Safety net",
+        "progress": -0.18,
+        "euros_to_go": 1089.71,
+        "ladder": [],
+    }
+    card = level_card(levels)
+    assert card["progress"] == 0.0
+    assert (card["current_level"], card["current_name"]) == (2, "In control")
+    assert (card["level"], card["name"]) == (3, "Safety net")
+    assert clean_card(card)["current_level"] == 2
+
+
+def test_prompt_attaches_the_balance_chart_for_tight_days():
+    from coach.gemini.system_prompt import SYSTEM_PROMPT
+
+    assert "money get tight" in SYSTEM_PROMPT
+
+
+def test_level_card_out_of_range_progress_is_clamped_not_rejected():
+    card = {"type": "level_progress", "level": 3, "name": "Safety net"}
+    assert clean_card({**card, "progress": -0.18})["progress"] == 0.0
+    assert clean_card({**card, "progress": 97})["progress"] == 1.0
