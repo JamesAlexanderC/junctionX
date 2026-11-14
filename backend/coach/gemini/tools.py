@@ -328,6 +328,18 @@ def _norm(text):
     return re.sub(r"[^a-z0-9]+", " ", str(text).lower()).strip()
 
 
+def unavailable(reason, **extra):
+    """What a tool returns when the data does not support the inference.
+
+    Gemini must then say it has no answer instead of using a default.
+    """
+    return {"available": False, "reason": reason, **extra}
+
+
+def _missing(value):
+    return value is None or value == [] or value == {}
+
+
 # --- tool implementations --------------------------------------------------
 
 
@@ -342,36 +354,31 @@ def get_category_spend(ctx, category, month=None):
         tx_date__year=year,
         tx_date__month=mon,
     )
-    if qs.exists():
-        rows = [t for t in qs if _norm(category) in _norm(t.category)]
-        if not rows:
-            return {"found": False, "category": category, "month": month}
-        total = round(sum(-t.tx_amount_eur for t in rows), 2)
+    rows = [t for t in qs if _norm(category) in _norm(t.category)]
+    if not rows:
         return {
-            "found": True,
+            **unavailable(f"No spending in '{category}' in {month}."),
+            "found": False,
             "category": category,
             "month": month,
-            "total": total,
-            "count": len(rows),
         }
-    # Profile-only fallback: mean monthly spend from the what-if section.
-    means = ctx.profile.get("whatif", {}).get("category_means", {})
-    for cat, value in means.items():
-        if _norm(category) in _norm(cat) or _norm(cat) in _norm(category):
-            return {
-                "found": True,
-                "category": cat,
-                "month": month,
-                "total": value,
-                "note": "monthly average of the last 3 months",
-            }
-    return {"found": False, "category": category, "month": month}
+    total = round(sum(-t.tx_amount_eur for t in rows), 2)
+    return {
+        "available": True,
+        "found": True,
+        "category": category,
+        "month": month,
+        "total": total,
+        "count": len(rows),
+    }
 
 
 def get_safe_to_spend(ctx):
     p = ctx.profile
     fc, payday = p.get("forecast", {}), p.get("income", {}).get("payday", {})
     next_payday = payday.get("next_payday")
+    if fc.get("safe_to_spend_week") is None:
+        return unavailable("Safe to spend could not be computed from the data.")
     bills = [
         b
         for b in fc.get("upcoming_bills", [])
@@ -391,6 +398,8 @@ def get_safe_to_spend(ctx):
 
 def get_safe_to_save(ctx):
     fc = ctx.profile.get("forecast", {})
+    if fc.get("safe_to_save_today") is None:
+        return unavailable("Safe to save could not be computed from the data.")
     return {
         "safe_to_save_today": fc.get("safe_to_save_today"),
         "danger_days": fc.get("danger_days", []),
@@ -399,11 +408,17 @@ def get_safe_to_save(ctx):
 
 
 def get_baskets(ctx):
-    return ctx.profile.get("baskets", {})
+    baskets = ctx.profile.get("baskets") or {}
+    if not any((baskets.get("totals") or {}).values()):
+        return unavailable("No spending found for the latest month.")
+    return baskets
 
 
 def get_level(ctx):
-    return ctx.profile.get("levels", {})
+    levels = ctx.profile.get("levels") or {}
+    if levels.get("current") is None:
+        return unavailable("Levels could not be computed from the data.")
+    return levels
 
 
 def simulate_cut(ctx, category, pct, goal_id=None):
@@ -422,7 +437,11 @@ def simulate_cut(ctx, category, pct, goal_id=None):
         None,
     )
     if match is None:
-        return {"found": False, "category": category}
+        return {
+            **unavailable(f"No recent spending in '{category}' to cut."),
+            "found": False,
+            "category": category,
+        }
     monthly_spend = means[match]
     monthly = round(pct * monthly_spend, 2)
     out = {
@@ -457,6 +476,8 @@ def simulate_cut(ctx, category, pct, goal_id=None):
 
 def forecast_balance(ctx):
     fc = ctx.profile.get("forecast", {})
+    if _missing(fc.get("end_of_month")):
+        return unavailable("The balance forecast could not be computed.")
     return {
         "balance": ctx.profile.get("balance"),
         "end_of_month": fc.get("end_of_month"),
@@ -467,7 +488,10 @@ def forecast_balance(ctx):
 
 
 def get_spender_type(ctx):
-    return ctx.profile.get("habits", {})
+    habits = ctx.profile.get("habits") or {}
+    if not (habits.get("spender_type") or {}).get("label"):
+        return unavailable("Not enough spending to tell a spender type.")
+    return habits
 
 
 def list_goals(ctx):
@@ -533,6 +557,8 @@ def rate_goal(ctx, goal_type, up):
     qs = GoalRating.objects.filter(customer_id=ctx.customer_id, goal_type=goal_type)
     ups = qs.filter(up=True).count()
     downs = qs.filter(up=False).count()
+    services.invalidate(ctx.customer_id)
+    ctx.reload()
     return {
         "goal_type": goal_type,
         "ups": ups,
@@ -542,11 +568,19 @@ def rate_goal(ctx, goal_type, up):
 
 
 def get_detected_goals(ctx):
-    return {"detected": ctx.profile.get("goals", {}).get("detected", [])}
+    detected = ctx.profile.get("goals", {}).get("detected", [])
+    if not detected:
+        return unavailable("No saving patterns detected in the data.", detected=[])
+    return {"available": True, "detected": detected}
 
 
 def get_mortgage_readiness(ctx):
     m = dict(ctx.profile.get("mortgage", {}))
+    if (m.get("readiness") or {}).get("score") is None:
+        return unavailable(
+            "The mortgage readiness model has not been fitted on the mortgage "
+            "files (run manage.py build_artifacts)."
+        )
     m["loan_details_entered"] = services.latest_loan(ctx.customer_id) is not None
     m["note"] = "Guidance only, not a loan decision."
     return m
@@ -598,13 +632,18 @@ def get_explainer(ctx, term):
     if key is None:
         return {"found": False, "term": term}
     text, numbers = EXPLAINERS[key]
-    return {"found": True, "term": key, "text": text, **numbers(ctx.profile)}
+    values = {k: v for k, v in numbers(ctx.profile).items() if v is not None}
+    return {"found": True, "term": key, "text": text, **values}
 
 
 def get_benchmark(ctx, kind, category=None):
     rows = ctx.profile.get("benchmarks", {}).get(kind, [])
     if category:
         rows = [r for r in rows if _norm(category) in _norm(r["category"])]
+    if not rows:
+        return unavailable(
+            "No peer group of at least 20 customers to compare with.", kind=kind
+        )
     return {
         "kind": kind,
         "rows": rows,
@@ -763,12 +802,47 @@ TOOLS = {
 }
 
 
+# Tool -> profile["availability"] item (inferences/availability.py). When the
+# item is unavailable the tool returns {"available": false, "reason"} instead
+# of running, so Gemini never sees a default standing in for missing data.
+TOOL_AVAILABILITY = {
+    "get_safe_to_spend": "forecast.safe_to_spend_week",
+    "get_safe_to_save": "forecast.safe_to_save_today",
+    "get_baskets": "baskets",
+    "get_level": "levels",
+    "simulate_cut": "whatif.category_cut",
+    "forecast_balance": "forecast.end_of_month",
+    "get_spender_type": "habits.spender_type",
+    "get_detected_goals": "goals.detected",
+    "get_mortgage_readiness": "mortgage.readiness",
+}
+
+
+def availability_item(name, args):
+    if name == "get_benchmark":
+        return f"benchmarks.{args.get('kind')}"
+    return TOOL_AVAILABILITY.get(name)
+
+
+def check_available(ctx, name, args):
+    """None when the tool may run, else the unavailable result."""
+    from inferences.availability import available
+
+    item = availability_item(name, args)
+    if item is None or available(ctx.profile, item):
+        return None
+    entry = (ctx.profile.get("availability") or {}).get(item) or {}
+    return unavailable(
+        entry.get("reason") or "The data does not support this.", item=item
+    )
+
+
 def call_tool(ctx, name, args):
     """Validate and run a tool; errors come back as a result for Gemini."""
     ctx.tools_called.append(name)
     try:
         clean = validate_args(name, args)
-        result = TOOLS[name](ctx, **clean)
+        result = check_available(ctx, name, clean) or TOOLS[name](ctx, **clean)
     except ToolError as exc:
         result = {"error": str(exc)}
     ctx.results.append(result)

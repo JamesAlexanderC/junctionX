@@ -62,7 +62,10 @@ def classify(df: pd.DataFrame, today, bills: list[dict] | None = None):
     if not len(outs):
         outs["basket"] = pd.Series(dtype=str)
         return outs
-    saver = (saver_mask(df) | internal_mask(df)).loc[outs.index]
+    # #75: savings types, matched own transfers (#41) or an investment MCC.
+    saver = (
+        saver_mask(df) | internal_mask(df) | df["mcc_code"].isin(th.INVESTMENT_MCCS)
+    ).loc[outs.index]
     if bills is None:
         from .income import regular_bills
 

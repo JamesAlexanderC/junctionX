@@ -1,19 +1,33 @@
-"""Profile storage and recomputation shared by the API, tools and commands."""
+"""Profiles built on demand from the real transactions in the database.
 
-import copy
-import json
+There is no demo or fixture fallback: a customer that is not in the DB has no
+profile (the API answers 404). Profiles are cached in the Profile table and
+rebuilt when the inference code changes or a goal, loan or snooze changes.
+"""
+
+import hashlib
 import logging
-import math
+import pickle
 from datetime import date, timedelta
+from functools import lru_cache
+from pathlib import Path
 
 from django.conf import settings
-from django.utils import timezone
+from django.db.models import Max, Q
 
-from .models import AlertSnooze, Customer, Goal, LoanDetails, Profile, Transaction
+from .models import (
+    AlertSnooze,
+    ComputedArtifact,
+    Customer,
+    Goal,
+    GoalRating,
+    LoanDetails,
+    Profile,
+    Transaction,
+)
 
 log = logging.getLogger(__name__)
 
-DEMO_CUSTOMER_ID = "demo-aino"
 TX_COLUMNS = [
     "tx_id",
     "customer_id",
@@ -28,130 +42,184 @@ TX_COLUMNS = [
     "mcc_code",
 ]
 SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
+PEER_TABLE_KEY = "peer_table"
+MORTGAGE_MODEL_KEY = "mortgage_model"
 
 
-def _reference_date_or_now():
-    """P1.1: the reference date is the latest tx_date in the database.
+# --- dates ------------------------------------------------------------------
 
-    The S-Bank data ends in the past, so "today" everywhere (goals, chat,
-    snoozes, alerts) is max(tx_date). With no transactions, the real date.
+
+@lru_cache(maxsize=1)
+def _dataset_as_of():
+    return Transaction.objects.aggregate(last=Max("tx_date"))["last"]
+
+
+def as_of_date():
+    """The date every inference runs 'as of'.
+
+    The S-Bank data ends 2026-09-30, so "today" is settings.AS_OF_DATE when
+    set, otherwise the date of the last loaded transaction. (The day after
+    would start an empty month, and every "this month" inference, such as the
+    basket split, would then have nothing to show.)
     """
-    from django.db.models import Max
+    if settings.AS_OF_DATE:
+        return date.fromisoformat(settings.AS_OF_DATE)
+    found = _dataset_as_of()
+    if found is None:
+        _dataset_as_of.cache_clear()  # nothing loaded yet; look again next time
+        return date.today()
+    return found
 
-    from coach.models import Transaction
 
-    latest = Transaction.objects.aggregate(d=Max("tx_date"))["d"]
-    return latest or timezone.localdate()
+def reset_as_of_cache():
+    _dataset_as_of.cache_clear()
 
 
 def today():
-    """The reference date (max tx_date); patched in tests."""
-    return _reference_date_or_now()
+    """'Today' for goals, snoozes, alerts and the chat: the dataset's as-of
+    date (max tx_date unless AS_OF_DATE is set; P1.1 reference date)."""
+    return as_of_date()
 
 
 def profile_today(profile):
-    """The profile's own 'today' (synthetic data lives in the past)."""
     raw = (profile or {}).get("today")
-    if raw:
-        return date.fromisoformat(raw)
-    return today()
+    return date.fromisoformat(raw) if raw else today()
 
 
-def demo_fixture():
-    path = settings.SHARED_FIXTURES_DIR / "profile_demo.json"
-    return json.loads(path.read_text())
+# --- inference version ---------------------------------------------------------
 
 
-def get_profile(customer_id):
-    """Return the stored profile dict or None.
-
-    Order: DB Profile row, then backend/profiles/<id>.json, then the shared
-    fixture for the demo customer (or any id when DEMO_MODE is on).
-    """
-    row = Profile.objects.filter(customer_id=customer_id).first()
-    if row:
-        return row.data
-    path = settings.PROFILES_DIR / f"{customer_id}.json"
-    if path.exists():
-        return json.loads(path.read_text())
-    if customer_id == DEMO_CUSTOMER_ID or settings.DEMO_MODE:
-        data = demo_fixture()
-        data["customer_id"] = customer_id
-        return data
-    return None
+@lru_cache(maxsize=1)
+def inference_version():
+    """Hash of the inference source, so cached profiles rebuild after changes."""
+    root = Path(__file__).resolve().parent.parent / "inferences"
+    digest = hashlib.sha1()
+    for path in sorted(root.glob("*.py")):
+        digest.update(path.name.encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:16]
 
 
-def save_profile(customer_id, data, write_file=False):
-    Profile.objects.update_or_create(customer_id=customer_id, defaults={"data": data})
-    if write_file:
-        settings.PROFILES_DIR.mkdir(parents=True, exist_ok=True)
-        path = settings.PROFILES_DIR / f"{customer_id}.json"
-        path.write_text(json.dumps(data, indent=2, default=str))
+def profile_version():
+    """Cache key for a stored profile: inference code + as-of date."""
+    return f"{inference_version()}@{as_of_date().isoformat()}"
 
 
-def list_customers():
-    rows = [
+# --- customers and transactions ---------------------------------------------
+
+
+def customer_exists(customer_id):
+    return Customer.objects.filter(customer_id=customer_id).exists()
+
+
+def list_customers(q=None, limit=50):
+    qs = Customer.objects.order_by("customer_id")
+    if q:
+        qs = qs.filter(Q(customer_id__icontains=q) | Q(postal_code__startswith=q))
+    return [
         {
             "customer_id": c.customer_id,
             "customer_age": c.age,
             "customer_postal_code": c.postal_code,
         }
-        for c in Customer.objects.order_by("customer_id")
+        for c in qs[:limit]
     ]
-    known = {r["customer_id"] for r in rows}
-    for p in Profile.objects.exclude(customer_id__in=known):
-        cust = p.data.get("customer", {})
-        rows.append(
-            {
-                "customer_id": p.customer_id,
-                "customer_age": cust.get("age"),
-                "customer_postal_code": cust.get("postal_code"),
-            }
-        )
-        known.add(p.customer_id)
-    if DEMO_CUSTOMER_ID not in known:
-        cust = demo_fixture()["customer"]
-        rows.append(
-            {
-                "customer_id": DEMO_CUSTOMER_ID,
-                "customer_age": cust["age"],
-                "customer_postal_code": cust["postal_code"],
-            }
-        )
-    return rows
 
 
 def transactions_df(customer_id):
     """Transactions for one customer as the CLAUDE.md DataFrame, or None."""
     import pandas as pd
 
-    qs = Transaction.objects.filter(customer_id=customer_id).values(
-        "tx_id",
-        "customer_id",
-        "account_id",
-        "tx_date",
-        "tx_timestamp",
-        "category",
-        "tx_amount_eur",
-        "balance_after_eur",
-        "transaction_type",
-        "merchant_id",
-        "mcc_code",
+    rows = list(
+        Transaction.objects.filter(customer_id=customer_id).values(
+            "tx_id",
+            "customer_id",
+            "account_id",
+            "tx_date",
+            "tx_timestamp",
+            "category",
+            "tx_amount_eur",
+            "balance_after_eur",
+            "transaction_type",
+            "merchant_id",
+            "mcc_code",
+        )
     )
-    rows = list(qs)
     if not rows:
         return None
-    df = pd.DataFrame(rows).rename(columns={"account_id": "bank_account_id"})
+    return _frame(pd.DataFrame(rows))
+
+
+def _frame(df):
+    import pandas as pd
+
+    df = df.rename(columns={"account_id": "bank_account_id"})
     df["tx_date"] = pd.to_datetime(df["tx_date"])
-    df["tx_timestamp"] = pd.to_datetime(df["tx_timestamp"]).dt.tz_localize(None)
+    ts = pd.to_datetime(df["tx_timestamp"], utc=True)
+    df["tx_timestamp"] = ts.dt.tz_localize(None)
     df["mcc_code"] = df["mcc_code"].astype(str)
-    return df[TX_COLUMNS].sort_values("tx_timestamp").reset_index(drop=True)
+    return df[TX_COLUMNS].sort_values(["tx_timestamp", "tx_id"]).reset_index(drop=True)
+
+
+def all_transactions_df():
+    """Every loaded transaction (for the dataset-wide artifacts)."""
+    import pandas as pd
+    from django.db import connection
+
+    if connection.vendor == "postgresql":
+        import io
+
+        cols = (
+            "tx_id, customer_id, account_id, tx_date, tx_timestamp, category, "
+            "tx_amount_eur, balance_after_eur, transaction_type, merchant_id, "
+            "mcc_code"
+        )
+        buf = io.BytesIO()
+        with connection.cursor() as cur:
+            with cur.cursor.copy(
+                f"COPY (SELECT {cols} FROM coach_transaction) TO STDOUT "
+                "WITH (FORMAT csv, HEADER)"
+            ) as copy:
+                for block in copy:
+                    buf.write(block)
+        buf.seek(0)
+        df = pd.read_csv(
+            buf,
+            dtype={
+                "customer_id": "category",
+                "account_id": "category",
+                "category": "category",
+                "transaction_type": "category",
+                "merchant_id": str,
+                "mcc_code": str,
+            },
+            keep_default_na=False,
+            na_values={"balance_after_eur": [""]},
+        )
+        return _frame(df)
+    rows = list(Transaction.objects.values())
+    if not rows:
+        return pd.DataFrame(columns=TX_COLUMNS)
+    df = pd.DataFrame(rows).rename(columns={"id": "tx_id"})
+    return _frame(df)
 
 
 def empty_df():
     import pandas as pd
 
     return pd.DataFrame(columns=TX_COLUMNS)
+
+
+def customer_dict(customer_id):
+    c = Customer.objects.filter(customer_id=customer_id).first()
+    return {
+        "customer_id": customer_id,
+        "age": c.age if c else None,
+        "postal_code": c.postal_code if c else "",
+    }
+
+
+# --- user state ---------------------------------------------------------------
 
 
 def goal_dicts(customer_id):
@@ -163,18 +231,102 @@ def goal_dicts(customer_id):
     ]
 
 
+def ratings(customer_id):
+    return [
+        {"goal_type": r.goal_type, "rating": "up" if r.up else "down"}
+        for r in GoalRating.objects.filter(customer_id=customer_id)
+    ]
+
+
 def latest_loan(customer_id):
     loan = LoanDetails.objects.filter(customer_id=customer_id).last()
     return loan.as_dict() if loan else None
 
 
-def snoozed_ids(customer_id, on=None):
+def snoozes(customer_id, on=None):
     on = on or today()
-    return set(
-        AlertSnooze.objects.filter(customer_id=customer_id, until__gt=on).values_list(
-            "alert_id", flat=True
-        )
+    return {
+        s.alert_id: s.until.isoformat()
+        for s in AlertSnooze.objects.filter(customer_id=customer_id, until__gt=on)
+    }
+
+
+def snoozed_ids(customer_id, on=None):
+    return set(snoozes(customer_id, on))
+
+
+# --- dataset-wide artifacts ----------------------------------------------------
+
+
+def peer_table():
+    row = ComputedArtifact.objects.filter(key=PEER_TABLE_KEY).first()
+    return row.data if row else None
+
+
+def mortgage_model():
+    row = ComputedArtifact.objects.filter(key=MORTGAGE_MODEL_KEY).first()
+    if row is None or row.blob is None:
+        return None
+    try:
+        return pickle.loads(bytes(row.blob))
+    except Exception:  # noqa: BLE001 - a stale pickle must not break profiles
+        log.exception("Could not load the mortgage model; rebuild_artifacts needed")
+        return None
+
+
+def save_artifact(key, data=None, blob=None):
+    ComputedArtifact.objects.update_or_create(
+        key=key, defaults={"data": data or {}, "blob": blob}
     )
+
+
+# --- profiles -------------------------------------------------------------------
+
+
+def build(customer_id):
+    """Run every inference for one customer (no caching)."""
+    from inferences.profile import build_profile
+
+    return build_profile(
+        transactions_df(customer_id),
+        customer_dict(customer_id),
+        as_of_date(),
+        goals=goal_dicts(customer_id),
+        loans=latest_loan(customer_id),
+        ratings=ratings(customer_id),
+        peer_table=peer_table(),
+        mortgage_model=mortgage_model(),
+        # Snoozes are applied when reading (active_alerts), not baked into the
+        # cached profile, so an alert comes back when its snooze ends.
+    )
+
+
+def get_profile(customer_id):
+    """The customer's profile, built on demand and cached. None if unknown."""
+    if not customer_exists(customer_id):
+        return None
+    version = profile_version()
+    row = Profile.objects.filter(customer_id=customer_id).first()
+    if row is not None and row.built_with == version:
+        return row.data
+    data = build(customer_id)
+    Profile.objects.update_or_create(
+        customer_id=customer_id, defaults={"data": data, "built_with": version}
+    )
+    return data
+
+
+def invalidate(customer_id):
+    Profile.objects.filter(customer_id=customer_id).delete()
+
+
+def refresh_profile(customer_id):
+    """Rebuild after a goal, rating, loan or snooze change."""
+    invalidate(customer_id)
+    return get_profile(customer_id)
+
+
+# --- alerts -------------------------------------------------------------------
 
 
 def alert_priority(alert, on):
@@ -200,172 +352,6 @@ def active_alerts(customer_id, profile, on=None):
             alert["priority"] = round(alert_priority(alert, p_today), 4)
         alerts.append(alert)
     return sorted(alerts, key=lambda a: a["priority"], reverse=True)
-
-
-# --- recomputation -------------------------------------------------------
-
-
-def build_customer_profile(customer_id, df, on):
-    """Full profile for a customer with transactions, as of `on`.
-
-    Goals get `on_track` first so levels (#31) are computed once, correctly;
-    recompute_goals_locally then adds the full goal metrics, and the stress
-    test (#77) is added when the user has given loan details.
-    """
-    from inferences import profile as profile_mod
-
-    customer = Customer.objects.filter(customer_id=customer_id).first()
-    cust = {
-        "customer_id": customer_id,
-        "age": customer.age if customer else None,
-        "postal_code": customer.postal_code if customer else "",
-    }
-    goals = goal_dicts(customer_id)
-    loans = latest_loan(customer_id)
-    scored = [
-        {**g, "on_track": goal_metrics(g, {}, on)["on_track"]}
-        for g in goals
-        if g["status"] == "active"
-    ]
-    data = profile_mod.build_profile(df, cust, on, goals=scored, loans=loans)
-    recompute_goals_locally(data, goals, on)
-    if loans:
-        data["mortgage"]["stress_test"] = stress_test(data, loans["balance"])
-    return data
-
-
-def refresh_profile(customer_id):
-    """Rerun goal and level inferences after a goal or loan change.
-
-    With transactions in the DB the full ``build_profile`` runs. Without them
-    (demo fixture), goal progress (#51, #52, #65, #49, #73), level 4 (#31) and
-    the stress test (#77) are recomputed locally on the stored profile.
-    """
-    df = transactions_df(customer_id)
-    goals = goal_dicts(customer_id)
-    loans = latest_loan(customer_id)
-    if df is not None:
-        data = build_customer_profile(customer_id, df, today())
-        save_profile(customer_id, data, write_file=True)
-        return data
-
-    base = get_profile(customer_id)
-    if base is None:
-        return None
-    data = copy.deepcopy(base)
-    p_today = profile_today(data)
-    recompute_goals_locally(data, goals, p_today)
-    if loans:
-        data.setdefault("mortgage", {})["stress_test"] = stress_test(
-            data, loans["balance"]
-        )
-    # TODO: rerun alerts once inferences.alerts can run without transactions.
-    save_profile(customer_id, data)
-    return data
-
-
-def _months_between(start, end):
-    return max(1, math.ceil((end - start).days / 30.44))
-
-
-def goal_metrics(goal, profile, on):
-    """#51 progress, #52 on track, #65 monthly, #26/#49 months and difficulty."""
-    target, saved = float(goal["target"]), float(goal["saved"])
-    start = date.fromisoformat(goal["start_date"])
-    end = date.fromisoformat(goal["target_date"])
-    # #72: a paused goal freezes its clock so it never shows off track.
-    clock = date.fromisoformat(goal["paused_at"]) if goal.get("paused_at") else on
-    total_days = max(1, (end - start).days)
-    expected = min(100.0, max(0.0, (clock - start).days / total_days * 100))
-    progress = saved / target * 100 if target else 0.0
-    remaining = max(0.0, target - saved)
-    months_left = _months_between(clock, end) if end > clock else 1
-    monthly = 5 * math.ceil(remaining / (5 * months_left)) if remaining else 0
-    rate = float(profile.get("baskets", {}).get("monthly_saving") or 0)
-    months_needed = math.ceil(remaining / rate) if rate > 0 else None
-    if months_needed is None:
-        difficulty = "Hard"
-    elif months_needed <= 2:
-        difficulty = "Easy"
-    elif months_needed <= 6:
-        difficulty = "Stretch"
-    else:
-        difficulty = "Hard"
-    safe_monthly = profile.get("goals", {}).get("clash", {}).get("safe_to_save_monthly")
-    realistic = safe_monthly is None or monthly <= safe_monthly
-    milestones = sorted(
-        set(goal.get("milestones_hit") or [])
-        | {m for m in (25, 50, 75, 100) if progress >= m}
-    )
-    return {
-        "progress_pct": round(progress, 1),
-        "expected_pct": round(expected, 1),
-        "on_track": goal.get("paused") or progress >= 0.9 * expected,
-        "monthly_needed": monthly,
-        "months_needed": months_needed,
-        "difficulty": difficulty,
-        "realistic": realistic,
-        "milestones_hit": milestones,
-    }
-
-
-def recompute_goals_locally(data, goals, on):
-    section = data.setdefault("goals", {})
-    fixture_goals = [g for g in section.get("active", []) if not g.get("db")]
-    db_goals = []
-    for g in goals:
-        if g["status"] != "active":
-            continue
-        db_goals.append({**g, **goal_metrics(g, data, on), "db": True})
-    section["active"] = fixture_goals + db_goals
-    total = sum(g.get("monthly_needed") or 0 for g in section["active"])
-    clash = section.setdefault("clash", {})
-    clash["total_needed"] = total
-    safe = clash.get("safe_to_save_monthly")
-    clash["clash"] = safe is not None and total > safe
-    _recompute_level4(data)
-
-
-def _recompute_level4(data):
-    levels = data.get("levels")
-    if not levels or not levels.get("ladder"):
-        return
-    on_track = any(g.get("on_track") for g in data["goals"]["active"])
-    for rung in levels["ladder"]:
-        if rung["level"] == 4:
-            rung["reached"] = bool(on_track)
-    current = 0
-    for rung in sorted(levels["ladder"], key=lambda r: r["level"]):
-        if not rung.get("reached"):
-            break
-        current = rung["level"]
-    levels["current"] = current
-    names = {r["level"]: r["name"] for r in levels["ladder"]}
-    levels["current_name"] = names.get(current, "")
-    if current < 6:
-        levels["next"] = current + 1
-        levels["next_name"] = names.get(current + 1, "")
-
-
-def stressed_payment(balance, annual_rate=0.06, months=300):
-    """#77 annuity payment at the FIN-FSA stress rate."""
-    i = annual_rate / 12
-    return balance * i / (1 - (1 + i) ** -months)
-
-
-def stress_test(profile, balance):
-    """#77 rate-rise stress test with a user-entered loan balance."""
-    income = float(profile.get("income", {}).get("monthly_income") or 0)
-    other = float(profile.get("mortgage", {}).get("other_loan_payments") or 0)
-    payment = stressed_payment(balance)
-    dsti = (payment + other) / income if income else None
-    return {
-        "loan_balance": balance,
-        "stressed_payment": round(payment, 2),
-        "dsti_stress": round(dsti, 4) if dsti is not None else None,
-        "fires": dsti is not None and dsti > 0.60,
-        "limit": 0.60,
-    }
 
 
 def add_days(on, days):

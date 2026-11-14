@@ -19,9 +19,18 @@ them in code comments). Everything below is binding for every teammate.
   today)` returns alert dicts.
 - `backend/coach/` Django app: models, `load_data` / `build_profiles` commands, API,
   Gemini loop (`coach/gemini/`), alert coach planner.
-- `frontend/` React + Vite (JSX). Falls back to `shared/fixtures/profile_demo.json`.
-- `shared/fixtures/profile_demo.json` is the canonical profile JSON shape.
+- `frontend/` React + Vite (JSX), chat-first. No mock or fixture data at runtime:
+  if the API is down it says so.
+- No demo data anywhere at runtime. Fixtures live only under `*/tests/`
+  (`backend/coach/tests/fixtures/profile_demo.json` is a test sample).
+- Profile shape = whatever `build_profile` returns: top-level keys
+  `customer_id, today, customer, balance, income, baskets, habits, forecast,
+  whatif, mortgage, levels, goals, benchmarks, multibank, alerts,
+  availability` (`availability[item] = {available, reason, inferences}`).
+  Profiles are built on demand from the DB as of `AS_OF_DATE` (default: date
+  of the last transaction) and cached in the Profile table.
 - `handoff/` notes for work too far out of scope to finish here.
+- `scripts/bin/`: `setup`, `dev` (run everything), `check` (all PR checks).
 
 ## Transaction DataFrame columns
 `tx_id, customer_id, bank_account_id, tx_date (datetime64), tx_timestamp
@@ -31,11 +40,18 @@ Own-account transfers: `transaction_type` in `OWN_TRANSFER_TYPES`
 (thresholds.py), to be confirmed against real data.
 
 ## API
-- `GET /api/home/<customer_id>/` -> profile JSON (404 if unknown).
-- `POST /api/chat/` `{customer_id, message, history, depth?}` -> send_reply JSON.
+- `GET /api/home/<customer_id>/` -> full profile JSON (404 if unknown).
+- `GET /api/insights/<customer_id>/` -> `{customer_id, as_of, insights: [{key,
+  inference, title, value, unit, text, section, severity?}]}`: only insights
+  the data supports, alerts first.
+- `POST /api/chat/` `{customer_id, message, history, depth?}` -> send_reply JSON;
+  503 `{"error": ...}` without `GEMINI_API_KEY`.
 - `POST /api/goals/`, `PATCH /api/goals/<id>/`, `POST /api/goals/<id>/rate/`.
 - `POST /api/loans/` `{customer_id, balance, interest_rate, years_left}`.
-- `GET /api/customers/` -> `[{customer_id, customer_age, customer_postal_code}]`.
+- `GET /api/customers/?q=&limit=50` -> `[{customer_id, customer_age,
+  customer_postal_code}]` (real customers only).
+- Tools return `{"available": false, "reason": ...}` when the data does not
+  support an inference; Gemini must say so, never substitute a default.
 
 ## send_reply
 ```json

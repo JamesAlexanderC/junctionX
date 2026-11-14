@@ -1,87 +1,72 @@
 // API client for the Django backend (contract: CLAUDE.md "API").
 //
-//   GET  /api/customers/                -> [{customer_id, customer_age, ...}]
-//   GET  /api/home/<customer_id>/       -> profile JSON
-//   POST /api/chat/  {customer_id, message, history, depth?} -> send_reply
-//   POST /api/goals/, PATCH /api/goals/<id>/, POST /api/goals/<id>/rate/
-//   POST /api/loans/ {customer_id, balance, interest_rate, years_left}
-//   POST /api/alerts/<id>/snooze/ {customer_id, days}
+//   GET  /api/customers/?q=<search>   -> [{customer_id, customer_age, ...}]
+//   GET  /api/insights/<customer_id>/  -> [{key, inference, title, value,
+//                                          unit, text, section, severity?}]
+//   POST /api/chat/ {customer_id, message, history, depth?} -> send_reply
 //
-// When the backend can't be reached the app runs in demo mode: the profile
-// comes from shared/fixtures/profile_demo.json and chat from mock.js.
-
-import demoProfile from '@shared/fixtures/profile_demo.json'
-import { MOCK_CUSTOMERS, mockReply } from './mock.js'
+// There is no offline or demo fallback: every error is shown as is.
 
 const API = import.meta.env.VITE_API_URL ?? ''
 
-export const DEMO_PROFILE = demoProfile
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message)
+    this.status = status
+  }
+}
 
 async function request(path, { method = 'GET', body, signal } = {}) {
-  const res = await fetch(`${API}${path}`, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
+  let res
+  try {
+    res = await fetch(`${API}${path}`, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+      signal,
+    })
+  } catch (e) {
+    if (e?.name === 'AbortError') throw e
+    throw new ApiError('Backend not reachable', 0)
+  }
+  let data = null
+  try {
+    data = await res.json()
+  } catch {
+    // not JSON (e.g. the Vite proxy's 502 page)
+  }
+  if (!res.ok) {
+    if (res.status >= 502 && res.status <= 504 && !data) {
+      throw new ApiError('Backend not reachable', res.status)
+    }
+    const msg = data?.error ?? data?.detail ?? `Request failed (HTTP ${res.status})`
+    throw new ApiError(msg, res.status)
+  }
+  return data
+}
+
+export async function getCustomers(q = '', { signal } = {}) {
+  const query = q ? `?q=${encodeURIComponent(q)}` : ''
+  const body = await request(`/api/customers/${query}`, { signal })
+  return Array.isArray(body) ? body : (body?.results ?? [])
+}
+
+export async function getInsights(customerId, { signal } = {}) {
+  const body = await request(`/api/insights/${encodeURIComponent(customerId)}/`, {
     signal,
   })
-  if (!res.ok) {
-    const err = new Error(`HTTP ${res.status}`)
-    err.status = res.status
-    try {
-      err.detail = await res.json()
-    } catch {
-      // body was not JSON
-    }
-    throw err
-  }
-  return res.status === 204 ? null : res.json()
-}
-
-export async function getCustomers() {
-  try {
-    const body = await request('/api/customers/')
-    const customers = Array.isArray(body) ? body : (body.results ?? [])
-    return { customers, demo: false }
-  } catch {
-    return { customers: MOCK_CUSTOMERS, demo: true }
-  }
-}
-
-export async function getProfile(customerId) {
-  try {
-    const profile = await request(`/api/home/${encodeURIComponent(customerId)}/`)
-    return { profile, demo: false }
-  } catch {
-    return { profile: structuredClone(demoProfile), demo: true }
-  }
+  return Array.isArray(body) ? body : []
 }
 
 // Only the last 6 turns are sent (context.md "Controls").
-export async function sendChat({ customerId, message, history, depth, demo, profile }) {
-  const body = {
-    customer_id: customerId,
-    message,
-    history: history.slice(-6),
-    ...(depth ? { depth } : {}),
-  }
-  if (demo) return mockReply({ message, depth, profile })
-  return request('/api/chat/', { method: 'POST', body })
-}
-
-export const createGoal = (goal) =>
-  request('/api/goals/', { method: 'POST', body: goal })
-
-export const updateGoal = (id, patch) =>
-  request(`/api/goals/${id}/`, { method: 'PATCH', body: patch })
-
-export const rateGoal = (id, body) =>
-  request(`/api/goals/${encodeURIComponent(id)}/rate/`, { method: 'POST', body })
-
-export const saveLoan = (loan) =>
-  request('/api/loans/', { method: 'POST', body: loan })
-
-export const snoozeAlert = (customerId, alertId, days) =>
-  request(`/api/alerts/${encodeURIComponent(alertId)}/snooze/`, {
+export function sendChat({ customerId, message, history = [], depth }) {
+  return request('/api/chat/', {
     method: 'POST',
-    body: { customer_id: customerId, days },
+    body: {
+      customer_id: customerId,
+      message,
+      history: history.slice(-6),
+      ...(depth ? { depth } : {}),
+    },
   })
+}

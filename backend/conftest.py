@@ -1,5 +1,5 @@
-"""Root pytest config: tests run on SQLite so Postgres is not required."""
+"""Root pytest config.
 
-import os
-
-os.environ.setdefault("USE_SQLITE", "1")
+Tests run on SQLite so Postgres is not required: conf/settings.py picks
+SQLite whenever pytest is running (set USE_SQLITE=0 to test on Postgres).
+"""

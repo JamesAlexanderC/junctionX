@@ -1,172 +1,215 @@
-"""build_profile: run every inference and return the profile_demo.json shape.
+"""Build one customer profile (context.md P1.6).
 
-Pure: DataFrame in, plain dict out. Callers in coach/ add the database goals
-afterwards with services.recompute_goals_locally (#51, #52, #65, #31), which
-holds the single copy of the goal maths. Benchmarks (#36, #37) and mortgage
-readiness (#34, #35) are not built yet and come out empty.
+build_profile runs every inference in dependency order and returns the dict
+whose shape is shared/fixtures/profile_demo.json. Every number the app shows
+comes from here; Gemini only explains it.
+
+Order: income -> baskets -> habits, forecast, whatif -> mortgage -> active
+goals (#52 on track) -> levels (#31 needs goals, #32 needs readiness) ->
+goals section (#44 to #48 need the level) -> benchmarks, multibank -> alerts
+(they read the finished profile) -> availability (which items the
+customer's data supports; see availability.py).
 """
 
 from __future__ import annotations
 
+import copy
 import math
+from datetime import date
 
 import pandas as pd
 
-from . import alerts as alert_rules
-from . import models
+from . import alerts as alerts_mod
+from .availability import availability
+from . import goals as goals_mod
 from .baskets import compute_baskets
-from .common import iso, latest_balance, prepare, r2, to_date
-from .detected_goals import detect_travel_goal
+from .benchmarks import age_band, area, compute_benchmarks
+from .common import COLUMNS, iso, latest_balance, prepare, r2, to_date
 from .forecast import compute_forecast
 from .habits import compute_habits
 from .income import compute_income
 from .levels import compute_levels
+from .mortgage import compute_mortgage
+from .multibank import compute_multibank
 from .whatif import compute_whatif
 
-# #36 age bands: (lowest age, label), checked from the top.
-AGE_BANDS = ((55, "55+"), (40, "40-54"), (30, "30-39"), (25, "25-29"), (18, "18-24"))
-AREA_DIGITS = 2  # #37: first 2 digits of the postcode
-RECOMMENDED_GOAL_MONTHS = 5  # safety-net goal spread over 5 months
 
-
-def age_band(age) -> str | None:
-    if age is None or (isinstance(age, float) and math.isnan(age)):
-        return None
-    for lowest, label in AGE_BANDS:
-        if age >= lowest:
-            return label
-    return None
-
-
-def _customer(customer: dict) -> dict:
-    postal = str(customer.get("postal_code") or "")
-    age = customer.get("age")
+def _customer(customer: dict | None) -> dict:
+    """Accepts {customer_id, age, postal_code} (or the CSV column names)."""
+    c = customer or {}
+    age = c.get("age", c.get("customer_age"))
+    postal = c.get("postal_code", c.get("customer_postal_code"))
+    age = None if age is None or pd.isna(age) else int(age)
+    postal = None if postal is None or pd.isna(postal) else str(postal)
     return {
         "age": age,
         "postal_code": postal,
         "age_band": age_band(age),
-        "area": postal[:AREA_DIGITS] or None,
+        "area": area(postal),
     }
 
 
-def _recommended(levels: dict, baskets: dict) -> dict | None:
-    """Next-level goal: the euros still missing for the next level."""
-    to_go = levels.get("euros_to_go") or 0.0
-    if not to_go or not levels.get("next"):
-        return None
-    monthly = models.monthly_needed(to_go, 0.0, RECOMMENDED_GOAL_MONTHS)
-    rate = baskets.get("monthly_saving") or 0.0
-    months = math.ceil(to_go / rate) if rate > 0 else None  # #26
-    return {
-        "id": f"rec-level-{levels['next']}",
-        "type": "safety_net" if levels["next"] == 3 else "level",
-        "for_level": levels["next"],
-        "name": levels.get("next_name", ""),
-        "target": r2(to_go),
-        "monthly_needed": float(monthly),
-        "difficulty": models.goal_difficulty(months),  # #49
-        "weight": 0.5,
-    }
+def _empty_df() -> pd.DataFrame:
+    return pd.DataFrame(columns=COLUMNS)
 
 
-def _detected(df: pd.DataFrame, today, baskets: dict) -> list[dict]:
-    """#56 unnamed saving and #58 travel pot."""
-    found = []
-    saving = baskets.get("monthly_saving") or 0.0
-    if saving > 0:
-        found.append(
-            {
-                "id": "det-56",
-                "inference": 56,
-                "type": "savings",
-                "text": "Looks like you're saving. Name it?",
-                "monthly_amount": r2(saving),
-            }
-        )
-    travel = detect_travel_goal(df, today)
-    if travel:
-        found.append({"id": "det-58", "type": "travel", **travel})
-    return found
+def _readiness_score(mortgage: dict):
+    return ((mortgage or {}).get("readiness") or {}).get("score")
 
 
-def _goals(df, today, levels, baskets, forecast) -> dict:
-    step = levels.get("easiest_next_step") or {}
-    cut_keys = ("category", "cut_pct", "monthly_saving")
-    cuts = [{k: step[k] for k in cut_keys if k in step}] if step else []
-    return {
-        "recommended": _recommended(levels, baskets),
-        "active": [],
-        "detected": _detected(df, today, baskets),
-        "clash": {
-            "clash": False,
-            "total_needed": 0.0,
-            "safe_to_save_monthly": forecast.get("safe_to_save_today"),
-        },
-        "funding_cuts": cuts,
-        "suggestion_weights": {},
-        "success_score": None,
-    }
+def _goals_and_levels(df, today, profile, goals, ratings, dismissed, loans):
+    """#28 to #33 and #44 to #74 from the profile's other sections."""
+    income, baskets, forecast = (
+        profile["income"],
+        profile["baskets"],
+        profile["forecast"],
+    )
+    active = goals_mod.evaluate_goals(goals, today, baskets, forecast)
+    levels = compute_levels(
+        df,
+        today,
+        income,
+        baskets,
+        goals=active,
+        readiness=_readiness_score(profile.get("mortgage")),
+    )
+    section = goals_mod.compute_goals(
+        df,
+        today,
+        income,
+        baskets,
+        forecast,
+        levels,
+        profile.get("whatif"),
+        goals=goals,
+        ratings=ratings,
+        dismissed=dismissed,
+        customer=profile.get("customer"),
+        mortgage=profile.get("mortgage"),
+        loans=loans,
+    )
+    return levels, section
 
 
-def _mortgage(df: pd.DataFrame, today, income: dict) -> dict:
-    """Loan payments and DSTI (#42, #76), whether or not alert #76 fires.
+def build_profile(
+    df: pd.DataFrame | None,
+    customer: dict | None,
+    today,
+    goals: list[dict] | None = None,
+    loans: dict | None = None,
+    ratings=None,
+    dismissed=None,
+    peer_table: dict | None = None,
+    mortgage_model: dict | None = None,
+    snoozed: dict | None = None,
+) -> dict:
+    """Full profile for one customer as of `today` (JSON-serialisable).
 
-    stress_test (#77) needs the user's loan details: coach.services adds it.
-    """
-    payments = alert_rules.monthly_loan_payments(df, today) if len(df) else 0.0
-    monthly = income.get("monthly_income") or 0.0
-    dsti = r2(payments / monthly) if payments > 0 and monthly > 0 else None
-    return {
-        "loan_payments_found": payments > 0,
-        "dsti": dsti,
-        "stress_test": None,
-        "readiness": None,
-    }
-
-
-def _multibank(df: pd.DataFrame, income: dict) -> dict:
-    accounts = sorted(df["bank_account_id"].astype(str).unique()) if len(df) else []
-    return {
-        "accounts": [{"bank_account_id": a, "bank": "S-Bank"} for a in accounts],
-        "true_income": income.get("monthly_income"),
-        "hidden_loans": [],
-        "duplicate_subscriptions": [],
-    }
-
-
-def build_profile(df, customer, today, goals=None, loans=None) -> dict:
-    """profile JSON for one customer as of `today` (the reference date).
-
-    goals: active goal dicts already carrying `on_track` (#31); others are
-    added by the caller. loans: {balance, interest_rate, years_left} (#77).
+    customer: {customer_id, age, postal_code}. goals: Goal rows as dicts.
+    loans: {balance, interest_rate, years_left, other_payments?} (#77, #82).
+    ratings: {goal_type: {up, down}} (#54). dismissed: detected-goal ids.
+    peer_table: benchmarks.compute_peer_table output. mortgage_model:
+    mortgage.fit_readiness_model output. snoozed: {alert_id: until date}.
     """
     today = to_date(today)
-    df = prepare(df, today)
-    income = compute_income(df, today)
-    baskets = compute_baskets(df, today, income["bills"])
-    forecast = compute_forecast(df, today, income, baskets)
-    levels = compute_levels(df, today, income, baskets, goals=goals)
+    df = _empty_df() if df is None or not len(df) else df
+    prepared = prepare(df, today)
+    cust = _customer(customer)
+    customer_id = (customer or {}).get("customer_id")
+    if customer_id is None and len(prepared):
+        customer_id = str(prepared["customer_id"].iloc[0])
+
+    income = compute_income(prepared, today)
+    baskets = compute_baskets(prepared, today, bills=income["bills"])
+    habits = compute_habits(prepared, today, income, baskets)
+    forecast = compute_forecast(prepared, today, income, baskets)
+    whatif = compute_whatif(prepared, today, income, baskets)
+    mortgage = compute_mortgage(
+        prepared, today, income, baskets, forecast, model=mortgage_model, loans=loans
+    )
     profile = {
-        "customer_id": customer.get("customer_id"),
-        "generated_at": iso(today),
+        "customer_id": customer_id,
+        "generated_at": date.today().isoformat(),
         "today": iso(today),
-        "customer": _customer(customer),
-        "balance": latest_balance(df),
+        "customer": cust,
+        "balance": r2(latest_balance(prepared)) if len(prepared) else None,
         "income": income,
         "baskets": baskets,
-        "habits": compute_habits(df, today, income, baskets),
+        "habits": habits,
         "forecast": forecast,
-        "whatif": compute_whatif(df, today, income, baskets),
-        "levels": levels,
-        "goals": _goals(df, today, levels, baskets, forecast),
-        "multibank": _multibank(df, income),
-        "benchmarks": {
-            "age": [],
-            "area": [],
-            "source": None,
-            "excluded_partial_view": income.get("partial_view", False),
-        },
+        "whatif": whatif,
+        "mortgage": mortgage,
     }
-    profile["alerts"] = alert_rules.run_all_alerts(df, profile, today, loans=loans)
-    profile["mortgage"] = _mortgage(df, today, income)
-    return profile
+    levels, goals_section = _goals_and_levels(
+        prepared, today, profile, goals, ratings, dismissed, loans
+    )
+    profile["levels"] = levels
+    profile["goals"] = goals_section
+    profile["benchmarks"] = compute_benchmarks(prepared, cust, peer_table, today)
+    profile["multibank"] = compute_multibank(prepared, today)
+    # No transactions -> nothing to alert about (not "balance EUR 0").
+    profile["alerts"] = (
+        alerts_mod.run_all_alerts(
+            prepared, profile, today, loans=loans, snoozed=snoozed
+        )
+        if len(prepared)
+        else []
+    )
+    # Which items the data supports, so the API shows only given insights.
+    profile["availability"] = availability(profile)
+    return _jsonable(profile)
+
+
+def recompute_goals_and_levels(
+    profile: dict,
+    df: pd.DataFrame | None,
+    today,
+    goals: list[dict] | None,
+    ratings=None,
+    dismissed=None,
+    loans: dict | None = None,
+    snoozed: dict | None = None,
+) -> dict:
+    """After a goal is created, edited, paused or rated: rerun the goal and
+    level inferences (#28 to #33, #44 to #74) and the alerts on a copy of the
+    stored profile. Other sections are reused as they are."""
+    today = to_date(today)
+    df = _empty_df() if df is None or not len(df) else df
+    prepared = prepare(df, today)
+    out = copy.deepcopy(profile)
+    out["today"] = iso(today)
+    levels, section = _goals_and_levels(
+        prepared, today, out, goals, ratings, dismissed, loans
+    )
+    out["levels"] = levels
+    out["goals"] = section
+    # Without transactions only the profile-based rules (#20, #50, #52, #70,
+    # #99, ...) can run; they read the stored sections.
+    out["alerts"] = alerts_mod.run_all_alerts(
+        prepared if len(prepared) else None,
+        out,
+        today,
+        loans=loans,
+        snoozed=snoozed,
+    )
+    out["availability"] = availability(out)
+    return _jsonable(out)
+
+
+def _jsonable(obj):
+    """Plain JSON types only: numpy / pandas scalars unwrapped, NaN / inf ->
+    None, dates -> ISO strings, sets -> sorted lists."""
+    if isinstance(obj, dict):
+        return {str(k): _jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set, frozenset)):
+        items = sorted(obj) if isinstance(obj, (set, frozenset)) else obj
+        return [_jsonable(v) for v in items]
+    if hasattr(obj, "item") and not isinstance(obj, (str, bytes)):
+        obj = obj.item()
+    if isinstance(obj, float):
+        return None if math.isnan(obj) or math.isinf(obj) else obj
+    if obj is pd.NaT:
+        return None
+    if hasattr(obj, "isoformat"):
+        return obj.isoformat()
+    return obj

@@ -24,8 +24,8 @@ MAPPING_NOTES = [
     "- #58 travel goal uses category == travel.",
     "- The reference date is max(tx_date), not the wall-clock date.",
     "- No loan, credit-card, fee or gambling values exist in the real data.",
-    "  #76-#84 and #86 run on the synthetic credit register and injected events",
-    "  only; those must use the labels in LOAN_CATEGORIES / FEE_CATEGORIES.",
+    "  #76-#84 (without user loan details), #86, #96 and #98 match no real rows",
+    "  and are reported unavailable (inferences/availability.py).",
 ]
 
 

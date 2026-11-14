@@ -53,9 +53,15 @@ def upcoming_bills(bills: list[dict], today) -> list[dict]:
 
 
 def discretionary_stats(df: pd.DataFrame, today, bills: list[dict]):
-    """#19: d = median daily discretionary spend over the last 60 days and
-    sigma = its standard deviation. Discretionary = spend that is not a
-    scheduled bill (days with no spend count as 0)."""
+    """#19: d = daily discretionary spend over the last 60 days and sigma =
+    its standard deviation. Discretionary = spend that is not a scheduled bill
+    (days with no spend count as 0).
+
+    Calibration (docs/calibration.md): the doc says median, but on the real
+    S-Bank data most days have no spend, so the median is EUR 0 for many
+    customers and the forecast never moves. We use the mean, which matches
+    the real month-on-month spend; set FORECAST_DAILY_STAT = "median" in
+    thresholds.py to go back to the doc's choice."""
     s = spend(df)
     bill_merchants = {b["merchant_id"] for b in bills}
     s = s[~s["merchant_id"].isin(bill_merchants)]
@@ -63,7 +69,8 @@ def discretionary_stats(df: pd.DataFrame, today, bills: list[dict]):
     start = end - pd.Timedelta(days=th.DISCRETIONARY_DAYS - 1)
     days = pd.date_range(start, end)
     daily = s.groupby("tx_date")["amount"].sum().reindex(days, fill_value=0.0)
-    return float(np.median(daily.values)), float(np.std(daily.values, ddof=0))
+    centre = np.median if th.FORECAST_DAILY_STAT == "median" else np.mean
+    return float(centre(daily.values)), float(np.std(daily.values, ddof=0))
 
 
 def _scheduled(income: dict, bills: list[dict], today, end):
@@ -148,7 +155,11 @@ def compute_forecast(df: pd.DataFrame, today, income: dict, baskets: dict) -> di
     return {
         "balance": r2(b0),
         "buffer": r2(buf),
-        "daily_discretionary": {"median": r2(d), "std": r2(sigma)},
+        "daily_discretionary": {
+            "stat": th.FORECAST_DAILY_STAT,
+            "value": r2(d),
+            "std": r2(sigma),
+        },
         "safe_to_spend_week": r2(safe_week),
         "safe_to_save_today": r2(safe_save),
         "end_of_month": end_of_month,

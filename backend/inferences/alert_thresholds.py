@@ -1,7 +1,8 @@
 """Thresholds and category/MCC sets for the alert rules (context.md #6 to #102).
 
 All values are starting points: tune them on the demo customers. Category and
-MCC sets are mapped from the real data in docs/data_profile.md.
+MCC sets come from inferences/thresholds.py, profiled on the real data
+(docs/vocabulary.md).
 """
 
 from inferences import thresholds as _th
@@ -9,47 +10,45 @@ from inferences import thresholds as _th
 # Priority weights: priority = weight / max(1, days until impact).
 SEVERITY_WEIGHT = {"red": 3, "amber": 2, "blue": 1}
 
-# Buffer: max(EUR 50, 10% of monthly essentials) (#17, #99, #102).
-BUFFER_MIN_EUR = 50.0
-BUFFER_ESSENTIALS_SHARE = 0.10
+from inferences.thresholds import (  # noqa: F401  shared with the inferences
+    BUFFER_ESSENTIALS_SHARE,
+    BUFFER_MIN_EUR,
+    ATM_MCC,
+    FEE_CATEGORIES,
+    FEE_MCCS,
+    GAMBLING_MCC,
+    LOAN_CATEGORIES,
+    LOAN_MCCS,
+    OWN_TRANSFER_TYPES,
+    SAVER_DEPOSIT_TYPES,
+    SAVER_TYPES,
+    SAVER_WITHDRAWAL_TYPES,
+    ROBUST_Z_CONST,
+    ROBUST_Z_FLAG,
+    STRESS_MONTHS,
+    SPIKE_MIN_DIFF_EUR,
+    SPIKE_MULT,
+    SPIKE_REQUIRE_FULL_HISTORY,
+    UNUSUAL_CATEGORY_MULT,
+    UNUSUAL_MIN_EXCESS_EUR,
+    UNUSUAL_MIN_HISTORY,
+    UNUSUAL_MIN_MULT,
+)
 
-# Transaction classification. Own-transfer and Saver types come from the real
-# data mapping in thresholds.py. Loan, fee and gambling values match no real
-# rows: #76-#84 and #86 only fire on the synthetic credit register and
-# injected events, which must use these labels.
-OWN_TRANSFER_TYPES = _th.OWN_TRANSFER_TYPES
-SAVER_DEPOSIT_TYPES = _th.SAVER_DEPOSIT_TYPES
-SAVER_WITHDRAWAL_TYPES = _th.SAVER_WITHDRAWAL_TYPES
-LOAN_CATEGORIES = {
-    "loan",
-    "loans",
-    "loan_payment",
-    "mortgage",
-    "credit",
-    "credit_card",
-    "consumer_credit",
-    "bnpl",
-}
-LOAN_MCCS = {"6012", "6051", "6141"}
-FEE_CATEGORIES = {"fee", "fees", "bank_fee", "late_fee", "collection"}
-FEE_MCCS = {"7322"}  # collection agencies
-ATM_MCC = "6011"
-GAMBLING_MCC = "7995"
+# Buffer, own-transfer / Saver types and the loan, fee, ATM and gambling sets
+# all live in inferences/thresholds.py (single source). Loan, fee, ATM and
+# gambling values match no real S-Bank rows: those alerts stay silent and the
+# profile reports them unavailable (inferences/availability.py).
 GAMBLING_SUPPORT_URL = "https://www.peluuri.fi/en"
 
 # #38 unusual charge
-ROBUST_Z_CONST = 0.6745
-ROBUST_Z_FLAG = 3.5
-UNUSUAL_MIN_HISTORY = 3
-UNUSUAL_CATEGORY_MULT = 3.0
 RECENT_DAYS = 30
 
 # #39 duplicate charge
 DUPLICATE_MINUTES = 10
 
 # #40 category spike
-SPIKE_RATIO = 1.5
-SPIKE_MIN_DIFF_EUR = 20.0
+SPIKE_RATIO = SPIKE_MULT  # thresholds.py is the single source
 
 # #62 life change / #83 new credit: "new" = first seen in the last 2 months.
 NEW_RECURRING_DAYS = 62
@@ -65,8 +64,7 @@ DSTI_AMBER = 0.40
 DSTI_RED = 0.50
 
 # #77 / #82 FIN-FSA stress test
-STRESS_RATE = 0.06
-STRESS_MONTHS = 300
+STRESS_RATE = 0.06  # == thresholds.STRESS_ANNUAL_RATE
 STRESS_DSTI_MAX = 0.60
 AFFORD_FITS_MAX = 0.50
 

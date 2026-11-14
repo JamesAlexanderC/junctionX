@@ -1,9 +1,7 @@
 """Alert unit tests from context.md ("Alert unit tests" plus edge cases)."""
 
 import copy
-import json
 from datetime import date
-from pathlib import Path
 
 import pytest
 
@@ -148,6 +146,18 @@ def test_payday_missed_only_after_three_days():
     assert a["trigger_values"]["expected_payday"] == "2026-10-23"
 
 
+def test_payday_missed_needs_detected_payday_and_data():
+    # #100 never fires without transactions or without a detected payday.
+    empty = make_df([])
+    assert alerts.rule_100_payday_missed(empty, profile(), date(2026, 10, 27)) is None
+    assert alerts.rule_100_payday_missed(None, profile(), date(2026, 10, 27)) is None
+    rows = [tx("2026-10-01 09:00", -20, "M_SHOP", "shopping", "5999", "card")]
+    p = profile()
+    p["income"]["payday"]["found"] = False
+    got = alerts.rule_100_payday_missed(make_df(rows), p, date(2026, 10, 27))
+    assert got is None
+
+
 # --- Earlier alerts ---------------------------------------------------------
 
 
@@ -217,10 +227,8 @@ def test_registry_covers_every_alert():
     assert set(alerts.ALERT_RULES) == expected
 
 
-def test_run_all_on_demo_fixture_and_empty():
-    path = Path(__file__).resolve().parents[3] / "shared/fixtures/profile_demo.json"
-    demo = json.loads(path.read_text())
-    found = alerts.run_all_alerts(make_df([]), demo, TODAY)
+def test_run_all_on_profile_only_and_empty():
+    found = alerts.run_all_alerts(make_df([]), profile(balance=40.0), TODAY)
     assert found == sorted(found, key=lambda a: -a["priority"])
     assert {"id", "inference", "severity", "priority"} <= set(found[0])
     assert alerts.run_all_alerts(None, {}, TODAY) == []

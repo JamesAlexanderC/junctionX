@@ -17,7 +17,7 @@ def data_path(name, data_dir=None):
     path = (data_dir or settings.DATA_DIR) / name
     if not path.exists():
         raise CommandError(
-            f"{path} not found. Put the S-Bank CSVs in data/ (see context.md)."
+            f"{path} not found. Put the S-Bank CSVs in DATA_DIR (see README.md)."
         )
     head = path.read_bytes()[:200] if path.stat().st_size < 1024 else None
     if head is None:
@@ -69,24 +69,41 @@ def iter_transactions(data_dir=None, customers=None, chunksize=CHUNK_ROWS):
         yield clean(chunk)
 
 
-def parse_timestamps(raw):
-    """Parse SAS timestamps (03OCT24:09:04:04) as UTC.
+def parse_timestamp(values, strict=False, column="tx_timestamp"):
+    """Parse the CSVs' SAS datetimes (03OCT24:09:04:04) into naive timestamps.
 
-    Raises CommandError when more than 1% of non-empty values fail, so a
-    format change cannot silently turn every timestamp into midnight.
+    Falls back to ISO parsing for any value that is not SAS formatted, so
+    hand-made test CSVs keep working. Unparseable values become NaT. With
+    ``strict``, raises CommandError when more than 1% of non-empty values
+    still fail, so a format change cannot silently turn every timestamp into
+    midnight (P1.2).
     """
     import pandas as pd
 
-    parsed = pd.to_datetime(raw, format=SAS_TIMESTAMP_FORMAT, errors="coerce")
-    present = raw.notna() & (raw.astype(str).str.strip() != "")
-    failed = int((parsed.isna() & present).sum())
-    if present.any() and failed / int(present.sum()) > MAX_TIMESTAMP_FAILURE_SHARE:
-        sample = raw[parsed.isna() & present].head(3).tolist()
-        raise CommandError(
-            f"{failed} of {int(present.sum())} tx_timestamp values do not match "
-            f"{SAS_TIMESTAMP_FORMAT}, e.g. {sample}"
-        )
-    return parsed.dt.tz_localize("UTC")
+    if values is None:
+        return pd.Series(dtype="datetime64[ns]")
+    raw = pd.Series(values).astype("string").str.strip()
+    ts = pd.to_datetime(raw, format=SAS_TIMESTAMP_FORMAT, errors="coerce")
+    missing = ts.isna() & raw.notna() & (raw != "")
+    if missing.any():
+        iso = pd.to_datetime(raw[missing], format="ISO8601", errors="coerce", utc=True)
+        ts.loc[missing] = iso.dt.tz_localize(None)
+    if strict:
+        present = raw.notna() & (raw != "")
+        failed = ts.isna() & present
+        n_present, n_failed = int(present.sum()), int(failed.sum())
+        if n_present and n_failed / n_present > MAX_TIMESTAMP_FAILURE_SHARE:
+            sample = raw[failed].head(3).tolist()
+            raise CommandError(
+                f"{n_failed} of {n_present} {column} values do not match "
+                f"{SAS_TIMESTAMP_FORMAT}, e.g. {sample}"
+            )
+    return ts
+
+
+def parse_timestamps(values, column="tx_timestamp"):
+    """Strict parse_timestamp: fails above 1% unparseable values."""
+    return parse_timestamp(values, strict=True, column=column)
 
 
 def clean(df):
@@ -95,8 +112,7 @@ def clean(df):
     df = df.copy()
     df["tx_id"] = df["customer_id"].astype(str) + "-" + df["tx_id"].astype(str)
     df["tx_date"] = pd.to_datetime(df["tx_date"], errors="coerce")
-    ts = parse_timestamps(df["tx_timestamp"])
-    df["tx_timestamp"] = ts.fillna(df["tx_date"].dt.tz_localize("UTC"))
+    df["tx_timestamp"] = parse_timestamps(df.get("tx_timestamp")).fillna(df["tx_date"])
     for col in ("tx_amount_eur", "balance_after_eur"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["mcc_code"] = (

@@ -46,7 +46,7 @@ class Transaction(models.Model):
 
 
 class MortgageOutcome(models.Model):
-    """One row of mtg_tx_customer_link_and_final_mtg_infio.csv."""
+    """One row of mtg_tx_customer_link_and_final_mtg_infio.csv (#34)."""
 
     mortgage_customer_id = models.CharField(max_length=64, primary_key=True)
     customer = models.ForeignKey(
@@ -56,15 +56,49 @@ class MortgageOutcome(models.Model):
         blank=True,
         related_name="mortgage_outcomes",
     )
-    outcome = models.CharField(max_length=64, blank=True, default="")
-    raw = models.JSONField(default=dict)
+    final_decision = models.CharField(max_length=32, blank=True, default="")
+    rejection_reason = models.CharField(max_length=64, blank=True, default="")
+    final_property_price_eur = models.FloatField(null=True, blank=True)
+    final_requested_loan_eur = models.FloatField(null=True, blank=True)
+    final_equity_amount_eur = models.FloatField(null=True, blank=True)
+    final_collateral_value_eur = models.FloatField(null=True, blank=True)
+    required_monthly_income_eur = models.FloatField(null=True, blank=True)
+    final_loan_to_value = models.FloatField(null=True, blank=True)
+
+    @property
+    def approved(self):
+        return self.final_decision.lower() == "approved"
 
 
 class MortgageEvent(models.Model):
-    """One row of mtg_negotiation_history.csv (columns kept raw)."""
+    """One row of mtg_negotiation_history.csv."""
 
     mortgage_customer_id = models.CharField(max_length=64, db_index=True)
-    raw = models.JSONField(default=dict)
+    timestamp = models.DateTimeField(null=True, blank=True)
+    event_type = models.CharField(max_length=64, blank=True, default="")
+    property_id = models.CharField(max_length=64, blank=True, default="")
+    property_type = models.CharField(max_length=64, blank=True, default="")
+    property_price_estimate = models.FloatField(null=True, blank=True)
+    loan_amount = models.FloatField(null=True, blank=True)
+    equity_amount = models.FloatField(null=True, blank=True)
+    collateral_type = models.CharField(max_length=64, blank=True, default="")
+    collateral_value = models.FloatField(null=True, blank=True)
+    collateral_status = models.CharField(max_length=64, blank=True, default="")
+    decision = models.CharField(max_length=32, blank=True, default="")
+    rejection_reason = models.CharField(max_length=64, blank=True, default="")
+    expense_type = models.CharField(max_length=64, blank=True, default="")
+    expense_amount = models.FloatField(null=True, blank=True)
+    note = models.TextField(blank=True, default="")
+
+
+class ComputedArtifact(models.Model):
+    """Dataset-wide results computed once: the #36/#37 peer table (JSON) and
+    the fitted #34 mortgage readiness model (pickled)."""
+
+    key = models.CharField(max_length=64, primary_key=True)
+    data = models.JSONField(default=dict, blank=True)
+    blob = models.BinaryField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class Goal(models.Model):
@@ -142,8 +176,11 @@ class LoanDetails(models.Model):
 
 
 class Profile(models.Model):
+    """Cached build_profile output; rebuilt when the inference code changes."""
+
     customer_id = models.CharField(max_length=64, primary_key=True)
     data = models.JSONField()
+    built_with = models.CharField(max_length=64, blank=True, default="")
     updated_at = models.DateTimeField(auto_now=True)
 
 
@@ -171,7 +208,10 @@ class ChatTurn(models.Model):
 
 
 class DemoCache(models.Model):
-    """Cached send_reply per customer and normalised question (P2.6)."""
+    """Cached real Gemini send_reply per customer and normalised question (P2.6).
+
+    Only filled from live Gemini answers; never pre-seeded.
+    """
 
     customer_id = models.CharField(max_length=64)
     question = models.CharField(max_length=500)

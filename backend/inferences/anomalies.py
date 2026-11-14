@@ -21,7 +21,11 @@ def unusual_charge(amount: float, merchant_history, category_history=None) -> di
     m = models.mad(hist) if hist else None
     z = models.robust_z(amount, hist) if hist else None
     if len(hist) >= th.UNUSUAL_MIN_HISTORY and z is not None:
-        flagged = z > th.ROBUST_Z_FLAG
+        flagged = (
+            z > th.ROBUST_Z_FLAG
+            and amount > th.UNUSUAL_MIN_MULT * med
+            and amount - med > th.UNUSUAL_MIN_EXCESS_EUR
+        )
         rule = "robust_z"
     else:
         cat = [float(x) for x in (category_history or hist)]
@@ -46,7 +50,10 @@ def unusual_charges(df: pd.DataFrame, today, days: int = 30) -> list[dict]:
     out = []
     for idx, row in s[s["tx_date"] >= start].iterrows():
         before = s[s["tx_timestamp"] < row["tx_timestamp"]]
-        merchant = before[before["merchant_id"] == row["merchant_id"]]["amount"]
+        known = row["merchant_id"] != ""
+        merchant = before[known & (before["merchant_id"] == row["merchant_id"])][
+            "amount"
+        ]
         category = before[before["category"] == row["category"]]["amount"]
         res = unusual_charge(row["amount"], merchant, category)
         if res["flagged"]:
@@ -89,6 +96,10 @@ def category_spikes(df: pd.DataFrame, today) -> list[dict]:
     for cat, g in s.groupby("category"):
         by_month = g.groupby("month")["amount"].sum()
         now = float(by_month.get(current, 0.0))
+        if th.SPIKE_REQUIRE_FULL_HISTORY and not all(
+            by_month.get(m, 0.0) > 0 for m in prev
+        ):
+            continue
         mean_prev = float(np.mean([by_month.get(m, 0.0) for m in prev]))
         threshold = th.SPIKE_MULT * mean_prev
         diff = now - mean_prev
