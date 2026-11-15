@@ -83,8 +83,12 @@ setup_env() {
                 fi
             done <"${example}"
         fi
-        [ "${added}" -eq 0 ] && echo ".env already exists and is up to date."
-        return
+        # if/fi, not `&&`: a false test would make the function return 1 and
+        # trip `set -e` whenever keys were added.
+        if [ "${added}" -eq 0 ]; then
+            echo ".env already exists and is up to date."
+        fi
+        return 0
     fi
     if [ ! -f "${example}" ]; then
         echo "Warning: no .env.example found, skipping .env creation." >&2
@@ -148,6 +152,31 @@ setup_backend() {
 
     local venv_py="${venv_dir}/bin/python"
     echo "Using $("${venv_py}" --version 2>&1) from ${venv_dir}"
+
+    # A venv made while python3-venv/ensurepip was missing (common on Debian
+    # and Ubuntu) has no pip. Try to bootstrap it, else rebuild the venv.
+    if ! "${venv_py}" -m pip --version >/dev/null 2>&1; then
+        echo "pip missing from ${venv_dir}, bootstrapping with ensurepip..."
+        if ! "${venv_py}" -m ensurepip --upgrade >/dev/null 2>&1; then
+            echo "ensurepip failed, recreating virtualenv..."
+            local base_py
+            base_py="$("${venv_py}" -c 'import sys; print(sys._base_executable)')"
+            rm -rf "${venv_dir}"
+            if ! "${base_py}" -m venv "${venv_dir}"; then
+                echo "Error: could not create a virtualenv with pip." >&2
+                echo "On Debian/Ubuntu: sudo apt install python3-venv" >&2
+                exit 1
+            fi
+        fi
+    fi
+
+    # The same half-built venv also lacks bin/activate. Re-running venv on
+    # the folder writes the scripts and keeps installed packages.
+    if [ ! -f "${venv_dir}/bin/activate" ]; then
+        echo "Activate scripts missing, regenerating..."
+        "$("${venv_py}" -c 'import sys; print(sys._base_executable)')" \
+            -m venv "${venv_dir}"
+    fi
 
     echo "Upgrading pip..."
     "${venv_py}" -m pip install --quiet --upgrade pip
