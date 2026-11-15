@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import math
+import re
 from datetime import date, timedelta
 
 import pandas as pd
@@ -30,6 +31,23 @@ COLUMNS = [
 
 
 # --- Small value helpers ---------------------------------------------------------
+
+
+# Fixed English names: user-facing text must not depend on the server locale.
+MONTH_NAMES = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
 
 
 def r2(x):
@@ -68,6 +86,11 @@ def month_key(d) -> str:
     return pd.Timestamp(d).strftime("%Y-%m")
 
 
+def month_name(month: str) -> str:
+    """English name of a 'YYYY-MM' key: '2026-10' -> 'October'."""
+    return MONTH_NAMES[int(month[5:7]) - 1]
+
+
 def add_months(month: str, n: int) -> str:
     p = pd.Period(month, freq="M") + n
     return str(p)
@@ -88,6 +111,18 @@ def full_months(today, n: int, df: pd.DataFrame | None = None) -> list[str]:
         )
         months = [m for m in months if m >= first_full]
     return months
+
+
+def last_complete_month(today) -> str:
+    """'YYYY-MM' of the latest complete calendar month as of ``today``: the
+    current month when today is its last day, otherwise the month before.
+    One rule for "last month" in chat and the Overview (F8: with data ending
+    30 Sep, "last month" said August)."""
+    today = to_date(today)
+    current = month_key(today)
+    if today.day == days_in_month(current):
+        return current
+    return add_months(current, -1)
 
 
 def days_in_month(month: str) -> int:
@@ -154,6 +189,9 @@ def merchant_name(df: pd.DataFrame, merchant_id: str) -> str:
         names = df.loc[df["merchant_id"] == merchant_id, "merchant_name"].dropna()
         if len(names):
             return str(names.iloc[-1])
+    coded = re.fullmatch(th.MERCHANT_ID_RE, merchant_id)
+    if coded:  # never show a raw "MRC-GRO-0016" to the user (#24, F11)
+        return th.MERCHANT_CODE_NAMES.get(coded.group(1), th.UNKNOWN_MERCHANT_NAME)
     return str(merchant_id)
 
 

@@ -55,7 +55,8 @@ def test_stream_sends_steps_thoughts_then_reply(client, aino, fake_gemini):
 def test_routed_turn_starts_with_reading_step(client, aino, fake_gemini, monkeypatch):
     monkeypatch.setattr(loop.router, "route", lambda *a, **k: 1)
     fake_gemini(reply())
-    out = events(stream(client, "hi", depth=None))
+    # Not small talk ("hi" is answered without the router).
+    out = events(stream(client, "Where does my money go?", depth=None))
     assert out[0] == {"type": "step", "text": progress.ROUTER_STEP}
 
 
@@ -120,3 +121,20 @@ def test_every_tool_has_a_step_label():
     from coach.gemini.tools.registry import TOOLS
 
     assert set(TOOLS) | {"send_reply"} == set(progress.STEP_LABELS)
+
+
+def test_streamed_reply_carries_the_conversation_id(client, aino, fake_gemini):
+    conversation = "6f1c2b7e-0000-4000-8000-000000000001"
+    fake_gemini(reply())
+    res = client.post(
+        "/api/chat/?stream=1",
+        {
+            "customer_id": AINO,
+            "message": "hi",
+            "depth": 1,
+            "conversation_id": conversation,
+        },
+        content_type="application/json",
+    )
+    out = events(res)
+    assert out[-1]["reply"]["conversation_id"] == conversation

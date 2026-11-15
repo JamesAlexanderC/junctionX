@@ -2,6 +2,10 @@
 
 from datetime import timedelta
 
+import pandas as pd
+
+from inferences.common import merchant_name
+
 from ... import planner
 from ...models import AlertSnooze, Goal, Transaction
 from ... import services
@@ -19,8 +23,35 @@ def _df(ctx):
     return df if df is not None else services.empty_df()
 
 
+def fixable_ids(ctx):
+    """Alert ids the 'Fix this' plan would clear, from the planner itself
+    (cached for the turn). Alerts outside it get 'Why?' instead of 'Fix
+    this', which looped: e.g. 'Bill went up' depends on past payments that
+    no plan step can change."""
+    if ctx.fixable is None:
+        plan = planner.suggest_fixes(
+            ctx.profile, _open_alerts(ctx), df=_df(ctx), run_alerts=ctx.alert_runner
+        )
+        ctx.fixable = {i for step in plan.get("steps", []) for i in step["clears"]}
+    return ctx.fixable
+
+
 def get_alerts(ctx):
-    return {"alerts": _open_alerts(ctx)}
+    ids = fixable_ids(ctx)
+    return {"alerts": [{**a, "fixable": a["id"] in ids} for a in _open_alerts(ctx)]}
+
+
+def mark_alert_cards(ctx, reply):
+    """Set each alert card's fixable flag from Python, whatever Gemini sent."""
+    cards = reply.get("cards") or []
+    if not any(c.get("type") == "alert" for c in cards):
+        return reply
+    ids = fixable_ids(ctx)
+    marked = [
+        {**c, "fixable": c.get("id") in ids} if c.get("type") == "alert" else c
+        for c in cards
+    ]
+    return {**reply, "cards": marked}
 
 
 def explain_alert(ctx, alert_id):
@@ -34,7 +65,8 @@ def explain_alert(ctx, alert_id):
             "date": t.tx_date.isoformat(),
             "amount": t.tx_amount_eur,
             "category": t.category,
-            "merchant_id": t.merchant_id,
+            # #24: a friendly name ("a grocery shop"), never the raw MRC id.
+            "merchant": merchant_name(pd.DataFrame(), t.merchant_id),
         }
         for t in Transaction.objects.filter(tx_id__in=ids[:5])
     ]
@@ -149,7 +181,7 @@ def accept_plan(ctx, actions):
             "instruction": "Tell the user this plan is already saved as their "
             f"'{existing.name}' goal. Nothing new was saved.",
         }
-    if not is_confirmed(ctx, "accept_plan"):
+    if not is_confirmed(ctx, "accept_plan", actions):
         return propose(
             ctx,
             "accept_plan",

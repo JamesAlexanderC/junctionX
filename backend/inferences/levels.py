@@ -80,13 +80,15 @@ def _requirement(lv, f):
     met}]}; every number in it is the customer's own.
     """
     if lv == 1:  # #28
+        bills = (
+            {"text": "Bills are paid from another bank", "met": True}
+            if f.get("partial_view") and not f["bills"]
+            else {"text": "A regular bill found", "met": f["bills"]}
+        )
         return {
             "text": "Get your salary paid into this account and have at least "
             "one regular bill paid from it.",
-            "checks": [
-                {"text": "Payday found", "met": f["payday"]},
-                {"text": "A regular bill found", "met": f["bills"]},
-            ],
+            "checks": [{"text": "Payday found", "met": f["payday"]}, bills],
         }
     if lv == 2:  # #29
         last = f["last_month"]
@@ -118,14 +120,16 @@ def _requirement(lv, f):
             ],
         }
     if lv == 4:  # #31
-        n, ok = f["goals_active"], f["goals_on_track"]
+        n, ok = f["goals_active"], f["goals_counting"]
         text = (
             "No active goal yet"
             if not n
-            else f"{n} active goal{'s' if n != 1 else ''}, {ok} on track"
+            else f"{n} active goal{'s' if n != 1 else ''}, {ok} on track with "
+            "money saved"
         )
         return {
-            "text": "Have an active goal that is on track.",
+            "text": "Have an active goal that is on track, with money saved "
+            "towards it.",
             "checks": [{"text": text, "met": ok > 0}],
         }
     if lv == 5:  # #32
@@ -175,16 +179,21 @@ def compute_levels(
     low = lowest_balance(df, today) if len(df) else 0.0
     low = low or 0.0
 
-    # #28 Level 1: payday and at least one regular bill detected.
-    l1 = bool(income.get("payday", {}).get("found")) and bool(income.get("bills"))
+    # #28 Level 1: payday and at least one regular bill detected. On a partial
+    # view the bills are paid from another bank, so a payday alone counts.
+    payday = bool(income.get("payday", {}).get("found"))
+    bills = bool(income.get("bills"))
+    partial_view = bool(income.get("partial_view"))
+    l1 = payday and (bills or partial_view)
     # #29 Level 2.
     l2, l2_progress, l2_gap, last_month = _level_2(df, today, income_monthly)
     # #30 Level 3: buffer months = lowest balance (30 days) / monthly essentials.
     buffer_months = safe_div(low, essentials, default=0.0)
     l3 = buffer_months >= th.SAFETY_NET_MONTHS
-    # #31 Level 4: an active goal that is on track.
+    # #31 Level 4: an active goal that is on track, with money saved.
     live = [g for g in goals or [] if not g.get("paused")]
-    l4 = any(g.get("on_track") for g in live)
+    counting = sum(1 for g in live if models.counts_for_level_4(g))
+    l4 = counting > 0
     # #32 Level 5: readiness >= 0.75.
     l5 = readiness is not None and readiness >= th.MORTGAGE_READY_SCORE
     # Level 6: buffer >= 3 months and Saver >= 10% of income 3 months running.
@@ -232,14 +241,15 @@ def compute_levels(
         }
 
     facts = {
-        "payday": bool(income.get("payday", {}).get("found")),
-        "bills": bool(income.get("bills")),
+        "payday": payday,
+        "bills": bills,
+        "partial_view": partial_view,
         "last_month": last_month,
         "essentials": essentials,
         "low": low,
         "l3": l3,
         "goals_active": len(live),
-        "goals_on_track": sum(1 for g in live if g.get("on_track")),
+        "goals_counting": counting,
         "readiness": readiness,
         "l5": l5,
         "buffer_months": buffer_months,

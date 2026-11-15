@@ -33,6 +33,7 @@ export default function CustomerView({
   onHelp,
   onCloseHelp,
 }) {
+  const [conversationId] = useState(() => crypto.randomUUID())
   const [insights, setInsights] = useState([])
   const [insightsError, setInsightsError] = useState(null)
   const [goals, setGoals] = useState(null)
@@ -47,9 +48,9 @@ export default function CustomerView({
   const [tab, setTab] = useState('overview')
   const overviewCtrl = useRef(null)
 
-  // Insights, goals and spending load side by side, so one failing never hides the
-  // other. Called on open and after every chat reply: the coach may have
-  // added or changed a goal, and the backend has already rebuilt the profile.
+  // Insights, goals and spending load side by side, so one failing never hides
+  // the other. Called on open and after a reply that changed state (a goal or
+  // plan written): the backend has already rebuilt the profile.
   const loadOverview = useCallback(async () => {
     overviewCtrl.current?.abort()
     const ctrl = new AbortController()
@@ -60,11 +61,12 @@ export default function CustomerView({
       getSpending(customerId, { signal: ctrl.signal }),
     ])
     if (ctrl.signal.aborted) return
-    setInsights(ins.status === 'fulfilled' ? ins.value : [])
+    // A failed refresh keeps the last good data on screen beside the error.
+    if (ins.status === 'fulfilled') setInsights(ins.value)
     setInsightsError(ins.status === 'rejected' ? ins.reason.message : null)
-    setGoals(gls.status === 'fulfilled' ? gls.value : null)
+    if (gls.status === 'fulfilled') setGoals(gls.value)
     setGoalsError(gls.status === 'rejected' ? gls.reason.message : null)
-    setSpending(spd.status === 'fulfilled' ? spd.value : null)
+    if (spd.status === 'fulfilled') setSpending(spd.value)
     setSpendingError(spd.status === 'rejected' ? spd.reason.message : null)
     setOverviewLoading(false)
   }, [customerId])
@@ -90,17 +92,18 @@ export default function CustomerView({
           message: text,
           history,
           depth,
+          conversationId,
           onProgress,
         })
         setMessages((m) => [...m, { role: 'assistant', reply }])
-        loadOverview()
+        if (reply.state_changed) loadOverview()
       } catch (e) {
         setMessages((m) => [...m, { role: 'assistant', error: e.message }])
       } finally {
         setBusy(false)
       }
     },
-    [customerId, busy, messages, loadOverview],
+    [customerId, busy, messages, conversationId, loadOverview],
   )
 
   // Tapping an insight asks the coach, so on phones jump to the Coach tab.
@@ -158,7 +161,10 @@ export default function CustomerView({
               .map((e) => (
                 <p key={e} className="error banner" role="alert">
                   <Icon name="error" />
-                  {e}
+                  {e}{' '}
+                  <button type="button" onClick={loadOverview}>
+                    Retry Overview
+                  </button>
                 </p>
               ))}
             {overviewLoading ? (

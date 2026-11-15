@@ -118,7 +118,14 @@ def test_chat_tool_then_send_reply(client, aino, fake_gemini):
     res = chat(client, "How much did I spend on groceries last month?")
     assert res.status_code == 200
     body = res.json()
-    assert set(body) == {"text", "depth", "cards", "chips"}
+    assert set(body) == {
+        "text",
+        "depth",
+        "cards",
+        "chips",
+        "state_changed",
+        "conversation_id",
+    }
     assert body["cards"][0]["value"] == total
 
 
@@ -156,7 +163,7 @@ def test_category_spend_leaves_out_own_transfers(aino):
 def test_no_send_reply_stops_after_max_rounds(client, aino, fake_gemini):
     fake = fake_gemini(response(("get_baskets", {})))
     res = chat(client, "How much?", depth=1)
-    assert res.json() == FALLBACK_REPLY
+    assert {k: res.json()[k] for k in FALLBACK_REPLY} == FALLBACK_REPLY
     assert len(fake.models.calls) == loop.MAX_ROUNDS
 
 
@@ -169,7 +176,7 @@ def test_invented_number_retried_once_then_fallback(client, aino, fake_gemini):
     )
     fake = fake_gemini(response(("get_safe_to_spend", {})), bad, bad, bad)
     res = chat(client, "How much can I spend?", depth=1)
-    assert res.json() == FALLBACK_REPLY
+    assert {k: res.json()[k] for k in FALLBACK_REPLY} == FALLBACK_REPLY
     # 1 tool round + first bad reply + one retry.
     assert len(fake.models.calls) == 3
 
@@ -186,7 +193,9 @@ def test_retry_succeeds_after_correction(client, aino, fake_gemini):
 
 
 def test_unknown_card_type_removed(client, aino, fake_gemini):
+    value = safe_to_spend()
     fake_gemini(
+        response(("get_safe_to_spend", {})),
         response(
             (
                 "send_reply",
@@ -195,12 +204,12 @@ def test_unknown_card_type_removed(client, aino, fake_gemini):
                     "depth": 1,
                     "cards": [
                         {"type": "hologram"},
-                        {"type": "number", "label": "Count", "value": 1},
+                        {"type": "number", "label": "Safe to spend", "value": value},
                     ],
                     "chips": ["a", "b", "c", "d"],
                 },
             )
-        )
+        ),
     )
     body = chat(client, "hi", depth=1).json()
     assert [c["type"] for c in body["cards"]] == ["number"]

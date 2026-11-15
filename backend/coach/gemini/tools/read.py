@@ -3,11 +3,12 @@
 import math
 import re
 
+from inferences.common import last_complete_month
 from inferences.thresholds import OWN_TRANSFER_TYPES
 
 from ...models import Transaction
 from ... import services
-from .context import ToolError, _last_full_month, _missing, _norm, unavailable
+from .context import ToolError, _missing, _norm, unavailable
 
 # --- tool implementations --------------------------------------------------
 
@@ -16,7 +17,7 @@ def get_category_spend(ctx, category, month=None):
     """Spend in one category: outflows minus own-account and Saver transfers
     (common.spend), so "salary" or "invest" never count the salary_sweep or
     investment deposits as spending."""
-    month = month or _last_full_month(ctx.today)
+    month = month or last_complete_month(ctx.today)  # F8
     if not re.fullmatch(r"\d{4}-\d{2}", month):
         raise ToolError("month must be YYYY-MM")
     year, mon = (int(x) for x in month.split("-"))
@@ -102,11 +103,15 @@ def level_card(levels):
     current = levels["current"]
     nxt = levels.get("next")
     step = levels.get("easiest_next_step") or {}
+    # FC-7: show where the user is, and clamp progress (it can come out < 0).
+    progress = min(1.0, max(0.0, float(levels.get("progress", 1.0) or 0.0)))
     card = {
         "type": "level_progress",
         "level": nxt or current,
         "name": levels.get("next_name") or levels.get("current_name"),
-        "progress": levels.get("progress", 1.0),
+        "current_level": current,
+        "current_name": levels.get("current_name"),
+        "progress": progress,
         "euros_to_go": levels.get("euros_to_go"),
         "next_step": step.get("text"),
         # What the next level needs, with the customer's own numbers.
@@ -211,7 +216,27 @@ def get_mortgage_readiness(ctx):
     return m
 
 
+TIGHT_DAYS_TEXT = (
+    "Days when your balance could drop below EUR 50: before your next payday, or "
+    "in the next 30 days when no payday is found."
+)
+
+SURPRISES_TEXT = (
+    "Surprises are must-pay costs that come irregularly, like a car repair or "
+    "the dentist. They are not the same as an unusual charge, which is one "
+    "payment much bigger than usual at a shop."
+)
+
 EXPLAINERS = {
+    # FC-7: tight days are below EUR 50, not below the buffer.
+    "danger days": (
+        TIGHT_DAYS_TEXT,
+        lambda p: {"value": len(p.get("forecast", {}).get("danger_days") or [])},
+    ),
+    "tight days": (
+        TIGHT_DAYS_TEXT,
+        lambda p: {"value": len(p.get("forecast", {}).get("danger_days") or [])},
+    ),
     "safe to spend": (
         "What you can spend this week without touching bills, savings or your "
         "buffer.",
@@ -231,8 +256,13 @@ EXPLAINERS = {
         "Must-pay regular costs: rent, utilities, insurance, loans, groceries.",
         lambda p: {"value": p.get("baskets", {}).get("monthly_essentials")},
     ),
+    # #8 (live test): "unexpected costs" got the unusual-charge alert instead.
+    "unexpected costs": (
+        SURPRISES_TEXT,
+        lambda p: {"value": p.get("forecast", {}).get("surprise_fund_monthly")},
+    ),
     "surprises": (
-        "Must-pay costs that come irregularly, like a car repair or the dentist.",
+        SURPRISES_TEXT,
         lambda p: {"value": p.get("forecast", {}).get("surprise_fund_monthly")},
     ),
     "saver": (

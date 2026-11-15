@@ -17,8 +17,8 @@ export function goalMonths(target, saved, rate) {
   const remaining = target - saved
   if (remaining <= 0) return 0
   if (!(rate > 0)) return null
-  // Round first so float noise (e.g. 859.9999) never adds a month.
-  return Math.ceil(cents(remaining / rate))
+  // Match Python's months_to_goal: remove float noise, not meaningful fractions.
+  return Math.ceil(Math.round((remaining / rate) * 1e9) / 1e9)
 }
 
 // Date that is `months` calendar months after `from` (ISO string or Date).

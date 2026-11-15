@@ -162,3 +162,17 @@ def test_level_insight_says_what_is_still_to_do():
     item = next(i for i in insights.insights(p) if i["key"] == "level")
     assert "To get there: Have an active goal that is on track." in item["text"]
     assert "Still to do: No active goal yet." in item["text"]
+
+
+def test_seasonal_insight_names_the_month():
+    # Live: "Last year 2026-10 cost 1.4x a usual month".
+    p = copy.deepcopy(sample())
+    p["forecast"]["seasonal"] = {
+        "warn": True,
+        "next_month": "2026-11",
+        "ratio": 1.4,
+        "pot": 120.0,
+    }
+    item = next(i for i in insights.insights(p) if i["key"] == "seasonal")
+    assert item["text"].startswith("Last November cost 1.4x a usual month.")
+    assert "2026-11" not in item["text"]
