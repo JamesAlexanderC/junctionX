@@ -156,3 +156,51 @@ def test_meta_reports_time_per_step(aino, monkeypatch):
     totals = meta["time_ms"]
     assert set(totals) == {"router", "gemini", "tool", "validate"}
     assert sum(totals.values()) <= meta["latency_ms"] + 1
+
+
+# --- FC-3: never run out of rounds without answering -----------------------------
+
+
+def test_last_round_only_allows_send_reply():
+    final = loop.build_config(final=True)
+    normal = loop.build_config()
+    assert final.tool_config.function_calling_config.allowed_function_names == [
+        "send_reply"
+    ]
+    # Live, Gemini ignored allowed_function_names, so the final round only
+    # declares send_reply at all.
+    final_names = [d.name for d in final.tools[0].function_declarations]
+    assert final_names == ["send_reply"]
+    assert len(normal.tools[0].function_declarations) > 1
+    assert not normal.tool_config.function_calling_config.allowed_function_names
+
+
+def test_loop_uses_the_final_config_on_the_last_round(aino):
+    from .conftest import FakeClient
+
+    client = FakeClient(response(("get_baskets", {})))
+    seen = []
+    original = client.models.generate_content
+
+    def spy(model, contents, config=None):
+        fc = config.tool_config.function_calling_config
+        seen.append(fc.allowed_function_names)
+        return original(model, contents, config)
+
+    client.models.generate_content = spy
+    loop.chat(AINO, "How much is in my baskets?", client=client)
+    assert seen[-1] == ["send_reply"]
+    assert all(not names for names in seen[:-1])
+
+
+def test_unavailable_item_gets_an_honest_answer(client, aino, fake_gemini):
+    from coach.gemini.system_prompt import FALLBACK_REPLY
+
+    out = call_tool(ToolContext(AINO), "get_inference", {"item": "forecast.seasonal"})
+    assert out["available"] is False
+    fake_gemini(
+        response(("get_inference", {"item": "forecast.seasonal"})),
+        response(("send_reply", {"text": out["reason"], "depth": 2, "cards": []})),
+    )
+    body = _chat(client, "Do I spend more at certain times of year?")
+    assert body.json()["text"] == out["reason"] != FALLBACK_REPLY["text"]

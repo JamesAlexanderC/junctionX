@@ -7,8 +7,6 @@ import { cutSaving, goalWithCut } from '../lib/formulas.js'
 import ChartCard from './Chart.jsx'
 import Icon from './Icon.jsx'
 
-const TODAY = () => new Date().toISOString().slice(0, 10)
-
 const pct = (v) => Math.max(0, Math.min(1, Number(v) || 0)) * 100
 
 // Progress bar for a 0..1 share; `marker` (0..1) draws a tick, e.g. where the
@@ -72,6 +70,7 @@ export function SliderCard({ card, onSend }) {
   const saving = cutSaving(card.monthly_spend, p / 100)
   const goal =
     card.goal &&
+    card.as_of &&
     goalWithCut(
       {
         target: card.goal.target,
@@ -79,7 +78,7 @@ export function SliderCard({ card, onSend }) {
         monthlyRate: card.goal.monthly_rate,
       },
       saving.monthly,
-      TODAY(),
+      card.as_of,
     )
   return (
     <div className="card">
@@ -173,9 +172,17 @@ function LevelProgressCard({ card }) {
   return (
     <div className="card">
       {card.ladder?.length > 0 && <Ladder ladder={card.ladder} target={card.level} />}
-      <strong>
-        Level {card.level}: {card.name}
-      </strong>
+      {/* FC-7: lead with where the user is; the bar is progress to the next. */}
+      {card.current_level != null && card.current_level !== card.level ? (
+        <>
+          <strong>{`Level ${card.current_level}: ${card.current_name}`}</strong>
+          <small className="muted">{`Next: Level ${card.level} ${card.name}`}</small>
+        </>
+      ) : (
+        <strong>
+          Level {card.level}: {card.name}
+        </strong>
+      )}
       <Bar value={card.progress} />
       <small>
         {card.euros_to_go != null && `${eur(card.euros_to_go)} to go`}
@@ -224,14 +231,26 @@ function AlertCard({ card, onSend }) {
         <i className={`dot sev-${card.severity}`} /> {card.title}
       </strong>
       <p>{card.text}</p>
-      <button
-        type="button"
-        className="btn-primary"
-        onClick={() => onSend(`Help me fix the "${card.title}" alert`, 4)}
-      >
-        <Icon name="fix" size={16} />
-        Fix this
-      </button>
+      {/* Only a plan-fixable alert gets "Fix this"; the backend sets fixable.
+          Otherwise "Why?" asks for the evidence instead of looping. */}
+      {card.fixable === false ? (
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => onSend(`Why did I get the "${card.title}" alert?`, 2)}
+        >
+          Why?
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => onSend(`Help me fix the "${card.title}" alert`, 4)}
+        >
+          <Icon name="fix" size={16} />
+          Fix this
+        </button>
+      )}
     </div>
   )
 }
