@@ -16,7 +16,7 @@ from coach import services
 from coach.gemini import loop, router
 from coach.gemini.cards import card_summary
 from coach.gemini.system_prompt import FALLBACK_REPLY
-from coach.models import ChatTurn
+from coach.models import ChatTurn, Conversation
 
 from .conftest import AINO, FakeClient, response
 
@@ -35,9 +35,10 @@ def _reply(text, *cards):
     return response(("send_reply", {"text": text, "depth": 1, "cards": list(cards)}))
 
 
-def _seed_alert_turn():
+def _seed_alert_turn(conversation=None):
     ChatTurn.objects.create(
         customer_id=AINO,
+        conversation=conversation,
         message="What alerts do I have?",
         reply={"text": "You have one alert.", "depth": 1, "cards": [ALERT_CARD]},
     )
@@ -80,13 +81,20 @@ def test_profile_summary_lists_open_alerts(aino):
 
 
 def test_reply_may_repeat_a_number_from_an_earlier_coach_reply(
-    client, aino, fake_gemini
+    client, user, aino, fake_gemini
 ):
-    _seed_alert_turn()
+    # Earlier turns count only within the same user's conversation.
+    conversation = Conversation.objects.create(owner=user, customer_id=AINO)
+    _seed_alert_turn(conversation)
     fake_gemini(_reply("Good to know the 15.64 charge was you."))
     body = client.post(
         "/api/chat/",
-        {"customer_id": AINO, "message": "looks familiar, had problems", "depth": 1},
+        {
+            "customer_id": AINO,
+            "message": "looks familiar, had problems",
+            "depth": 1,
+            "conversation_id": str(conversation.id),
+        },
         content_type="application/json",
     ).json()
     assert body["text"] == "Good to know the 15.64 charge was you."

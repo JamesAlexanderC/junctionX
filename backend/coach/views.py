@@ -1,5 +1,10 @@
 """Saldo REST API (CLAUDE.md "API", P2.1, P2.5, P2.8)."""
 
+import json
+import logging
+from itertools import chain
+
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -11,7 +16,7 @@ from . import insights as insights_mod
 from . import services
 from .gemini import loop
 from .gemini.tools import ToolContext, rate_goal, snooze_alert
-from .models import Goal, LoanDetails
+from .models import Conversation, Goal, LoanDetails
 from .serializers import (
     ChatRequest,
     GoalSerializer,
@@ -19,6 +24,9 @@ from .serializers import (
     RateSerializer,
     SnoozeSerializer,
 )
+
+log = logging.getLogger("coach.api")
+NDJSON = "application/x-ndjson"
 
 
 def _not_found(customer_id):
@@ -36,6 +44,13 @@ def customers(request):
     return Response(
         services.list_customers(q=request.query_params.get("q"), limit=limit)
     )
+
+
+@api_view(["GET"])
+def demo_customers(request):
+    """Demo picks (one per app level) and every customer with their income
+    level, app level and spender type (build_customer_index)."""
+    return Response(services.demo_directory())
 
 
 @api_view(["GET"])
@@ -70,25 +85,125 @@ def home(request, customer_id):
 
 @api_view(["POST"])
 def chat(request):
+    """POST {customer_id, message, history, depth?} -> send_reply JSON.
+
+    With ?stream=1 the answer is NDJSON instead, one event a line, so the
+    chat can show what the coach is doing (coach/gemini/progress.py):
+    {"type": "step"|"thought", "text"} while it works, then {"type": "reply",
+    "reply": <send_reply>}, or {"type": "error", "error"} if it broke midway.
+    404 and 503 are still plain JSON statuses, sent before any event.
+    """
     req = ChatRequest(data=request.data)
     req.is_valid(raise_exception=True)
     data = req.validated_data
+    conversation = _conversation_for(request.user, data)
+    if conversation is None:
+        return Response({"detail": "Conversation not found"}, status=404)
+    # History comes from the stored turns of this conversation, not the client.
+    events = loop.chat_stream(
+        data["customer_id"],
+        data["message"],
+        history=None,
+        conversation=conversation,
+        depth=data.get("depth"),
+    )
     try:
-        reply, _meta = loop.chat(
-            data["customer_id"],
-            data["message"],
-            history=data.get("history"),
-            depth=data.get("depth"),
-        )
+        first = next(events)
     except LookupError:
         return _not_found(data["customer_id"])
     except loop.GeminiNotConfigured as exc:
         return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-    return Response(reply)
+    events = _with_conversation_id(chain([first], events), conversation)
+    if request.query_params.get("stream") != "1":
+        done = [e for e in events if e["type"] == "done"]
+        return Response(done[-1]["reply"])
+    response = StreamingHttpResponse(_ndjson(events), content_type=NDJSON)
+    # Proxies must pass each line on at once, not buffer the whole answer.
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
 
 
-@api_view(["POST"])
+def _conversation_for(user, data):
+    """The user's conversation for this customer; None if the id given belongs
+    to another user or customer."""
+    customer_id = data["customer_id"]
+    conversation_id = data.get("conversation_id")
+    if conversation_id:
+        conversation, _ = Conversation.objects.get_or_create(
+            pk=conversation_id,
+            defaults={"owner": user, "customer_id": customer_id},
+        )
+        if conversation.owner_id != user.pk or conversation.customer_id != customer_id:
+            return None
+        return conversation
+    # Compatibility for clients predating conversation ids, scoped per user.
+    conversation = (
+        Conversation.objects.filter(owner=user, customer_id=customer_id)
+        .order_by("created_at")
+        .first()
+    )
+    return conversation or Conversation.objects.create(
+        owner=user, customer_id=customer_id
+    )
+
+
+def _with_conversation_id(events, conversation):
+    """Add conversation_id to the final reply so the client can continue it."""
+    for e in events:
+        if e["type"] == "done":
+            e = {**e, "reply": {**e["reply"], "conversation_id": str(conversation.id)}}
+        yield e
+
+
+def _ndjson(events):
+    """One JSON line per event; the final "done" (reply and meta) goes out as
+    {"type": "reply", "reply"} without the meta."""
+
+    def line(event):
+        return json.dumps(event, default=str) + "\n"
+
+    try:
+        for e in events:
+            if e["type"] == "done":
+                yield line({"type": "reply", "reply": e["reply"]})
+            else:
+                yield line(e)
+    except Exception:  # noqa: BLE001 - the status line is already sent
+        log.exception("chat stream failed")
+        yield line({"type": "error", "error": "The coach stopped unexpectedly."})
+
+
+def _panel(request, summary):
+    """GET ?customer_id= -> {customer_id, as_of, **summary(profile)}."""
+    customer_id = request.query_params.get("customer_id")
+    if not customer_id:
+        return Response(
+            {"detail": "customer_id is required."}, status=status.HTTP_400_BAD_REQUEST
+        )
+    profile = services.get_profile(customer_id)
+    if profile is None:
+        return _not_found(customer_id)
+    return Response(
+        {
+            "customer_id": customer_id,
+            "as_of": profile.get("today"),
+            **summary(profile),
+        }
+    )
+
+
+@api_view(["GET"])
+def spending(request):
+    """GET ?customer_id= lists spending per data category for the Overview."""
+    return _panel(request, insights_mod.spending_summary)
+
+
+@api_view(["GET", "POST"])
 def goals(request):
+    """GET ?customer_id= lists goals for the Overview; POST creates one (#64)."""
+    if request.method == "GET":
+        return _panel(request, insights_mod.goal_summary)
     ser = GoalSerializer(data=request.data)
     ser.is_valid(raise_exception=True)
     if services.get_profile(ser.validated_data["customer_id"]) is None:

@@ -52,5 +52,8 @@ def test_explanations_think_a_little(aino):
 @pytest.mark.parametrize("depth", [3, 4])
 def test_what_ifs_and_plans_keep_the_default(aino, depth):
     thinking, meta = _thinking_seen("Help me plan my money", depth=depth)
-    assert thinking is None
+    # No level or budget forced; thought summaries may still be asked for.
+    assert thinking is None or (
+        thinking.thinking_level is None and thinking.thinking_budget is None
+    )
     assert meta["thinking"] == "default"

@@ -98,3 +98,29 @@ def fake_gemini(monkeypatch):
         return client
 
     return install
+
+
+@pytest.fixture
+def user(db):
+    from django.contrib.auth import get_user_model
+
+    return get_user_model().objects.create_user("demo", password="demo-pass-123")
+
+
+@pytest.fixture
+def anon_client():
+    """An API client with no token: every endpoint but login answers 401."""
+    from rest_framework.test import APIClient
+
+    return APIClient()
+
+
+@pytest.fixture
+def client(user):
+    """API client logged in with a real token, as the frontend sends it."""
+    from rest_framework.authtoken.models import Token
+    from rest_framework.test import APIClient
+
+    api = APIClient()
+    api.credentials(HTTP_AUTHORIZATION=f"Token {Token.objects.create(user=user).key}")
+    return api

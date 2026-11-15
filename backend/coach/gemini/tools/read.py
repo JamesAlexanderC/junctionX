@@ -105,6 +105,8 @@ def level_card(levels):
         "progress": progress,
         "euros_to_go": levels.get("euros_to_go"),
         "next_step": step.get("text"),
+        # What the next level needs, with the customer's own numbers.
+        "requirement": levels.get("next_requirement") if nxt else None,
         "ladder": [
             {"level": r["level"], "name": r["name"], "reached": r["level"] <= current}
             for r in levels.get("ladder") or []

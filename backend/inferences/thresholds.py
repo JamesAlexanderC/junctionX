@@ -297,3 +297,11 @@ AGE_BANDS = ((18, 24), (25, 29), (30, 39), (40, 54), (55, 200))
 PEER_MIN_CUSTOMERS = 20
 PEER_ABOVE = 1.2
 PEER_BELOW = 0.8
+
+
+# --- Demo customer picks (landing page) ----------------------------------------
+
+# Income bands on the landing page, one typical customer each.
+DEMO_LEVELS = 5
+# Shorter histories give noisy monthly averages.
+DEMO_MIN_HISTORY_MONTHS = 6

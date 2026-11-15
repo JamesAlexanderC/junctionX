@@ -167,6 +167,38 @@ def test_safety_net_progress(df_today, inc, bsk):
     assert lv["easiest_next_step"]["category"] == "takeaway"
 
 
+def test_next_requirement_says_what_level_3_needs(df_today, inc, bsk):
+    # #30 with Aino's numbers: lowest balance 445 of 890 (1 month essentials).
+    req = levels.compute_levels(df_today, TODAY, inc, bsk)["next_requirement"]
+    assert "1 month of essential spending" in req["text"]
+    [check] = req["checks"]
+    assert check == {
+        "text": "Lowest balance in the last 30 days: EUR 445 of EUR 890 needed",
+        "met": False,
+    }
+
+
+@pytest.mark.parametrize("lv", [1, 2, 3, 4, 5, 6])
+def test_every_level_has_a_requirement(lv):
+    facts = {
+        "payday": True,
+        "bills": False,
+        "last_month": {"month": "2026-09", "spent": 1200.0, "earned": 1000.0},
+        "essentials": 890.0,
+        "low": 445.0,
+        "l3": False,
+        "goals_active": 1,
+        "goals_on_track": 0,
+        "readiness": 0.5,
+        "l5": False,
+        "buffer_months": 0.5,
+        "saver_months": (1, 3),
+    }
+    req = levels._requirement(lv, facts)
+    assert req["text"] and req["checks"]
+    assert not all(c["met"] for c in req["checks"])
+
+
 def test_level_4_with_goal_on_track(df_today, inc, bsk):
     goals = [{"on_track": True, "paused": False}]
     lv = levels.compute_levels(df_today, TODAY, inc, bsk, goals=goals)
@@ -213,3 +245,22 @@ def test_everything_json_serialisable(df_today, inc, bsk):
         "levels": levels.compute_levels(df_today, TODAY, inc, bsk),
     }
     json.dumps(out)
+
+
+def _no_bills(inc, partial_view):
+    return {**inc, "bills": [], "partial_view": partial_view}
+
+
+def test_level_1_reached_without_bills_on_a_partial_view(df_today, inc, bsk):
+    # #28: bills paid from another bank are not visible on a partial view.
+    lv = levels.compute_levels(df_today, TODAY, _no_bills(inc, True), bsk)
+    ladder = {step["level"]: step for step in lv["ladder"]}
+    assert ladder[1]["reached"] is True
+    assert lv["current"] == 2
+
+
+def test_level_1_without_bills_says_the_bill_is_missing(df_today, inc, bsk):
+    lv = levels.compute_levels(df_today, TODAY, _no_bills(inc, False), bsk)
+    assert lv["current"] == 0
+    checks = {c["text"]: c["met"] for c in lv["next_requirement"]["checks"]}
+    assert checks == {"Payday found": True, "A regular bill found": False}

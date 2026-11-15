@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Start the production stack in the background. Only Caddy is published
+# (HTTP_PORT, default 80; HTTPS_PORT, default 443).
+#
+# Usage: scripts/bin/docker-up [--build] [--load-data]
+#   --build       rebuild the images first
+#   --load-data   run `manage.py load_data` once the backend is up
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+BUILD=0
+LOAD_DATA=0
+for arg in "$@"; do
+    case "${arg}" in
+        --build) BUILD=1 ;;
+        --load-data) LOAD_DATA=1 ;;
+        -h|--help)
+            sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: ${arg}" >&2
+            exit 1
+            ;;
+    esac
+done
+
+cd "${REPO_ROOT}"
+if [ ! -f .env ]; then
+    echo "No .env found. Run 'scripts/bin/setup' first." >&2
+    exit 1
+fi
+if ! grep -q '^DJANGO_SECRET_KEY=.\+' .env \
+    || grep -q '^DJANGO_SECRET_KEY=\*\*CHANGE_ME\*\*' .env; then
+    echo "Set DJANGO_SECRET_KEY in .env (production refuses the dev key)." >&2
+    exit 1
+fi
+
+COMPOSE=(docker compose -f docker-compose.prod.yml)
+if [ "${BUILD}" -eq 1 ]; then
+    "${COMPOSE[@]}" up -d --build
+else
+    "${COMPOSE[@]}" up -d
+fi
+
+if [ "${LOAD_DATA}" -eq 1 ]; then
+    # Backend migrates on start; wait until manage.py answers.
+    echo "Waiting for the backend..."
+    for _ in $(seq 1 60); do
+        if "${COMPOSE[@]}" exec -T backend python manage.py check >/dev/null 2>&1
+        then
+            break
+        fi
+        sleep 2
+    done
+    "${COMPOSE[@]}" exec -T backend python manage.py load_data
+fi
+
+"${COMPOSE[@]}" ps
+PORT="$(grep -E '^HTTP_PORT=' .env | cut -d= -f2 || true)"
+echo "Saldo is up: http://localhost:${PORT:-80}/"

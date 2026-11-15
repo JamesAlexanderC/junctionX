@@ -116,7 +116,14 @@ def test_chat_tool_then_send_reply(client, aino, fake_gemini):
     res = chat(client, "How much did I spend on groceries last month?")
     assert res.status_code == 200
     body = res.json()
-    assert set(body) == {"text", "depth", "cards", "chips"}
+    assert set(body) == {
+        "text",
+        "depth",
+        "cards",
+        "chips",
+        "state_changed",
+        "conversation_id",
+    }
     assert body["cards"][0]["value"] == total
 
 
@@ -128,7 +135,7 @@ def test_unsupported_category_is_unavailable(aino):
 def test_no_send_reply_stops_after_max_rounds(client, aino, fake_gemini):
     fake = fake_gemini(response(("get_baskets", {})))
     res = chat(client, "How much?", depth=1)
-    assert res.json() == FALLBACK_REPLY
+    assert {k: res.json()[k] for k in FALLBACK_REPLY} == FALLBACK_REPLY
     assert len(fake.models.calls) == loop.MAX_ROUNDS
 
 
@@ -141,7 +148,7 @@ def test_invented_number_retried_once_then_fallback(client, aino, fake_gemini):
     )
     fake = fake_gemini(response(("get_safe_to_spend", {})), bad, bad, bad)
     res = chat(client, "How much can I spend?", depth=1)
-    assert res.json() == FALLBACK_REPLY
+    assert {k: res.json()[k] for k in FALLBACK_REPLY} == FALLBACK_REPLY
     # 1 tool round + first bad reply + one retry.
     assert len(fake.models.calls) == 3
 
@@ -158,7 +165,9 @@ def test_retry_succeeds_after_correction(client, aino, fake_gemini):
 
 
 def test_unknown_card_type_removed(client, aino, fake_gemini):
+    value = safe_to_spend()
     fake_gemini(
+        response(("get_safe_to_spend", {})),
         response(
             (
                 "send_reply",
@@ -167,12 +176,12 @@ def test_unknown_card_type_removed(client, aino, fake_gemini):
                     "depth": 1,
                     "cards": [
                         {"type": "hologram"},
-                        {"type": "number", "label": "Count", "value": 1},
+                        {"type": "number", "label": "Safe to spend", "value": value},
                     ],
                     "chips": ["a", "b", "c", "d"],
                 },
             )
-        )
+        ),
     )
     body = chat(client, "hi", depth=1).json()
     assert [c["type"] for c in body["cards"]] == ["number"]
@@ -259,6 +268,59 @@ def test_pause_goal_never_off_track(client, aino):
     assert _active(res.json()["profile"], "Bike")[0]["on_track"]
 
 
+def test_goal_list_needs_auth_and_customer(anon_client, client, aino):
+    assert anon_client.get(f"/api/goals/?customer_id={AINO}").status_code == 401
+    assert client.get("/api/goals/").status_code == 400
+    assert client.get("/api/goals/?customer_id=nobody").status_code == 404
+
+
+def test_goal_list_returns_profile_numbers(client, aino):
+    res = client.get(f"/api/goals/?customer_id={AINO}")
+    assert res.status_code == 200
+    assert res.json()["active"] == [] and res.json()["clash"] is None
+    goal = client.post(
+        "/api/goals/",
+        {"customer_id": AINO, "name": "Bike", "amount": 300, "date": "2027-03-01"},
+        content_type="application/json",
+    ).json()["goal"]
+    client.patch(
+        f"/api/goals/{goal['id']}/", {"saved": 60}, content_type="application/json"
+    )
+    profile = client.get(f"/api/home/{AINO}/").json()
+    body = client.get(f"/api/goals/?customer_id={AINO}").json()
+    assert body["customer_id"] == AINO and body["as_of"] == "2026-10-18"
+    [row] = body["active"]
+    [src] = _active(profile, "Bike")
+    for key in ("saved", "target", "progress_pct", "monthly_needed", "on_track"):
+        assert row[key] == src[key]
+    assert row["saved"] == 60 and not row["paused"]
+    assert body["clash"]["total_needed"] == profile["goals"]["clash"]["total_needed"]
+
+    client.patch(
+        f"/api/goals/{goal['id']}/", {"paused": True}, content_type="application/json"
+    )
+    body = client.get(f"/api/goals/?customer_id={AINO}").json()
+    assert body["active"][0]["paused"] is True
+
+
+def test_spending_list_needs_auth_and_customer(anon_client, client, aino):
+    assert anon_client.get(f"/api/spending/?customer_id={AINO}").status_code == 401
+    assert client.get("/api/spending/").status_code == 400
+    assert client.get("/api/spending/?customer_id=nobody").status_code == 404
+
+
+def test_spending_list_returns_profile_numbers(client, aino):
+    profile = client.get(f"/api/home/{AINO}/").json()
+    body = client.get(f"/api/spending/?customer_id={AINO}").json()
+    assert body["customer_id"] == AINO and body["as_of"] == "2026-10-18"
+    assert body["categories"] == profile["spending"]["categories"]
+    assert body["savings"] == profile["spending"]["savings"]
+    saved = {r["category"] for r in body["savings"]}
+    assert not saved & {c["category"] for c in body["categories"]}
+    assert body["month"] == profile["spending"]["month"]
+    assert body["total"] == round(sum(c["total"] for c in body["categories"]), 2)
+
+
 def test_rate_goal_weight(client, aino):
     for up in (True, True, False):
         res = client.post(
@@ -300,3 +362,42 @@ def test_tool_respects_availability_flags(aino):
     out = call_tool(ToolContext(AINO), "get_mortgage_readiness", {})
     assert out["available"] is False and out["item"] == "mortgage.readiness"
     assert out["reason"]
+
+
+def test_demo_directory_lists_demos_and_every_customer(client, db, monkeypatch):
+    from inferences import thresholds as th
+    from inferences.tests.fixtures import aino_df
+
+    from .conftest import load_customer
+
+    monkeypatch.setattr(th, "DEMO_MIN_HISTORY_MONTHS", 3)  # Aino has ~4 months
+    base = aino_df()
+    for level in range(1, 6):
+        df = base.assign(tx_amount_eur=base["tx_amount_eur"] * level)
+        load_customer(df, f"C-L{level}", age=20 + level)
+    index, demos = services.build_customer_index(workers=1)
+    assert len(index) == 5
+
+    body = client.get("/api/customers/demo/").json()
+    assert body["built"] is True
+    rows = {c["customer_id"]: c for c in body["customers"]}
+    assert [rows[f"C-L{i}"]["income_level"] for i in range(1, 6)] == [1, 2, 3, 4, 5]
+    assert rows["C-L1"]["income_label"] == "Lowest income"
+    assert rows["C-L1"]["spender_type"]
+    assert all(isinstance(rows[f"C-L{i}"]["level"], int) for i in range(1, 6))
+    assert rows["C-L1"]["level_name"]
+    # Same habits scaled by income: every customer is at the same app level,
+    # so there is one demo, for that level.
+    assert len(body["demos"]) == 1
+    demo = body["demos"][0]
+    assert demo["demo"] == 1
+    assert demo["level"] == rows[demo["customer_id"]]["level"]
+    assert demo["level_name"] == rows[demo["customer_id"]]["level_name"]
+    # No goals, no readiness model: the index level is the profile's level.
+    profile = services.get_profile(demo["customer_id"])
+    assert profile["levels"]["current"] == demo["level"]
+
+
+def test_demo_directory_not_built(client, db):
+    body = client.get("/api/customers/demo/").json()
+    assert body == {"built": False, "demos": [], "customers": []}

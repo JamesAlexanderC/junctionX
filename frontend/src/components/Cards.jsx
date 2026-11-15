@@ -5,14 +5,19 @@ import { useState } from 'react'
 import { eur, formatValue, longDate } from '../lib/format.js'
 import { cutSaving, goalWithCut } from '../lib/formulas.js'
 import ChartCard from './Chart.jsx'
+import Icon from './Icon.jsx'
 
-const TODAY = () => new Date().toISOString().slice(0, 10)
+const pct = (v) => Math.max(0, Math.min(1, Number(v) || 0)) * 100
 
-function Bar({ value }) {
-  const w = Math.max(0, Math.min(1, Number(value) || 0)) * 100
+// Progress bar for a 0..1 share; `marker` (0..1) draws a tick, e.g. where the
+// goal should be by now (#52).
+export function Bar({ value, marker }) {
   return (
     <div className="bar">
-      <div style={{ width: `${w}%` }} />
+      <div style={{ width: `${pct(value)}%` }} />
+      {marker != null && (
+        <i className="bar-marker" style={{ left: `${pct(marker)}%` }} />
+      )}
     </div>
   )
 }
@@ -52,11 +57,20 @@ function BasketBarCard({ card }) {
 }
 
 // What-if slider: #24 and #26 recalculated locally, no API call.
-export function SliderCard({ card }) {
-  const [p, setP] = useState(card.pct ?? 20)
+// The slider works in whole percent on 5 % steps. A fraction (0.2) is read as
+// 20 %, in case a card still carries simulate_cut's 0-1 value.
+const sliderStart = (pct) => {
+  const p = pct > 0 && pct <= 1 ? pct * 100 : (pct ?? 20)
+  return Math.round(p / 5) * 5
+}
+
+export function SliderCard({ card, onSend }) {
+  const [p, setP] = useState(() => sliderStart(card.pct))
+  const [sent, setSent] = useState(null)
   const saving = cutSaving(card.monthly_spend, p / 100)
   const goal =
     card.goal &&
+    card.as_of &&
     goalWithCut(
       {
         target: card.goal.target,
@@ -64,12 +78,14 @@ export function SliderCard({ card }) {
         monthlyRate: card.goal.monthly_rate,
       },
       saving.monthly,
-      TODAY(),
+      card.as_of,
     )
   return (
     <div className="card">
-      <label>
-        Cut {card.category} by {p}%
+      <label className="slider">
+        <span>
+          Cut {card.category} by <strong>{p}%</strong>
+        </span>
         <input
           type="range"
           min={card.min_pct ?? 0}
@@ -91,6 +107,24 @@ export function SliderCard({ card }) {
             : `Goal date: ${longDate(goal.afterDate)}` +
               (goal.monthsSooner > 0 ? ` (${goal.monthsSooner} months sooner)` : '')}
         </p>
+      )}
+      {onSend && (
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={p <= 0 || sent === p}
+          onClick={() => {
+            setSent(p)
+            onSend(
+              `Save cutting ${card.category} by ${p}% as my plan ` +
+                `(${eur(saving.monthly)} a month)`,
+              4,
+            )
+          }}
+        >
+          <Icon name="check" size={16} />
+          {sent === p ? 'Sent to the coach' : `Cut ${card.category} by ${p}%`}
+        </button>
       )}
     </div>
   )
@@ -154,6 +188,22 @@ function LevelProgressCard({ card }) {
         {card.euros_to_go != null && `${eur(card.euros_to_go)} to go`}
         {card.next_step && ` · ${card.next_step}`}
       </small>
+      {card.requirement?.text && (
+        <div className="level-req">
+          <p>{card.requirement.text}</p>
+          {card.requirement.checks?.length > 0 && (
+            <ul aria-label="What this level needs">
+              {card.requirement.checks.map((c) => (
+                <li key={c.text} className={c.met ? 'met' : 'todo'}>
+                  <Icon name={c.met ? 'check' : 'behind'} size={14} />
+                  {c.text}
+                  <span className="sr-only">{c.met ? ' (done)' : ' (to do)'}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -197,6 +247,7 @@ function AlertCard({ card, onSend }) {
           className="btn-primary"
           onClick={() => onSend(`Help me fix the "${card.title}" alert`, 4)}
         >
+          <Icon name="fix" size={16} />
           Fix this
         </button>
       )}
@@ -206,6 +257,13 @@ function AlertCard({ card, onSend }) {
 
 export function PlanCard({ card, onSend }) {
   const steps = card.steps ?? []
+  // One tap only: the backend also refuses to save the same plan twice.
+  const [accepted, setAccepted] = useState(false)
+  const accept = () => {
+    if (accepted) return
+    setAccepted(true)
+    onSend('Accept plan', 4)
+  }
   return (
     <div className="card">
       <ol>
@@ -219,8 +277,14 @@ export function PlanCard({ card, onSend }) {
           )
         })}
       </ol>
-      <button type="button" className="btn-primary" onClick={() => onSend('Accept plan', 4)}>
-        Accept plan
+      <button
+        type="button"
+        className="btn-primary"
+        disabled={accepted}
+        onClick={accept}
+      >
+        <Icon name="check" size={16} />
+        {accepted ? 'Plan accepted' : 'Accept plan'}
       </button>
     </div>
   )

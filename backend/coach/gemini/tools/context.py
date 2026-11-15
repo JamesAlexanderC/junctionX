@@ -1,12 +1,16 @@
 """ToolContext, ToolError and helpers shared by every tool (P2.2)."""
 
 import re
+from copy import deepcopy
 
 from ... import services
+from ...models import ChatTurn
 
 CONFIRM_RE = re.compile(
-    r"\b(yes|yeah|yep|sure|ok|okay|confirm|confirmed|accept|accepted|do it|"
-    r"save it|go ahead|sounds good|kyllä|joo|hyväksy)\b",
+    r"(?:yes|yeah|yep|sure|ok|okay|confirm|confirmed|accept|accepted|do it|"
+    r"save it|go ahead|sounds good|kyllä|joo|hyväksy|accept plan|accept the plan)"
+    r"(?:[\s,]+(?:please|yes|save it|do it|go ahead|accept plan|accept the plan))*"
+    r"[.!\s]*",
     re.I,
 )
 
@@ -19,10 +23,15 @@ class ToolError(ValueError):
 
 
 class ToolContext:
-    def __init__(self, customer_id, message="", previous_pending=None):
+    def __init__(
+        self, customer_id, message="", previous_pending=None, previous_turn_id=None
+    ):
         self.customer_id = customer_id
         self.message = message
-        self.previous_pending = previous_pending or {}
+        self.previous_pending = deepcopy(previous_pending or {})
+        self.previous_turn_id = previous_turn_id
+        self.consumed = set()
+        self.state_changed = False
         self.pending = {}
         self.results = []
         self.tools_called = []
@@ -51,7 +60,7 @@ class ToolContext:
     def user_confirmed(self, kind):
         """True when the previous turn proposed ``kind`` and the user said yes."""
         return kind in self.previous_pending and bool(
-            CONFIRM_RE.search(self.message or "")
+            CONFIRM_RE.fullmatch((self.message or "").strip())
         )
 
 
@@ -66,11 +75,29 @@ def is_confirmed(ctx, kind, proposal=None):
     """
     if not ctx.user_confirmed(kind):
         return False
-    return proposal is None or ctx.previous_pending.get(kind) == proposal
+    if proposal is not None and ctx.previous_pending.get(kind) != proposal:
+        return False
+    remaining = {k: v for k, v in ctx.previous_pending.items() if k != kind}
+    if ctx.previous_turn_id is not None:
+        # Compare-and-swap in the tool's transaction: concurrent requests or
+        # stale contexts cannot consume the same proposal a second time.
+        claimed = ChatTurn.objects.filter(
+            pk=ctx.previous_turn_id,
+            customer_id=ctx.customer_id,
+            pending=ctx.previous_pending,
+        ).update(pending=remaining)
+        if not claimed:
+            raise ToolError("This proposal was already used or has changed.")
+    ctx.previous_pending = remaining
+    ctx.consumed.add(kind)
+    ctx.pending.pop(kind, None)
+    return True
 
 
 def propose(ctx, kind, proposal, instruction, key="proposal"):
     """Remember ``proposal`` for the next turn; nothing is saved."""
+    if kind in ctx.consumed:
+        raise ToolError("This proposal was already applied in this turn.")
     ctx.pending[kind] = proposal
     return {"status": "needs_confirmation", key: proposal, "instruction": instruction}
 

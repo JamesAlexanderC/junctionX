@@ -4,6 +4,7 @@
 // (alerts first), as S-mobiili style list sections.
 
 import { formatValue } from '../lib/format.js'
+import Icon from './Icon.jsx'
 
 const SECTION_NAMES = {
   alerts: 'Alerts',
@@ -61,7 +62,10 @@ export default function Insights({ items, onAsk }) {
     <div className="insights" aria-label="Insights">
       {groupBySection(items).map(([section, rows]) => (
         <div className="section" key={section}>
-          <h2 className="section-title">{sectionName(section)}</h2>
+          <h2 className="section-title">
+            <Icon name={section} size={16} />
+            {sectionName(section)}
+          </h2>
           <ul className="panel rows">
             {rows.map((it) => (
               <li key={it.key}>
@@ -80,9 +84,7 @@ export default function Insights({ items, onAsk }) {
                   {it.value != null && (
                     <strong className="ins-value">{formatValue(it.value, it.unit)}</strong>
                   )}
-                  <span className="chevron" aria-hidden="true">
-                    ›
-                  </span>
+                  <Icon name="chevron" className="chevron" />
                 </button>
               </li>
             ))}

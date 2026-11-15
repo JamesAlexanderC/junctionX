@@ -52,6 +52,83 @@ def test_share_as_percent_and_user_numbers():
     validate_reply({"text": "Cut by 20%", "depth": 3}, [], message="cut 20%")
 
 
+@pytest.mark.parametrize("text", ["EUR 5000", "5000 euros", "5000%", "EUR 5"])
+def test_amounts_cannot_be_scaled_or_invented(text):
+    with pytest.raises(ReplyError):
+        validate_reply({"text": text, "depth": 1}, [{"balance": 50}])
+
+
+def test_percentages_and_counts_are_not_money_sources():
+    for result in ({"share": 0.2}, {"count": 20}, {"date": "2026-10-20"}):
+        with pytest.raises(ReplyError):
+            validate_reply({"text": "EUR 20", "depth": 1}, [result])
+
+
+def test_percentage_number_card_uses_percentage_sources():
+    card = {"type": "number", "label": "Share", "value": 20, "unit": "%"}
+    validate_reply(_reply(card), [{"share": 0.2}])
+    card["unit"] = "EUR"
+    with pytest.raises(ReplyError):
+        validate_reply(_reply(card), [{"share": 0.2}])
+
+
+def test_money_card_does_not_get_free_small_counts():
+    card = {"type": "number", "label": "Balance", "value": 5}
+    with pytest.raises(ReplyError):
+        validate_reply(_reply(card), [])
+
+
+@pytest.mark.parametrize("text", ["EUR -20", "EUR 2027", "EUR 20"])
+def test_text_numbers_do_not_become_currency_without_units(text):
+    with pytest.raises(ReplyError):
+        validate_reply(
+            {"text": text, "depth": 1}, [], "20 purchases planned by June 2027"
+        )
+
+
+def test_currency_and_percent_formatting_remain_supported():
+    validate_reply(
+        {"text": "EUR 1 103,89 and 20 percent", "depth": 1},
+        [{"balance": 1103.89, "share": 0.2}],
+    )
+
+
+def test_percentage_chart_uses_explicit_unit():
+    card = {
+        "type": "chart",
+        "kind": "bar",
+        "title": "Shares",
+        "unit": "%",
+        "data": [{"label": "Saver", "value": 20}],
+    }
+    assert validate_reply(_reply(card), [{"card": card}])["cards"] == [card]
+
+
+@pytest.mark.parametrize("result", [{"balance": 0.2}, {"count": 20}])
+def test_only_percentage_sources_can_justify_percentages(result):
+    with pytest.raises(ReplyError):
+        validate_reply({"text": "20%", "depth": 1}, [result])
+
+
+def test_scalar_inference_preserves_its_percentage_unit():
+    validate_reply(
+        {"text": "20% at night", "depth": 1},
+        [{"item": "habits.night.share", "data": 0.2}],
+    )
+
+
+def test_counts_and_months_do_not_provide_currency_evidence():
+    with pytest.raises(ReplyError):
+        validate_reply({"text": "EUR 20", "depth": 1}, [{"buffer_months": 20}])
+
+
+def test_count_card_uses_count_sources():
+    card = {"type": "number", "label": "Time", "unit": "months", "value": 20}
+    validate_reply(_reply(card), [{"months_needed": 20}])
+    with pytest.raises(ReplyError):
+        validate_reply(_reply(card), [{"balance": 20}])
+
+
 def test_bad_depth_rejected():
     with pytest.raises(ReplyError):
         validate_reply({"text": "x", "depth": 7}, [])
@@ -59,7 +136,9 @@ def test_bad_depth_rejected():
 
 # --- cards: shape and numbers (CLAUDE.md "Card payloads") ---------------------
 
-BASKETS = [{"totals": {"essential": 820.0, "surprise": 120.0, "leaky": 212.5}}]
+BASKETS = [
+    {"totals": {"essential": 820.0, "surprise": 120.0, "leaky": 212.5, "saver": 0}}
+]
 CHART_RESULT = [{"chart_data": [{"label": "2026-08", "value": 5320.29}]}]
 
 
@@ -206,6 +285,20 @@ def test_chips_repeating_question_options_are_dropped():
     }
     reply = validate_reply(args, [], "")
     assert reply["chips"] == ["Different goal"]
+
+
+@pytest.mark.parametrize("given,shown", [(0.2, 20), (20, 20), (0, 0)])
+def test_slider_pct_is_shown_in_percent(given, shown):
+    card = {
+        "type": "slider",
+        "category": "restaurants",
+        "monthly_spend": 370.95,
+        "pct": given,
+    }
+    reply = validate_reply(
+        {"text": "Try it.", "depth": 3, "cards": [card]}, [{"spend": 370.95}], ""
+    )
+    assert reply["cards"][0]["pct"] == shown
 
 
 def test_raw_merchant_ids_are_rejected_with_the_friendly_name():

@@ -10,3 +10,4 @@ backend/profiles/*.json
 *.sqlite3
 .env
 .DS_Store
+spam.txt

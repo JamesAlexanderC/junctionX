@@ -7,18 +7,19 @@ import re
 import time
 from contextlib import contextmanager
 
+import httpx2
 from django.conf import settings
 from google.genai import errors as genai_errors
 from google.genai import types
 
 from .. import services
 from ..models import ChatTurn, DemoCache
-from . import router
+from . import progress, router
+from .cards import card_summary, reference_dates
 from .system_prompt import FALLBACK_REPLY, SYSTEM_PROMPT
 from .tools import ToolContext, call_tool, tool_declarations
 from .tools.alerts import mark_alert_cards
 from .tools.inference import list_inferences
-from .cards import card_summary
 from .validate import ReplyError, validate_reply
 
 log = logging.getLogger("coach.gemini")
@@ -50,24 +51,34 @@ def get_client():
         return None
     from google import genai
 
-    return genai.Client(api_key=settings.GEMINI_API_KEY)
+    # Without a timeout a stalled call hung the chat ("Looking deeper into
+    # your data..." forever); now it is retried, then ends in the fallback.
+    options = types.HttpOptions(
+        timeout=int(settings.GEMINI_TIMEOUT_S * 1000),  # milliseconds
+        retry_options=types.HttpRetryOptions(attempts=settings.GEMINI_RETRY_ATTEMPTS),
+    )
+    return genai.Client(api_key=settings.GEMINI_API_KEY, http_options=options)
 
 
 # Speed #2: thinking by depth. Each Gemini call took 6.5-8 s, mostly the
 # model's thinking; a script test with thinking off halved the median
 # (~20 s -> 8.7 s). Facts and small talk need none, explanations a little;
-# what-ifs and plans keep the model's default.
+# what-ifs and plans use GEMINI_THINKING_LEVEL.
 THINKING_OFF = types.ThinkingConfig(thinking_budget=0)
 THINKING_LOW = types.ThinkingConfig(thinking_level="low")
 
 
 def _thinking(ctx):
-    """(label, ThinkingConfig or None) for this turn's depth."""
+    """(label, ThinkingConfig or None) for this turn's depth. Depth 3 and 4
+    use GEMINI_THINKING_LEVEL; empty = the model's default."""
     depth = getattr(ctx, "depth", None) or 1
     if ctx.conversational or depth <= 1:
         return "off", THINKING_OFF
     if depth == 2:
         return "low", THINKING_LOW
+    level = settings.GEMINI_THINKING_LEVEL
+    if level:
+        return level, types.ThinkingConfig(thinking_level=level)
     return "default", None
 
 
@@ -87,8 +98,18 @@ def build_config(final=False, thinking=None):
         tools=[types.Tool(function_declarations=declarations)],
         tool_config=types.ToolConfig(function_calling_config=calling),
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-        thinking_config=thinking,
+        thinking_config=_with_thoughts(thinking),
     )
+
+
+def _with_thoughts(thinking):
+    """Ask for thought summaries (the chat shows them while it waits,
+    progress.py) whenever the model thinks; they cost no extra rounds."""
+    if not settings.GEMINI_SHOW_THOUGHTS or thinking is THINKING_OFF:
+        return thinking
+    if thinking is None:
+        return types.ThinkingConfig(include_thoughts=True)
+    return thinking.model_copy(update={"include_thoughts": True})
 
 
 def normalise_question(text):
@@ -156,20 +177,20 @@ def _with_cards_shown(reply):
     return text
 
 
-def _earlier_coach_replies(customer_id):
+def _earlier_coach_replies(customer_id, conversation=None):
     """What the coach said in the last HISTORY_TURNS turns (conversation B):
     its numbers were checked against tools when first said."""
-    stored = ChatTurn.objects.filter(customer_id=customer_id).order_by(
-        "-created_at", "-id"
-    )[:HISTORY_TURNS]
+    stored = ChatTurn.objects.filter(
+        customer_id=customer_id, conversation=conversation
+    ).order_by("-created_at", "-id")[:HISTORY_TURNS]
     return [t.reply for t in stored]
 
 
-def _history_contents(customer_id, history):
+def _history_contents(customer_id, history, conversation=None):
     turns = list(
-        ChatTurn.objects.filter(customer_id=customer_id).order_by("-created_at", "-id")[
-            :HISTORY_TURNS
-        ]
+        ChatTurn.objects.filter(
+            customer_id=customer_id, conversation=conversation
+        ).order_by("-created_at", "-id")[:HISTORY_TURNS]
     )[::-1]
     contents = []
     if turns:
@@ -208,11 +229,11 @@ def _time_per_step(ctx):
     return totals
 
 
-def _earlier_user_messages(customer_id, history):
+def _earlier_user_messages(customer_id, history, conversation=None):
     """What the user said in the last HISTORY_TURNS turns (stored or sent)."""
-    stored = ChatTurn.objects.filter(customer_id=customer_id).order_by(
-        "-created_at", "-id"
-    )[:HISTORY_TURNS]
+    stored = ChatTurn.objects.filter(
+        customer_id=customer_id, conversation=conversation
+    ).order_by("-created_at", "-id")[:HISTORY_TURNS]
     said = [t.message for t in stored]
     if said:
         return said
@@ -232,40 +253,84 @@ class GeminiNotConfigured(RuntimeError):
 
 
 def chat(
-    customer_id, message, history=None, depth=None, client=None, alert_runner=None
+    customer_id,
+    message,
+    history=None,
+    depth=None,
+    client=None,
+    alert_runner=None,
+    conversation=None,
 ):
     """Answer one user message. Returns (reply, meta)."""
+    for event in chat_stream(
+        customer_id,
+        message,
+        history=history,
+        depth=depth,
+        client=client,
+        alert_runner=alert_runner,
+        conversation=conversation,
+    ):
+        if event["type"] == "done":
+            return event["reply"], event["meta"]
+    raise RuntimeError("chat_stream ended without a reply")
+
+
+def chat_stream(
+    customer_id,
+    message,
+    history=None,
+    depth=None,
+    client=None,
+    alert_runner=None,
+    conversation=None,
+):
+    """Answer one user message, yielding progress as it goes: {"type":
+    "step"|"thought", "text"} events (progress.py), then one {"type": "done",
+    "reply", "meta"}. LookupError and GeminiNotConfigured are raised before
+    the first event, so a caller can still answer 404 / 503."""
     started = time.monotonic()
     profile = services.get_profile(customer_id)
     if profile is None:
         raise LookupError(customer_id)
-    question = normalise_question(message)
-    if settings.DEMO_MODE:
-        cached = DemoCache.objects.filter(
-            customer_id=customer_id, question=question
-        ).first()
-        if cached:
-            ChatTurn.objects.create(
-                customer_id=customer_id, message=message, reply=cached.reply
-            )
-            return cached.reply, {"cached": True, "tools": []}
-
-    client = client if client is not None else get_client()
     previous = (
-        ChatTurn.objects.filter(customer_id=customer_id)
+        ChatTurn.objects.filter(customer_id=customer_id, conversation=conversation)
         .order_by("-created_at", "-id")
         .first()
     )
+    question = normalise_question(message)
+    if settings.DEMO_MODE and not (previous and previous.pending):
+        cached = DemoCache.objects.filter(
+            customer_id=customer_id, question=question, conversation=conversation
+        ).first()
+        if cached:
+            reply = reference_dates(
+                copy.deepcopy(cached.reply), services.profile_today(profile)
+            )
+            reply["state_changed"] = False
+            ChatTurn.objects.create(
+                customer_id=customer_id,
+                message=message,
+                reply=reply,
+                conversation=conversation,
+            )
+            yield {"type": "done", "reply": reply, "meta": {"cached": True}}
+            return
+
+    client = client if client is not None else get_client()
     ctx = ToolContext(
-        customer_id, message, previous_pending=previous.pending if previous else {}
+        customer_id,
+        message,
+        previous_pending=previous.pending if previous else {},
+        previous_turn_id=previous.id if previous else None,
     )
     ctx.alert_runner = alert_runner
     # F1: numbers the user gave earlier, or that sit in the stored proposal,
     # may be repeated in the reply ("A 20,000 euro goal by 2028?").
     ctx.user_numbers = [
         ctx.previous_pending,
-        *_earlier_user_messages(customer_id, history),
-        *_earlier_coach_replies(customer_id),
+        *_earlier_user_messages(customer_id, history, conversation),
+        *_earlier_coach_replies(customer_id, conversation),
     ]
     # Conversation C: small talk gets one round with send_reply only. Never
     # while a proposal waits, so "ok" / "yes" still confirms it.
@@ -278,13 +343,14 @@ def chat(
         depth = 1  # small talk: no router call needed
     routed = depth is None
     if routed:
+        yield {"type": "step", "text": progress.ROUTER_STEP}
         with _timed(ctx, "router"):
             depth = router.route(
                 message, client=client, model=settings.GEMINI_ROUTER_MODEL
             )
 
     ctx.depth = depth  # speed #2: thinking is set by depth (_thinking)
-    contents = _history_contents(customer_id, history)
+    contents = _history_contents(customer_id, history, conversation)
     contents.append(
         _text(
             "user",
@@ -296,20 +362,33 @@ def chat(
         )
     )
     try:
-        reply, rounds, reason, detail = _run(client, contents, ctx)
+        reply, rounds, reason, detail = yield from _run(client, contents, ctx)
     except genai_errors.APIError as exc:
         log.exception("Gemini call failed for %s", customer_id)
         reply, rounds, reason, detail = None, 0, "gemini_error", str(exc)
+    except httpx2.TransportError as exc:
+        # Timed out after the retries, or Gemini could not be reached.
+        log.exception("Gemini unreachable for %s", customer_id)
+        reply, rounds, reason, detail = None, 0, "gemini_unreachable", str(exc)
     if reason:
         reply = copy.deepcopy(FALLBACK_REPLY)
+    reply = reference_dates(reply, ctx.today)
+    reply["state_changed"] = ctx.state_changed
     ChatTurn.objects.create(
-        customer_id=customer_id, message=message, reply=reply, pending=ctx.pending
+        customer_id=customer_id,
+        message=message,
+        reply=reply,
+        conversation=conversation,
+        pending=ctx.pending,
     )
     # A turn that left a proposal waiting is never cached: a replay would not
     # restore the proposal, so the user's "yes" could not confirm it (F1).
-    if settings.DEMO_MODE and not reason and not ctx.pending:
+    if settings.DEMO_MODE and not reason and not ctx.pending and not ctx.state_changed:
         DemoCache.objects.update_or_create(
-            customer_id=customer_id, question=question, defaults={"reply": reply}
+            customer_id=customer_id,
+            question=question,
+            conversation=conversation,
+            defaults={"reply": reply},
         )
     if reason:
         reply = _explain_fallback(ctx, reply, reason, detail, rounds)
@@ -328,7 +407,7 @@ def chat(
         "timings": ctx.timings,
     }
     log.info("chat %s", meta)
-    return reply, meta
+    yield {"type": "done", "reply": reply, "meta": meta}
 
 
 def _explain_fallback(ctx, reply, reason, detail, rounds):
@@ -354,8 +433,8 @@ def _explain_fallback(ctx, reply, reason, detail, rounds):
 
 def _run(client, contents, ctx):
     """The tool loop: at most MAX_ROUNDS rounds, one retry on a bad reply.
-
-    Returns (reply, rounds, fallback reason or None, detail).
+    A generator: yields progress events, returns (reply, rounds, fallback
+    reason or None, detail).
     """
     thinking = _thinking(ctx)[1]
     config = build_config(thinking=thinking)
@@ -374,9 +453,14 @@ def _run(client, contents, ctx):
                 ),
             )
         contents.append(resp.candidates[0].content)
+        yield from progress.thoughts(resp)
         parts = []
         for call in resp.function_calls or []:
             args = dict(call.args or {})
+            if call.name == "send_reply" and retried:
+                yield {"type": "step", "text": progress.RETRY_STEP}
+            else:
+                yield progress.step(call.name)
             if call.name == "send_reply":
                 try:
                     with _timed(ctx, "validate"):

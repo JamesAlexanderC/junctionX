@@ -37,7 +37,11 @@ def _env(name, default=None):
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-0(6hz1jb!#d&nasyvdnd+$t^f@m6h4q^fbdn_4$xmw-vvlg1+c"
+# Defaults keep local dev working; prod sets these in the environment.
+SECRET_KEY = os.environ.get(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-0(6hz1jb!#d&nasyvdnd+$t^f@m6h4q^fbdn_4$xmw-vvlg1+c",
+)
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 
@@ -51,7 +55,10 @@ def env_flag(name):
 # Off unless DJANGO_DEBUG=1 (.env): with it on, 404 pages list every route.
 DEBUG = env_flag("DJANGO_DEBUG")
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+
+if not DEBUG and SECRET_KEY.startswith("django-insecure-"):
+    raise ImproperlyConfigured("Set DJANGO_SECRET_KEY when DJANGO_DEBUG=0.")
 
 
 # Application definition
@@ -65,6 +72,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third party
     "rest_framework",
+    "rest_framework.authtoken",
     "drf_spectacular",
     # Local
     "coach",
@@ -175,6 +183,15 @@ MAILERS = {
 
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Every API call needs "Authorization: Token <key>" from POST
+    # /api/auth/login/. Token only (no session auth), so a Django admin login
+    # in the same browser never turns on CSRF checks for the SPA.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
 }
 
 
@@ -197,6 +214,9 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Backend API for the three musketeers project.",
     "VERSION": _project_version(),
     "SERVE_INCLUDE_SCHEMA": False,
+    # The schema and docs stay public; "Authorize" in Swagger takes a token.
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
+    "SERVE_AUTHENTICATION": [],
 }
 
 
@@ -211,4 +231,14 @@ AS_OF_DATE = os.environ.get("AS_OF_DATE", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_ROUTER_MODEL = os.environ.get("GEMINI_ROUTER_MODEL", "gemini-3.5-flash-lite")
+# Thinking for depth 3-4 (what-ifs, plans): "low" or "high"; empty = the
+# model's default (dynamic, slower). Depth 1 never thinks, depth 2 thinks low.
+GEMINI_THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "")
+# Each Gemini call gives up after this many seconds, tried this many times
+# in all; then the turn ends with the fallback reply instead of hanging.
+GEMINI_TIMEOUT_S = float(os.environ.get("GEMINI_TIMEOUT_S", "30"))
+GEMINI_RETRY_ATTEMPTS = int(os.environ.get("GEMINI_RETRY_ATTEMPTS", "2"))
+# Ask Gemini for thought summaries; the chat shows their headings while it
+# waits (coach/gemini/progress.py). "0" turns them off.
+GEMINI_SHOW_THOUGHTS = os.environ.get("GEMINI_SHOW_THOUGHTS", "1") == "1"
 DEMO_MODE = os.environ.get("DEMO_MODE", "0") == "1"

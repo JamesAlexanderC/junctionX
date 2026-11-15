@@ -42,6 +42,16 @@ class _Rung(_Card):
     reached: bool
 
 
+class _Check(_Card):
+    text: str
+    met: bool
+
+
+class _Requirement(_Card):
+    text: str
+    checks: list[_Check] = []
+
+
 class _Snapshot(_Card):
     safe_to_spend: float | None = None
     buffer_months: float | None = None
@@ -91,6 +101,13 @@ class SliderCard(_Card):
     max_pct: float = 50
     pct: float
     goal: _SliderGoal | None = None
+    as_of: str | None = None
+
+    @field_validator("pct")
+    @classmethod
+    def pct_is_a_percent(cls, v):
+        # simulate_cut takes a fraction (0.2 = 20 %); the slider wants percent.
+        return round(v * 100, 2) if 0 < v <= 1 else v
 
 
 class GoalCard(_Card):
@@ -117,6 +134,7 @@ class LevelProgressCard(_Card):
 
     euros_to_go: float | None = None
     next_step: str | None = None
+    requirement: _Requirement | None = None
     ladder: list[_Rung] | None = None
 
 
@@ -162,7 +180,7 @@ CARD_MODELS = {
 # question card, whose options are choices Gemini offers, not facts.
 ALWAYS_NOT_DATA = {"type", "id", "clears", "unit", "kind"}
 NOT_DATA = {
-    "slider": {"min_pct", "max_pct", "pct"},
+    "slider": {"min_pct", "max_pct", "pct", "as_of"},
     "question": {"question", "options", "quick_answer"},
 }
 
@@ -178,6 +196,14 @@ def data_fields(card: dict) -> dict:
     """The parts of a cleaned card whose numbers must come from tools."""
     skip = ALWAYS_NOT_DATA | NOT_DATA.get(card["type"], set())
     return {k: v for k, v in card.items() if k not in skip}
+
+
+def reference_dates(reply, today):
+    """Slider dates are trusted server metadata, never chosen by the model."""
+    for card in reply.get("cards", []):
+        if card.get("type") == "slider":
+            card["as_of"] = today.isoformat()
+    return reply
 
 
 # --- what a card showed, as one line for the chat history (conversation A) ---

@@ -117,6 +117,9 @@ def test_get_level_includes_a_ready_level_card(aino):
     assert card["name"] == out["next_name"]
     assert card["euros_to_go"] == out["euros_to_go"]
     assert [r["level"] for r in card["ladder"]] == [1, 2, 3, 4, 5, 6]
+    # The card says what the next level needs, as the levels profile does.
+    assert card["requirement"] == out["next_requirement"]
+    assert card["requirement"]["checks"]
 
 
 @pytest.mark.parametrize(

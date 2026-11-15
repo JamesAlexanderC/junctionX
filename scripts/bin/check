@@ -50,6 +50,9 @@ run() {
 if [ "${DO_BACKEND}" -eq 1 ]; then
     cd "${REPO_ROOT}/backend" || exit 1
     export USE_SQLITE=1
+    # Local checks run with debug on: off (the default) needs a real
+    # DJANGO_SECRET_KEY. pytest-django still runs the tests with DEBUG off.
+    export DJANGO_DEBUG=1
     if [ "${FIX}" -eq 1 ]; then
         run "black" "${PY}" -m black .
     else

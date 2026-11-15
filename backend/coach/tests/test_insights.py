@@ -89,10 +89,79 @@ def test_empty_profile_has_no_insights():
     assert insights.insights({}) == []
 
 
+def test_active_goals_left_to_goal_panel():
+    p = sample()
+    assert p["goals"]["active"]
+    goal_rows = [i for i in insights.insights(p) if i["section"] == "goals"]
+    assert all(i["title"] == "Goal idea" for i in goal_rows)
+
+
+def test_goal_summary_picks_computed_fields():
+    p = sample()
+    p["goals"]["active"][0]["tip"] = {"text": "Cut takeaway", "shortfall": 40.0}
+    p["goals"]["active"][0]["funding_cuts"] = [{"category": "x"}]
+    out = insights.goal_summary(p)
+    goal = out["active"][0]
+    src = sample()["goals"]["active"][0]
+    for key in ("name", "target", "saved", "progress_pct", "monthly_needed"):
+        assert goal[key] == src[key]
+    assert goal["tip"] == {"text": "Cut takeaway", "shortfall": 40.0}
+    assert "funding_cuts" not in goal
+    assert out["completed"] == []
+
+
+def test_spending_summary_picks_computed_fields():
+    p = copy.deepcopy(sample())
+    p["spending"]["categories"].append({"category": "Travel", "total": 0.0})
+    out = insights.spending_summary(p)
+    assert out["month"] == "2026-10" and out["is_current"] is True
+    assert out["total"] == 1212.99
+    assert out["categories"][0] == {
+        "category": "Housing",
+        "total": 650.0,
+        "share": 53.6,
+        "count": 1,
+        "usual": 650.0,
+        "vs_usual": 0.0,
+    }
+    assert out["categories"][3]["vs_usual"] == 12.99
+    assert "Travel" not in {c["category"] for c in out["categories"]}
+    assert out["savings"] == [
+        {"category": "Invest Deposit", "total": 150.0, "count": 1}
+    ]
+    assert out["savings_total"] == 150.0
+
+
+def test_spending_summary_empty_profile():
+    assert insights.spending_summary({}) == {
+        "month": None,
+        "is_current": None,
+        "total": 0,
+        "categories": [],
+        "savings": [],
+        "savings_total": 0,
+    }
+
+
+def test_goal_summary_empty_profile():
+    assert insights.goal_summary({}) == {"active": [], "completed": [], "clash": None}
+
+
 def test_end_of_month_hidden_on_the_last_day():
     p = sample()
     p["forecast"]["end_of_month"] = {"expected": 500.0, "low": 500.0, "high": 500.0}
     assert "end_of_month" not in {i["key"] for i in insights.insights(p)}
+
+
+def test_level_insight_says_what_is_still_to_do():
+    p = copy.deepcopy(sample())
+    p["levels"]["next_requirement"] = {
+        "text": "Have an active goal that is on track.",
+        "checks": [{"text": "No active goal yet", "met": False}],
+    }
+    item = next(i for i in insights.insights(p) if i["key"] == "level")
+    assert "To get there: Have an active goal that is on track." in item["text"]
+    assert "Still to do: No active goal yet." in item["text"]
 
 
 def test_seasonal_insight_names_the_month():

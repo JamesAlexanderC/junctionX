@@ -104,6 +104,88 @@ def test_accept_plan_after_proposal_and_yes(client, aino, fake_gemini):
     assert goal.type == "plan" and goal.checklist[0]["action"]["category"] == "takeaway"
 
 
+def test_accept_plan_cannot_substitute_different_actions(aino):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    action = {"type": "cut_category", "category": "takeaway", "pct": 0.1}
+    first = ToolContext(AINO, "Make a plan")
+    call_tool(first, "accept_plan", {"actions": [action]})
+    ctx = ToolContext(AINO, "yes", previous_pending=first.pending)
+    changed = {**action, "pct": 0.3}
+    out = call_tool(ctx, "accept_plan", {"actions": [changed]})
+    assert out["status"] == "needs_confirmation"
+    assert Goal.objects.count() == 0
+
+
+def test_accepting_the_same_plan_twice_saves_one_goal(client, aino, fake_gemini):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    action = {"type": "cut_category", "category": "takeaway", "pct": 0.2}
+    body = {"customer_id": AINO, "depth": 4}
+    for message in ("Make that a plan", "Yes, accept plan") * 2:
+        fake_gemini(
+            response(("accept_plan", {"actions": [action]})),
+            response(("send_reply", {"text": "Ok.", "depth": 4, "cards": []})),
+        )
+        client.post(
+            "/api/chat/", {**body, "message": message}, content_type="application/json"
+        )
+    goal = Goal.objects.get()
+    # Asked again, the tool says it is saved instead of proposing it again.
+    out = call_tool(
+        ToolContext(AINO, "Accept plan"), "accept_plan", {"actions": [action]}
+    )
+    assert out["status"] == "already_accepted" and out["goal_id"] == goal.id
+    assert Goal.objects.count() == 1
+
+
+def _propose_then_accept(action):
+    """accept_plan as in a chat: proposed in one turn, confirmed in the next."""
+    from coach.gemini.tools import ToolContext, call_tool
+
+    first = ToolContext(AINO, "Make it a plan")
+    assert call_tool(first, "accept_plan", {"actions": [action]})["status"] == (
+        "needs_confirmation"
+    )
+    ctx = ToolContext(AINO, "Yes", previous_pending=first.pending)
+    return call_tool(ctx, "accept_plan", {"actions": [action]})
+
+
+def test_a_different_plan_is_still_proposed(client, aino, fake_gemini):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    takeaway = {"type": "cut_category", "category": "takeaway", "pct": 0.2}
+    assert _propose_then_accept(takeaway)["status"] == "accepted"
+    other = {"type": "cut_category", "category": "coffee", "pct": 0.2}
+    out = call_tool(ToolContext(AINO, "Plan"), "accept_plan", {"actions": [other]})
+    assert out["status"] == "needs_confirmation"
+
+
+def test_a_slider_cut_can_be_saved_as_a_plan(client, aino):
+    # 25 % is between the planner's steps; groceries is not a leaky category.
+    cut = {"type": "cut_category", "category": "groceries", "pct": 25}
+    out = _propose_then_accept(cut)
+    assert out["status"] == "accepted"
+    [step] = Goal.objects.get().checklist
+    means = services.get_profile(AINO)["whatif"]["category_means"]
+    assert step["action"]["pct"] == 0.25
+    assert step["action"]["monthly_impact"] == round(0.25 * means["groceries"], 2)
+
+
+@pytest.mark.parametrize(
+    "cut",
+    [
+        {"type": "cut_category", "category": "groceries", "pct": 0.6},
+        {"type": "cut_category", "category": "no such thing", "pct": 0.2},
+    ],
+)
+def test_slider_cuts_outside_the_slider_are_refused(aino, cut):
+    from coach.gemini.tools import ToolContext, call_tool
+
+    out = call_tool(ToolContext(AINO, "Plan"), "accept_plan", {"actions": [cut]})
+    assert "error" in out and Goal.objects.count() == 0
+
+
 @pytest.mark.parametrize(
     "payload",
     [

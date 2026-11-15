@@ -143,6 +143,18 @@ _ENTRIES = [
         "Categories with small everyday leaky spending.",
         gate="baskets",
     ),
+    # --- spending per data category ---
+    Entry(
+        "spending.categories",
+        "Spending per transaction category for spending.month, in EUR, with "
+        "each category's share, its usual monthly spend over the last 3 full "
+        "months (usual) and the difference (vs_usual).",
+    ),
+    Entry(
+        "spending.savings",
+        "Money moved into savings or investments in spending.month, per "
+        "category. Not spending and not part of spending.total.",
+    ),
     # --- habits (#11 to #16) ---
     Entry("habits.weekend", "Weekend share of spending.", gate="habits.weekend"),
     Entry("habits.night", "Share of spending 22:00 to 05:00.", gate="habits.night"),
@@ -256,6 +268,12 @@ _ENTRIES = [
         "levels.easiest_next_step",
         "Smallest cut that reaches the next level.",
         gate="levels.easiest_next_step",
+    ),
+    Entry(
+        "levels.next_requirement",
+        "What the next level needs (text) and each part of it with the "
+        "customer's own numbers and whether it is met (checks).",
+        gate="levels",
     ),
     # --- goals (#44 to #74) ---
     Entry(

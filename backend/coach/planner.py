@@ -6,13 +6,12 @@ that turn off are the set the action clears. Score = priority cleared / effort.
 """
 
 import copy
-from datetime import date, timedelta
+from datetime import date
 
-from . import services
+from . import projection, services
 
 MAX_STEPS = 3
 CUT_EFFORT = {0.1: 1, 0.2: 2, 0.3: 3}
-DANGER_EUR = 50.0
 TIGHT_DAYS = 20  # alert inference number: balance may drop low (#20)
 NOTHING_TO_CHANGE = (
     "There is nothing the coach can change for this: no everyday spending to "
@@ -125,36 +124,23 @@ def candidate_actions(profile, alerts):
 
 
 def _free_money(p, monthly):
-    """Spread a monthly saving over the forecast numbers."""
-    fc = p.setdefault("forecast", {})
-    days_to_payday = p.get("income", {}).get("payday", {}).get("days_to_payday")
-    days = days_to_payday or 30
-    daily = monthly / 30.44
-    if "safe_to_spend_week" in fc:
-        fc["safe_to_spend_week"] = round(fc["safe_to_spend_week"] + daily * 7, 2)
-    if "safe_to_save_today" in fc:
-        fc["safe_to_save_today"] = round(fc["safe_to_save_today"] + daily * days, 2)
-    eom = fc.get("end_of_month")
-    if eom:
-        for k in ("expected", "low", "high"):
-            if k in eom:
-                eom[k] = round(eom[k] + daily * days, 2)
-    path = fc.get("daily_path") or []
-    for t, day in enumerate(path, start=1):
-        for k in ("expected", "low", "high"):
-            if k in day:
-                day[k] = round(day[k] + daily * t, 2)
-    if path:
-        fc["danger_days"] = [d["date"] for d in path if d.get("low", 1e9) < DANGER_EUR]
-    # Extra saving speeds goals up (#26, #52).
+    """Reduce future discretionary spending; summaries come from the path."""
+    state = p["_projection"]
+    daily = min(state["daily"], max(0.0, monthly) / 30.44)
+    state["daily"] -= daily
+    p["forecast"].setdefault("daily_discretionary", {})["value"] = round(
+        state["daily"], 2
+    )
+    projection.shift(p, daily, daily=True)
     for g in p.get("goals", {}).get("active", []):
-        g["extra_monthly"] = round(g.get("extra_monthly", 0) + monthly, 2)
+        g["extra_monthly"] = round(g.get("extra_monthly", 0) + daily * 30.44, 2)
 
 
 def apply_action(profile, action):
     """Return a simulated copy of ``profile`` with ``action`` applied."""
     p = copy.deepcopy(profile)
     kind = action["type"]
+    projection.prepare(p)
     p.setdefault("simulated_actions", []).append(action)
     baskets = p.setdefault("baskets", {})
     totals = baskets.setdefault("totals", {})
@@ -173,13 +159,23 @@ def apply_action(profile, action):
     elif kind == "cancel_subscription":
         mid = action["merchant_id"]
         inc = p.setdefault("income", {})
+        from inferences.forecast import scheduled_bills
+
+        path = p["_projection"]["path"]
+        removed = [b for b in inc.get("bills", []) if b.get("merchant_id") == mid]
+        if path:
+            for bill in scheduled_bills(removed, p["today"], path[-1]["date"]):
+                projection.shift(p, bill["amount"], on=bill["date"])
         for key in ("subscriptions", "bills", "possibly_unused"):
             inc[key] = [s for s in inc.get(key, []) if s.get("merchant_id") != mid]
         fc = p.get("forecast", {})
         fc["upcoming_bills"] = [
             b for b in fc.get("upcoming_bills", []) if b.get("merchant_id") != mid
         ]
-        _free_money(p, action["monthly_impact"])
+        for g in p.get("goals", {}).get("active", []):
+            g["extra_monthly"] = round(
+                g.get("extra_monthly", 0) + action["monthly_impact"], 2
+            )
     elif kind in ("pause_goal", "resize_goal"):
         for g in p.get("goals", {}).get("active", []):
             if g["id"] != action["goal_id"]:
@@ -210,19 +206,10 @@ def apply_action(profile, action):
         essentials = float(baskets.get("monthly_essentials") or 0)
         if essentials and "buffer_months" in lv:
             lv["buffer_months"] = round(lv["buffer_months"] + amount / essentials, 2)
-        fc = p.setdefault("forecast", {})
-        for day in fc.get("daily_path") or []:
-            for k in ("expected", "low", "high"):
-                if k in day:
-                    day[k] = round(day[k] + amount, 2)
-        if fc.get("daily_path"):
-            fc["danger_days"] = [
-                d["date"] for d in fc["daily_path"] if d.get("low", 1e9) < DANGER_EUR
-            ]
-        if "safe_to_spend_week" in fc:
-            fc["safe_to_spend_week"] = round(fc["safe_to_spend_week"] + amount, 2)
+        projection.shift(p, amount)
     else:
         raise ValueError(f"Unknown action type: {kind}")
+    projection.summarise(p)
     return p
 
 
@@ -356,11 +343,9 @@ def _goal_date(profile, on):
     g = goals[0]
     rate = float(profile.get("baskets", {}).get("monthly_saving") or 0)
     rate += float(g.get("extra_monthly") or 0)
-    remaining = float(g["target"]) - float(g["saved"])
-    if rate <= 0:
-        return None
-    months = -(-remaining // rate)
-    return (on + timedelta(days=int(months * 30.44))).isoformat()
+    from inferences.whatif import goal_date
+
+    return goal_date(float(g["target"]), float(g["saved"]), rate, on)["date"]
 
 
 def _snapshot(profile, on):

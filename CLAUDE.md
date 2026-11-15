@@ -24,8 +24,8 @@ them in code comments). Everything below is binding for every teammate.
 - No demo data anywhere at runtime. Fixtures live only under `*/tests/`
   (`backend/coach/tests/fixtures/profile_demo.json` is a test sample).
 - Profile shape = whatever `build_profile` returns: top-level keys
-  `customer_id, today, customer, balance, income, baskets, habits, forecast,
-  whatif, mortgage, levels, goals, benchmarks, multibank, alerts,
+  `customer_id, today, customer, balance, income, baskets, spending, habits,
+  forecast, whatif, mortgage, levels, goals, benchmarks, multibank, alerts,
   availability` (`availability[item] = {available, reason, inferences}`).
   Profiles are built on demand from the DB as of `AS_OF_DATE` (default: date
   of the last transaction) and cached in the Profile table.
@@ -40,16 +40,52 @@ Own-account transfers: `transaction_type` in `OWN_TRANSFER_TYPES`
 (thresholds.py), to be confirmed against real data.
 
 ## API
+- Auth: every endpoint needs `Authorization: Token <key>` (DRF TokenAuthentication,
+  401 without). `POST /api/auth/login/ {username, password}` -> `{token, user}`
+  (400 on wrong credentials), `POST /api/auth/logout/` deletes the token,
+  `GET /api/auth/me/` -> `{user}`. Users are Django users (`createsuperuser`);
+  any logged-in user may open any customer. `/api/schema/` and docs stay public.
 - `GET /api/home/<customer_id>/` -> full profile JSON (404 if unknown).
 - `GET /api/insights/<customer_id>/` -> `{customer_id, as_of, insights: [{key,
   inference, title, value, unit, text, section, severity?}]}`: only insights
   the data supports, alerts first.
 - `POST /api/chat/` `{customer_id, message, history, depth?}` -> send_reply JSON;
   503 `{"error": ...}` without `GEMINI_API_KEY`.
+  `?stream=1` answers NDJSON instead: `{type: "step"|"thought", text}` lines
+  while it works (`coach/gemini/progress.py`), then `{type: "reply", reply}`
+  or `{type: "error", error}`; 404 / 503 stay plain JSON. Thought headings
+  only appear when Gemini thinks (depth 2 and up; depth 1 never thinks).
+- `GET /api/goals/?customer_id=` -> `{customer_id, as_of, active: [{id, name,
+  emoji, type, priority, paused, target, saved, progress_pct, expected_pct,
+  on_track, target_date, projected_date, months_needed, difficulty,
+  monthly_needed, realistic, suggested_monthly, suggested_date, tip: {text,
+  shortfall}|null, milestones_hit}], completed: [{id, name, type}], clash:
+  {clash, total_needed, safe_to_save_monthly}|null}` (`insights.goal_summary`,
+  fields as `profile["goals"]` computed them; 400 without `customer_id`, 404 if
+  unknown). Active goals are shown here, not in `/api/insights/`.
 - `POST /api/goals/`, `PATCH /api/goals/<id>/`, `POST /api/goals/<id>/rate/`.
+- `GET /api/spending/?customer_id=` -> `{customer_id, as_of, month, is_current,
+  total, categories: [{category, total, share, count, usual, vs_usual}],
+  savings: [{category, total, count}], savings_total}`
+  (`insights.spending_summary` of `profile["spending"]`, built by
+  `inferences/spending.py`): spending per data `category`, names spelt as in
+  the data, this month else last month (`is_current`). Spending = outflows
+  minus own-account and Saver transfers (`common.spend`). `usual` = the #24
+  mean monthly spend over the last 3 full months (`whatif.category_means`),
+  null without history; `vs_usual = total - usual`. Saver deposits (#75, e.g.
+  "Invest Deposit") are listed under `savings`, not in `total`. 400 without
+  `customer_id`, 404 if unknown.
 - `POST /api/loans/` `{customer_id, balance, interest_rate, years_left}`.
 - `GET /api/customers/?q=&limit=50` -> `[{customer_id, customer_age,
   customer_postal_code}]` (real customers only).
+- `GET /api/customers/demo/` -> `{built, as_of, demos: [{demo, customer_id,
+  level, level_name, income_level, income_label, spender_type, clarity}],
+  customers: [{customer_id, level (0-3), level_name, income_level (0-5),
+  income_label, spender_type}]}`: one demo per app level (#28 to #30; no
+  goals or readiness, so 4+ never appear), spread over the income fifths and
+  spender types (#16), plus every customer for the landing page
+  (`inferences/demo.py`). Cached by
+  `manage.py build_customer_index`; `built: false` until it has run.
 - Tools return `{"available": false, "reason": ...}` when the data does not
   support an inference; Gemini must say so, never substitute a default.
 
@@ -72,13 +108,21 @@ Card payloads:
   flag?: "danger"|"bill"|"payday"}]}` (low/high = 80% band; forecast chart only)
 - basket_bar `{essential, surprise, leaky, saver}`
 - slider `{category, monthly_spend, min_pct: 0, max_pct: 50, pct, goal?: {target,
-  saved, monthly_rate}}` (frontend recomputes #24 / #26 locally)
+  saved, monthly_rate}, as_of}` (server sets as_of from the profile; frontend
+  recomputes #24 / #26 locally using that date; its button asks the coach to
+  save the cut as a plan, and `accept_plan` takes a `cut_category` step for
+  any category with a #24 mean, pct up to 50 %)
 - goal `{name, target, saved, target_date, difficulty, monthly_needed}`
-- level_progress `{level, name, progress, euros_to_go, next_step, ladder?:
-  [{level, name, reached}]}` (`get_level` returns it ready as `card`)
+- level_progress `{level, name, progress, euros_to_go, next_step, requirement?:
+  {text, checks: [{text, met}]}, ladder?: [{level, name, reached}]}`
+  (`get_level` returns it ready as `card`; `requirement` is
+  `levels.next_requirement`: what the next level needs, in the customer's
+  numbers)
 - question `{question, options: [str], quick_answer?: str}`
 - alert `{id, severity, title, text}`
-- plan `{steps: [{text, monthly_impact, clears: [alert_id]}]}`
+- plan `{steps: [{text, monthly_impact, clears: [alert_id]}]}` (Accept works
+  once; `accept_plan` returns `already_accepted` for a plan that matches an
+  active plan goal)
 - before_after `{before: {safe_to_spend, buffer_months, goal_date}, after: {...}}`
 
 ## Gemini tools

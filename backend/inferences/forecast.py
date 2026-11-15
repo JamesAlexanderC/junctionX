@@ -73,7 +73,7 @@ def discretionary_stats(df: pd.DataFrame, today, bills: list[dict]):
     return float(centre(daily.values)), float(np.std(daily.values, ddof=0))
 
 
-def _scheduled(income: dict, bills: list[dict], today, end):
+def scheduled_flows(income: dict, bills: list[dict], today, end):
     """Signed scheduled flows (date, amount) in (today, end]."""
     flows = [(b["date"], -b["amount"]) for b in scheduled_bills(bills, today, end)]
     payday = income.get("payday") or {}
@@ -137,7 +137,7 @@ def compute_forecast(df: pd.DataFrame, today, income: dict, baskets: dict) -> di
         days_to_payday or th.NO_PAYDAY_HORIZON_DAYS,
     )
     horizon = today + timedelta(days=horizon_days)
-    flows = _scheduled(income, bills, today, horizon)
+    flows = scheduled_flows(income, bills, today, horizon)
     path = models.project_balance(b0, today, horizon, d, sigma, flows)
     days_left = (month_end - today).days
     if days_left > 0:

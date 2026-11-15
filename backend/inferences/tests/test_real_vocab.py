@@ -162,12 +162,12 @@ def test_no_travel_goal_below_threshold():
 
 
 def test_forecast_payday_inflow_is_retained_income():
-    from inferences.forecast import _scheduled
+    from inferences.forecast import scheduled_flows
 
     income = {
         "payday": {"found": True, "next_payday": "2026-10-15", "amount": 3000.0},
         "monthly_income": 3000.0,
         "retained_income": 300.0,
     }
-    flows = _scheduled(income, [], date(2026, 10, 1), date(2026, 10, 31))
+    flows = scheduled_flows(income, [], date(2026, 10, 1), date(2026, 10, 31))
     assert flows == [("2026-10-15", 300.0)]

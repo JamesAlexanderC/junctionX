@@ -338,6 +338,12 @@ def level(p):
         if _num(lv.get("euros_to_go")) and lv["euros_to_go"] > 0:
             text += f", {_eur(lv['euros_to_go'])} to go"
         text += "."
+        req = lv.get("next_requirement") or {}
+        if req.get("text"):
+            text += f" To get there: {req['text']}"
+            missing = [c["text"] for c in req.get("checks") or [] if not c["met"]]
+            if missing:
+                text += " Still to do: " + "; ".join(missing) + "."
     step = lv.get("easiest_next_step") or {}
     if _available(p, "levels.easiest_next_step") and step.get("text"):
         text += f" Easiest next step: {step['text']}."
@@ -369,28 +375,113 @@ def detected_goals(p):
     return out
 
 
-def active_goals(p):
-    out = []
-    for g in (p.get("goals") or {}).get("active") or []:
-        if not _num(g.get("progress_pct")):
-            continue
-        state = "on track" if g.get("on_track") else "behind"
-        text = (
-            f"{g.get('name')}: {g['progress_pct']:.0f}% of {_eur(g.get('target', 0))}"
-            f", {state}."
+GOAL_FIELDS = (
+    "id",
+    "name",
+    "emoji",
+    "type",
+    "priority",
+    "paused",
+    "target",
+    "saved",
+    "progress_pct",  # #51
+    "expected_pct",  # #52
+    "on_track",  # #52, #72
+    "target_date",
+    "projected_date",  # #26
+    "months_needed",  # #26
+    "difficulty",  # #49
+    "monthly_needed",  # #65
+    "realistic",  # #50, #66
+    "suggested_monthly",  # #66
+    "suggested_date",  # #66
+    "milestones_hit",  # #73
+)
+
+
+def goal_summary(p):
+    """Active and completed goals for the Overview panel (GET /api/goals/).
+
+    Active goals get their own panel rather than insight rows. Fields are
+    picked from ``profile["goals"]`` as the inference engine computed them
+    (inferences/goals.py: evaluate_goal); nothing is calculated here.
+    """
+    goals = (p or {}).get("goals") or {}
+    active = []
+    for g in goals.get("active") or []:
+        row = {k: g.get(k) for k in GOAL_FIELDS}
+        tip = g.get("tip") or {}  # #53
+        row["tip"] = (
+            {"text": tip["text"], "shortfall": tip.get("shortfall")}
+            if tip.get("text")
+            else None
         )
-        out.append(
-            _item(
-                f"goal_{g.get('id')}",
-                51,
-                g.get("name") or "Goal",
-                g["progress_pct"],
-                "%",
-                text,
-                "goals",
-            )
-        )
-    return out
+        active.append(row)
+    completed = [
+        {"id": g.get("id"), "name": g.get("name"), "type": g.get("type")}
+        for g in goals.get("completed") or []
+    ]
+    clash = goals.get("clash") or {}  # #70
+    return {
+        "active": active,
+        "completed": completed,
+        "clash": (
+            {
+                "clash": bool(clash.get("clash")),
+                "total_needed": clash.get("total_needed"),
+                "safe_to_save_monthly": clash.get("safe_to_save_monthly"),
+            }
+            if active and clash
+            else None
+        ),
+    }
+
+
+SPENDING_FIELDS = (
+    "category",
+    "total",
+    "share",
+    "count",
+    "usual",  # #24 mean monthly spend, last 3 full months
+    "vs_usual",
+)
+
+
+def spending_summary(p):
+    """Spending per data category for the Overview panel (GET /api/spending/).
+
+    Fields are picked from ``profile["spending"]`` as inferences/spending.py
+    computed them; nothing is calculated here. Savings (#75) are listed apart
+    and are not part of ``total``.
+    """
+    sp = (p or {}).get("spending") or {}
+
+    def rows(key, fields):
+        return [
+            {k: c.get(k) for k in fields}
+            for c in sp.get(key) or []
+            if _num(c.get("total")) and c["total"] > 0
+        ]
+
+    cats = rows("categories", SPENDING_FIELDS)
+    savings = rows("savings", ("category", "total", "count"))  # #75, not spending
+    if not cats and not savings:
+        return {
+            "month": None,
+            "is_current": None,
+            "total": 0,
+            "categories": [],
+            "savings": [],
+            "savings_total": 0,
+        }
+    return {
+        "month": sp.get("month"),
+        "is_current": bool(sp.get("is_current")),
+        "total": sp.get("total") or 0,
+        "categories": cats,
+        "savings": savings,
+        "savings_total": sp.get("savings_total") or 0,
+    }
 
 
 def alerts(p):
@@ -492,7 +583,6 @@ BUILDERS = [
     surprise_fund,
     seasonal,
     level,
-    active_goals,
     detected_goals,
     spender_type,
     habits,
