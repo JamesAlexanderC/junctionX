@@ -6,7 +6,7 @@ from copy import deepcopy
 
 from django.db import transaction
 
-from . import alerts, goals, inference, loans, read
+from . import alerts, goals, inference, loans, multibank, read
 from .context import ToolError, unavailable
 from .declarations import validate_args
 
@@ -42,6 +42,9 @@ TOOLS = {
     "calculate_goal": goals.calculate_goal,
     "dismiss_suggestion": goals.dismiss_suggestion,
     "save_loan_details": loans.save_loan_details,
+    "get_accounts_overview": multibank.get_accounts_overview,
+    "get_multibank_insights": multibank.get_multibank_insights,
+    "compare_linked_view": multibank.compare_linked_view,
 }
 
 

@@ -118,7 +118,7 @@ def test_42_hidden_loan_is_found_with_its_bank(hero):
     (loan,) = after["multibank"]["hidden_loans"]
     assert loan["bank"] == "Nordea" and loan["amount"] == 310.0
     assert loan["day_of_month"] == 3  # what the coach says ("on the 3rd")
-    assert loan["next_date"] in ("2026-10-03", "2026-10-04")  # #4 estimate
+    assert loan["next_date"] == "2026-10-03"  # the day it is paid, not #4's estimate
 
 
 def test_42_hidden_loan_counts_in_dsti_and_bills_before_payday(hero):

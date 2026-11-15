@@ -56,6 +56,19 @@ class _Snapshot(_Card):
     safe_to_spend: float | None = None
     buffer_months: float | None = None
     goal_date: str | None = None
+    # Multibank before/after (MULTIBANK_PLAN.md): S-Bank only vs all banks.
+    dsti: float | None = None
+    level: int | None = None
+    monthly_income: float | None = None
+
+
+class _AccountRow(_Card):
+    bank: str
+    name: str
+    type: str
+    balance: float | None = None
+    iban_masked: str | None = None
+    simulated: bool = False
 
 
 # #13 (live test): units are English words the app formats; anything else
@@ -163,6 +176,13 @@ class BeforeAfterCard(_Card):
     after: _Snapshot
 
 
+class AccountsCard(_Card):
+    """Every account with its bank and a 'simulated' tag for other banks."""
+
+    accounts: list[_AccountRow] = Field(min_length=1)
+    coverage: Literal["sbank_only", "partial", "full"] | None = None
+
+
 CARD_MODELS = {
     "number": NumberCard,
     "chart": ChartCard,
@@ -174,6 +194,7 @@ CARD_MODELS = {
     "alert": AlertCard,
     "plan": PlanCard,
     "before_after": BeforeAfterCard,
+    "accounts": AccountsCard,
 }
 
 # Fields that are not claims about money: ids, display settings, and the
@@ -182,6 +203,7 @@ ALWAYS_NOT_DATA = {"type", "id", "clears", "unit", "kind"}
 NOT_DATA = {
     "slider": {"min_pct", "max_pct", "pct", "as_of"},
     "question": {"question", "options", "quick_answer"},
+    "accounts": {"coverage"},
 }
 
 

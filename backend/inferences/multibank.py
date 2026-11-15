@@ -199,6 +199,19 @@ def _evidence(rows: pd.DataFrame, n: int = 3) -> list[dict]:
     return out
 
 
+def _next_on_day(today, day: int) -> str:
+    """Next date after today on this day of the month (clamped to month end)."""
+    start = pd.Timestamp(today) + pd.Timedelta(days=1)
+    for months in (0, 1):
+        month = (start + pd.DateOffset(months=months)).to_period("M")
+        candidate = month.start_time + pd.Timedelta(
+            days=min(day, month.days_in_month) - 1
+        )
+        if candidate >= start:
+            return candidate.date().isoformat()
+    return (start + pd.DateOffset(months=1)).date().isoformat()
+
+
 def _hidden_loans(other: pd.DataFrame, today) -> list[dict]:
     """#42: #4 on the other banks' outflows, kept when loan category / MCC."""
     hidden = []
@@ -208,14 +221,16 @@ def _hidden_loans(other: pd.DataFrame, today) -> list[dict]:
         if not _is_loan(b):
             continue
         rows = other[other["merchant_id"] == b["merchant_id"]]
+        day = int(rows["tx_date"].dt.day.mode().iloc[0])
         hidden.append(
             {
                 "merchant_id": b["merchant_id"],
                 "name": b["name"],
                 "bank": str(rows["bank"].iloc[0]),
                 "amount": b["amount"],
-                "day_of_month": int(rows["tx_date"].dt.day.mode().iloc[0]),
-                "next_date": b["next_date"],
+                "day_of_month": day,
+                # The day it is actually paid, not #4's last + median gap.
+                "next_date": _next_on_day(today, day),
                 "evidence": _evidence(rows),
             }
         )
