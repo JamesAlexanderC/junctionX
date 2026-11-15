@@ -66,7 +66,9 @@ if [ "${DO_BACKEND}" -eq 1 ]; then
         (cd "${REPO_ROOT}" && docker compose up -d --wait db)
     fi
     echo "==> Applying migrations"
-    (cd "${REPO_ROOT}/backend" && "${PY}" manage.py migrate --noinput)
+    # Debug on: with DJANGO_DEBUG=0 settings refuse to load without a real
+    # DJANGO_SECRET_KEY, and migrating locally needs neither.
+    (cd "${REPO_ROOT}/backend" && DJANGO_DEBUG=1 "${PY}" manage.py migrate --noinput)
     if [ "${DEMO}" -eq 1 ]; then
         echo "==> Django (gunicorn, ${DEMO_WORKERS} workers) on http://localhost:8000"
         (cd "${REPO_ROOT}/backend" && DJANGO_DEBUG=0 exec "${PY}" -m gunicorn \
