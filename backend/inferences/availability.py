@@ -271,8 +271,26 @@ RULES = {
 }
 
 
+# #112: income-based items stay available on a partial view, with a caveat
+# so the coach says it only sees part of the money.
+PARTIAL_VIEW_ITEMS = (
+    "income.monthly_income",
+    "income.stability",
+    "forecast.safe_to_spend_week",
+    "forecast.safe_to_save_today",
+    "forecast.end_of_month",
+    "levels",
+)
+
+
+def _caveat(profile: dict, item: str) -> dict:
+    partial = _get(profile, "multibank.coverage") == "partial"
+    return {"caveat": "partial_view"} if partial and item in PARTIAL_VIEW_ITEMS else {}
+
+
 def availability(profile: dict) -> dict:
-    """{item: {available, reason, inferences}} for every item in RULES."""
+    """{item: {available, reason, inferences, caveat?}} for every item in
+    RULES."""
     out = {}
     for item, (numbers, check, reason) in RULES.items():
         try:
@@ -285,6 +303,7 @@ def availability(profile: dict) -> dict:
             "available": ok,
             "reason": None if ok else reason,
             "inferences": numbers,
+            **_caveat(profile, item),
         }
     return out
 

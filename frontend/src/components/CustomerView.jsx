@@ -3,7 +3,16 @@
 // bottom tabs on phones (Overview / Coach), two columns on wide screens.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getSpending, getGoals, getInsights, sendChat } from '../api.js'
+import {
+  disconnectBank,
+  getAccounts,
+  getGoals,
+  getInsights,
+  getSpending,
+  sendChat,
+} from '../api.js'
+import Accounts, { PartialViewBanner } from './Accounts.jsx'
+import ConnectBank from './ConnectBank.jsx'
 import Spending from './Spending.jsx'
 import Chat from './Chat.jsx'
 import Goals from './Goals.jsx'
@@ -40,6 +49,8 @@ export default function CustomerView({
   const [goalsError, setGoalsError] = useState(null)
   const [spending, setSpending] = useState(null)
   const [spendingError, setSpendingError] = useState(null)
+  const [accounts, setAccounts] = useState(null)
+  const [connecting, setConnecting] = useState(false)
   const [overviewLoading, setOverviewLoading] = useState(true)
   const [messages, setMessages] = useState([])
   const [busy, setBusy] = useState(false)
@@ -55,10 +66,11 @@ export default function CustomerView({
     overviewCtrl.current?.abort()
     const ctrl = new AbortController()
     overviewCtrl.current = ctrl
-    const [ins, gls, spd] = await Promise.allSettled([
+    const [ins, gls, spd, acc] = await Promise.allSettled([
       getInsights(customerId, { signal: ctrl.signal }),
       getGoals(customerId, { signal: ctrl.signal }),
       getSpending(customerId, { signal: ctrl.signal }),
+      getAccounts(customerId, { signal: ctrl.signal }),
     ])
     if (ctrl.signal.aborted) return
     // A failed refresh keeps the last good data on screen beside the error.
@@ -68,6 +80,8 @@ export default function CustomerView({
     setGoalsError(gls.status === 'rejected' ? gls.reason.message : null)
     if (spd.status === 'fulfilled') setSpending(spd.value)
     setSpendingError(spd.status === 'rejected' ? spd.reason.message : null)
+    // Accounts are optional (simulated PSD2): if they fail, the rest still shows.
+    if (acc.status === 'fulfilled') setAccounts(acc.value)
     setOverviewLoading(false)
   }, [customerId])
 
@@ -104,6 +118,17 @@ export default function CustomerView({
       }
     },
     [customerId, busy, messages, conversationId, loadOverview],
+  )
+
+  const disconnect = useCallback(
+    async (consentId) => {
+      try {
+        await disconnectBank(consentId)
+      } finally {
+        loadOverview()
+      }
+    },
+    [loadOverview],
   )
 
   // Tapping an insight asks the coach, so on phones jump to the Coach tab.
@@ -167,6 +192,10 @@ export default function CustomerView({
                   </button>
                 </p>
               ))}
+            <PartialViewBanner
+              coverage={accounts?.coverage}
+              onConnect={() => setConnecting(true)}
+            />
             {overviewLoading ? (
               <InsightsSkeleton />
             ) : (
@@ -174,14 +203,33 @@ export default function CustomerView({
                 {goals && <Goals goals={goals} onAsk={ask} />}
                 {spending && <Spending spending={spending} onAsk={ask} />}
                 <Insights items={insights} onAsk={ask} />
+                <Accounts
+                  data={accounts}
+                  onDisconnect={disconnect}
+                  onConnect={() => setConnecting(true)}
+                />
               </>
             )}
           </section>
 
           <section className="pane coach" aria-label="Coach">
-            <Chat messages={messages} busy={busy} progress={progress} onSend={send} />
+            <Chat
+              messages={messages}
+              busy={busy}
+              progress={progress}
+              onSend={send}
+              onConnect={() => setConnecting(true)}
+            />
           </section>
         </main>
+
+        {connecting && (
+          <ConnectBank
+            customerId={customerId}
+            onClose={() => setConnecting(false)}
+            onConnected={loadOverview}
+          />
+        )}
 
         <nav className="tabbar" aria-label="Sections">
           {TABS.map(([key, label]) => (
