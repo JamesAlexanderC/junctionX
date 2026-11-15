@@ -1064,6 +1064,34 @@ table.card thead th {
   fill: var(--text);
 }
 
+/* FC-2: forecast band, its label and day markers. */
+.chart-svg .band {
+  fill: var(--accent-soft);
+  stroke: none;
+}
+
+.chart-svg .band-label {
+  font-size: 10px;
+  fill: var(--muted);
+}
+
+.chart-svg .marker {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.chart-svg .marker.danger {
+  fill: var(--error);
+}
+
+.chart-svg .marker.bill {
+  fill: var(--b2);
+}
+
+.chart-svg .marker.payday {
+  fill: var(--brand-green);
+}
+
 .chart-svg .col {
   fill: var(--brand-green);
 }

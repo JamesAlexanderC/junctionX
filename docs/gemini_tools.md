@@ -99,8 +99,26 @@ catalogue path is missing from a built profile, or when an item in
 `{"status": "needs_confirmation", "proposal": ...}` and stores the proposal on
 the chat turn. It runs only when the user's next message says yes and Gemini
 sends the same proposal again. A changed request is proposed again.
-(`create_goal` and `accept_plan` accept any yes after a proposal of their
-kind.)
+`create_goal` executes the stored proposal even if model arguments drift;
+`accept_plan` requires the exact proposed actions. Negative or ambiguous
+messages do not confirm. Proposals are consumed atomically with the write,
+so repeated tool calls and stale requests cannot execute them twice.
+
+Monthly savings capacity uses the recurring Saver rate only. Available cash
+today remains a one-off amount. Evaluated goals include `one_off_scenario`
+with the optional contribution and resulting date; this does not change
+recorded savings or make a recurring commitment affordable.
+
+Slider cards receive `as_of` from the server's profile date after validation,
+including cached replies. The frontend uses this date and the same nine-decimal
+goal-month rounding as Python. Older cards without it do not show a goal date.
+
+Planner scenarios keep one dated balance path: spending cuts reduce daily
+outflows, cancelled subscriptions remove their actual scheduled payments, and
+moving savings adds a one-off balance change. Month-end balance, danger days
+and safe-to-save are derived from that path. Changes to the existing weekly
+allowance use the extra pre-payday capacity, prorated over that pay cycle and
+capped by current cash less the buffer. The uncertainty band is retained.
 
 **`add_saved` fast path.** Recording money the user already put aside runs at
 once when Python can see that:
@@ -119,7 +137,30 @@ message "Undo" (`manage_goal` with `action: "undo"`) reverses it.
   or in the user's message.
 - Each card must match its payload in `cards.py`; unknown fields are dropped
   and unknown card types are removed.
+- Currency and percentage claims use separate source pools. Only fractional
+  percentage fields permit scaling by 100. Dates and counts cannot justify
+  euro amounts; the small-count allowance does not apply to currency cards.
 - A failed check gets one retry, then the fallback reply.
 - A turn has at most 5 rounds of tool calls and about 60,000 characters of
   tool results. A result past that budget is replaced by an error, and its
   numbers can't be quoted.
+
+## Conversations and Overview refresh
+
+`POST /api/chat/` accepts a UUID `conversation_id` and returns it with the
+reply. A conversation belongs to the authenticated user and one customer;
+foreign users or a different customer receive 404. The frontend creates a
+new UUID when opening a customer and reuses it for subsequent messages.
+Stored history, pending confirmations and demo caches are scoped to that
+conversation. Client-supplied history is not used by the authenticated API.
+Older clients without an id reuse that user's first conversation for the
+customer. Existing unowned chat turns remain stored but are not imported
+into owned conversations.
+
+Replies include `state_changed`, determined by successful write tools rather
+than model text. A successful write triggers an Overview reload, including
+when a later model reply fails. Proposals and read tools do not trigger it.
+The current Overview stays visible during refresh; errors offer a retry.
+Write replies are never cached, so a cached reply cannot impersonate a write.
+
+Apply migration 0004 with `python manage.py migrate` before running this build.

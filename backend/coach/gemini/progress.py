@@ -23,6 +23,7 @@ STEP_LABELS = {
     "get_spender_type": "Looking at your spending habits",
     "list_goals": "Checking your goals",
     "create_goal": "Setting up a goal",
+    "calculate_goal": "Working out when you could get there",
     "rate_goal": "Saving your goal rating",
     "get_detected_goals": "Looking for goals in your spending",
     "get_mortgage_readiness": "Checking your mortgage readiness",

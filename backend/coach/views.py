@@ -10,11 +10,13 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from inferences.alert_thresholds import MAX_SHOWN_ALERTS
+
 from . import insights as insights_mod
 from . import services
 from .gemini import loop
 from .gemini.tools import ToolContext, rate_goal, snooze_alert
-from .models import Goal, LoanDetails
+from .models import Conversation, Goal, LoanDetails
 from .serializers import (
     ChatRequest,
     GoalSerializer,
@@ -57,7 +59,9 @@ def insights(request, customer_id):
     if profile is None:
         return _not_found(customer_id)
     profile = dict(profile)
-    profile["alerts"] = services.active_alerts(customer_id, profile)
+    profile["alerts"] = services.active_alerts(
+        customer_id, profile, limit=MAX_SHOWN_ALERTS
+    )
     return Response(
         {
             "customer_id": customer_id,
@@ -73,7 +77,9 @@ def home(request, customer_id):
     if profile is None:
         return _not_found(customer_id)
     profile = dict(profile)
-    profile["alerts"] = services.active_alerts(customer_id, profile)
+    profile["alerts"] = services.active_alerts(
+        customer_id, profile, limit=MAX_SHOWN_ALERTS
+    )
     return Response(profile)
 
 
@@ -90,10 +96,15 @@ def chat(request):
     req = ChatRequest(data=request.data)
     req.is_valid(raise_exception=True)
     data = req.validated_data
+    conversation = _conversation_for(request.user, data)
+    if conversation is None:
+        return Response({"detail": "Conversation not found"}, status=404)
+    # History comes from the stored turns of this conversation, not the client.
     events = loop.chat_stream(
         data["customer_id"],
         data["message"],
-        history=data.get("history"),
+        history=None,
+        conversation=conversation,
         depth=data.get("depth"),
     )
     try:
@@ -102,7 +113,7 @@ def chat(request):
         return _not_found(data["customer_id"])
     except loop.GeminiNotConfigured as exc:
         return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-    events = chain([first], events)
+    events = _with_conversation_id(chain([first], events), conversation)
     if request.query_params.get("stream") != "1":
         done = [e for e in events if e["type"] == "done"]
         return Response(done[-1]["reply"])
@@ -111,6 +122,38 @@ def chat(request):
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"
     return response
+
+
+def _conversation_for(user, data):
+    """The user's conversation for this customer; None if the id given belongs
+    to another user or customer."""
+    customer_id = data["customer_id"]
+    conversation_id = data.get("conversation_id")
+    if conversation_id:
+        conversation, _ = Conversation.objects.get_or_create(
+            pk=conversation_id,
+            defaults={"owner": user, "customer_id": customer_id},
+        )
+        if conversation.owner_id != user.pk or conversation.customer_id != customer_id:
+            return None
+        return conversation
+    # Compatibility for clients predating conversation ids, scoped per user.
+    conversation = (
+        Conversation.objects.filter(owner=user, customer_id=customer_id)
+        .order_by("created_at")
+        .first()
+    )
+    return conversation or Conversation.objects.create(
+        owner=user, customer_id=customer_id
+    )
+
+
+def _with_conversation_id(events, conversation):
+    """Add conversation_id to the final reply so the client can continue it."""
+    for e in events:
+        if e["type"] == "done":
+            e = {**e, "reply": {**e["reply"], "conversation_id": str(conversation.id)}}
+        yield e
 
 
 def _ndjson(events):
@@ -222,7 +265,9 @@ def alerts(request, customer_id):
     profile = services.get_profile(customer_id)
     if profile is None:
         return _not_found(customer_id)
-    return Response({"alerts": services.active_alerts(customer_id, profile)})
+    return Response(
+        {"alerts": services.active_alerts(customer_id, profile, limit=MAX_SHOWN_ALERTS)}
+    )
 
 
 @api_view(["POST"])

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { addMonths, cutSaving, goalMonths, goalWithCut } from '../lib/formulas.js'
+import goalCases from '../../../shared/tests/goal_cases.json'
 
 // Test Aino numbers from context.md "Inference unit tests".
 describe('#24 cut a category', () => {
@@ -12,6 +13,11 @@ describe('#24 cut a category', () => {
 })
 
 describe('#26 goal date', () => {
+  it.each(goalCases)('matches Python for $target at $rate from $today', (c) => {
+    const months = goalMonths(c.target, c.saved, c.rate)
+    expect(months).toBe(c.months)
+    expect(months == null ? null : addMonths(c.today, months)).toBe(c.date)
+  })
   it('1,500 target, 640 saved, 150 a month = 6 months', () => {
     expect(goalMonths(1500, 640, 150)).toBe(6)
   })

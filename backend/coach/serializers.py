@@ -7,6 +7,7 @@ from .models import Goal
 
 
 class ChatRequest(serializers.Serializer):
+    conversation_id = serializers.UUIDField(required=False)
     customer_id = serializers.CharField()
     message = serializers.CharField()
     history = serializers.ListField(child=serializers.DictField(), required=False)

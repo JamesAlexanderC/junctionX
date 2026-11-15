@@ -70,6 +70,19 @@ GOAL_FLOWS = [
 ]
 
 
+# Conversation F: multi-turn chat. Every turn must answer (no fallback) and
+# nothing may be saved; small-talk turns should take one round.
+CONVERSATION_FLOWS = [
+    ["What alerts do I have?", "looks familiar, had problems"],
+    ["my dog died"],
+    ["thanks!"],
+    ["hi"],
+    ["I'm feeling really stressed today"],
+    ["How much did I spend on restaurants last month?", "and the month before?"],
+    ["What is safe for me to spend this week?", "is that a lot?", "ok cool"],
+]
+
+
 class Command(BaseCommand):
     help = "Run the Gemini eval set 3x per question and report the pass rate."
 
@@ -119,9 +132,31 @@ class Command(BaseCommand):
                 passed += ok
                 mark = "PASS" if ok else "FAIL"
                 self.stdout.write(f"[{mark}] flow {messages} #{run + 1} {why or ''}")
+        for messages in CONVERSATION_FLOWS:
+            for run in range(opts["runs"]):
+                ok, why = self._conversation_flow(cid, messages)
+                total += 1
+                passed += ok
+                mark = "PASS" if ok else "FAIL"
+                self.stdout.write(f"[{mark}] chat {messages} #{run + 1} {why or ''}")
         rate = passed / total if total else 0
         style = self.style.SUCCESS if rate >= 0.9 else self.style.ERROR
         self.stdout.write(style(f"Pass rate: {passed}/{total} = {rate:.0%}"))
+
+    def _conversation_flow(self, cid, messages):
+        """Play one chat; every turn must answer and nothing may be saved."""
+        ChatTurn.objects.filter(customer_id=cid).delete()
+        before = _saved_state(cid)
+        why = []
+        for i, message in enumerate(messages):
+            _, meta = loop.chat(cid, message)
+            if meta.get("fallback"):
+                why.append(f"turn {i + 1} fell back: {meta.get('fallback_reason')}")
+            if meta.get("conversational") and meta.get("rounds") != 1:
+                why.append(f"turn {i + 1} small talk took {meta.get('rounds')} rounds")
+        if _saved_state(cid) != before:
+            why.append("saved a change")
+        return not why, why
 
     def _goal_flow(self, cid, messages):
         """Play one flow; only goals created by it are deleted afterwards."""

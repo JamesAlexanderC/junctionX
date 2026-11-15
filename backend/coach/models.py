@@ -1,5 +1,8 @@
 """Database models for Saldo (context.md "The data", #54, #63-#64, #72, P2.8)."""
 
+import uuid
+
+from django.conf import settings
 from django.db import models
 
 
@@ -199,6 +202,13 @@ class AlertSnooze(models.Model):
     until = models.DateField()
 
 
+class Conversation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    customer_id = models.CharField(max_length=64, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class ChatTurn(models.Model):
     """One user message and the reply, kept for history and confirmations.
 
@@ -206,6 +216,9 @@ class ChatTurn(models.Model):
     the next user turn must confirm before it is executed.
     """
 
+    conversation = models.ForeignKey(
+        Conversation, null=True, blank=True, on_delete=models.CASCADE
+    )
     customer_id = models.CharField(max_length=64, db_index=True)
     message = models.TextField()
     reply = models.JSONField(default=dict)
@@ -223,9 +236,12 @@ class DemoCache(models.Model):
     """
 
     customer_id = models.CharField(max_length=64)
+    conversation = models.ForeignKey(
+        Conversation, null=True, blank=True, on_delete=models.CASCADE
+    )
     question = models.CharField(max_length=500)
     reply = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [("customer_id", "question")]
+        unique_together = [("conversation", "customer_id", "question")]

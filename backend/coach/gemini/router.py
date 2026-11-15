@@ -27,9 +27,12 @@ ROUTER_PROMPT = (
 
 
 # Saving or progress questions get the user's level in the answer (#28-#33).
+# Only questions about getting better or the level itself; plain "save" in a
+# fact, goal or bonus question is not one (live tests: the level card was
+# attached to unrelated answers).
 LEVELS_RE = re.compile(
-    r"\b(sav(e|es|ed|ing)|spend less|level|next step|doing well|improve|"
-    r"säästä\w*|taso\w*)\b",
+    r"\b(how (can|do|could) i save|save more|saving more|spend less|levels?|"
+    r"next step|doing well|how am i doing|improve|miten säästä\w*|taso\w*)\b",
     re.I,
 )
 
@@ -64,3 +67,54 @@ def route(message, client=None, model=None):
     except Exception:  # noqa: BLE001 - router must never break chat
         log.exception("router failed, defaulting to depth 2")
         return 2
+
+
+# --- conversation C: small talk is answered directly, in one round ---------------
+
+CHAT_RE = re.compile(
+    r"\b(thanks?|thank you|thx|kiitos|cheers|hi|hello|hey|moi|terve|"
+    r"good (morning|evening|night)|ok(ay)?|cool|great|nice|got it|i see|"
+    r"makes sense|fair enough|all good|no worries|never ?mind|familiar|"
+    r"that was me|that's me|it was me|died|passed away|funeral|sad|stressed|"
+    r"anxious|worried|upset|lonely|depressed|heartbroken|lost my job|"
+    r"break ?up|divorce|sick)\b",
+    re.I,
+)
+DATA_RE = re.compile(
+    r"€|\b(money|spend\w*|spent|sav\w+|euros?|eur|budget|pay\w*|bills?|"
+    r"afford\w*|loans?|mortgage|goals?|balance|income|salary|costs?|prices?|"
+    r"how much|levels?|charts?|baskets?|alerts?|plan|cut|cancel|"
+    r"rahaa?|säästä\w*)\b",
+    re.I,
+)
+QUESTION_RE = re.compile(
+    r"\?|^\s*(what|why|how|when|where|which|who|can|could|should|would|do|does|"
+    r"did|is|are|will|show|explain|tell)\b",
+    re.I,
+)
+# One-word answers that drive a flow (confirm, undo, question-card options).
+REPLY_WORDS = {
+    "yes",
+    "yeah",
+    "yep",
+    "no",
+    "nope",
+    "sure",
+    "undo",
+    "high",
+    "medium",
+    "low",
+    "kyllä",
+    "joo",
+}
+
+
+def is_conversational(message):
+    """True for thanks, greetings, acknowledgements ("looks familiar") and
+    feelings ("my dog died"): no question, no money words, no flow answer."""
+    text = (message or "").strip()
+    if not text or text.lower().strip(" .!") in REPLY_WORDS:
+        return False
+    if QUESTION_RE.search(text) or DATA_RE.search(text):
+        return False
+    return bool(CHAT_RE.search(text))

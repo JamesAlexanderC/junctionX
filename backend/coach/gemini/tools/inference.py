@@ -47,28 +47,67 @@ def _is_number(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def chart_data(entry: Entry, value) -> list[dict]:
-    """[{label, value}] for a chart card; rows without a number are skipped."""
+FLAG_ORDER = ("bill", "payday", "danger")  # later wins: danger shows on top
+
+
+def _day_flags(profile: dict | None) -> dict:
+    """{date: "danger" | "payday" | "bill"} for the forecast chart (FC-2)."""
+    if not profile:
+        return {}
+    fc = profile.get("forecast") or {}
+    days = {
+        "bill": [b.get("date") for b in fc.get("upcoming_bills") or []],
+        "payday": [
+            ((profile.get("income") or {}).get("payday") or {}).get("next_payday")
+        ],
+        "danger": fc.get("danger_days") or [],
+    }
+    flags = {}
+    for flag in FLAG_ORDER:
+        for day in days[flag]:
+            if day:
+                flags[str(day)[:10]] = flag
+    return flags
+
+
+def _point(chart, row, flags) -> dict | None:
+    """One chart point from a list row, with the band and flag if asked."""
+    value = row.get(chart.value_key)
+    if not _is_number(value):
+        return None
+    label = str(row.get(chart.label_key))
+    point = {"label": label, "value": value}
+    if chart.band:
+        low, high = (row.get(key) for key in chart.band)
+        if _is_number(low) and _is_number(high):
+            point.update(low=low, high=high)
+    if label[:10] in flags:
+        point["flag"] = flags[label[:10]]
+    return point
+
+
+def chart_data(entry: Entry, value, profile: dict | None = None) -> list[dict]:
+    """[{label, value, low?, high?, flag?}] for a chart card; rows without a
+    number are skipped. Band and flags only for specs that ask (FC-2)."""
     chart = entry.chart
     if chart is None:
         return []
     if isinstance(value, dict):
-        pairs = list(value.items())
-    elif isinstance(value, list):
-        pairs = [
-            (row.get(chart.label_key), row.get(chart.value_key))
-            for row in value
-            if isinstance(row, dict)
+        points = [
+            {"label": str(k), "value": v} for k, v in value.items() if _is_number(v)
         ]
+    elif isinstance(value, list):
+        flags = _day_flags(profile) if chart.flags else {}
+        rows = [_point(chart, r, flags) for r in value if isinstance(r, dict)]
+        points = [p for p in rows if p is not None]
     else:
         return []
-    points = [{"label": str(k), "value": v} for k, v in pairs if _is_number(v)]
     return points[-MAX_CHART_POINTS:]
 
 
-def chart_card(entry: Entry, value) -> dict | None:
+def chart_card(entry: Entry, value, profile: dict | None = None) -> dict | None:
     """A complete chart card for a chartable entry, or None without data."""
-    data = chart_data(entry, value)
+    data = chart_data(entry, value, profile)
     if not data:
         return None
     card = {
@@ -142,7 +181,7 @@ def get_inference(ctx, item, detail="summary"):
         out["note"] = "Some lists were shortened; use detail='full' for all rows."
     if entry.chart is not None:
         out["chart"] = {"kind": entry.chart.kind}
-        out["chart_data"] = chart_data(entry, raw)
+        out["chart_data"] = chart_data(entry, raw, ctx.profile)
     return out
 
 
@@ -161,7 +200,7 @@ def get_chart(ctx, item):
     ok, reason, numbers = _status(ctx.profile, entry)
     if not ok:
         return unavailable(reason, item=item)
-    card = chart_card(entry, get_path(ctx.profile, entry.path))
+    card = chart_card(entry, get_path(ctx.profile, entry.path), ctx.profile)
     if card is None:
         return unavailable("There are no numbers to chart yet.", item=item)
     return {"available": True, "item": item, "inferences": numbers, "card": card}

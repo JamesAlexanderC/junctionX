@@ -171,10 +171,12 @@ export async function sendChat({
   message,
   history = [],
   depth,
+  conversationId,
   onProgress,
 }) {
   const body = {
     customer_id: customerId,
+    ...(conversationId ? { conversation_id: conversationId } : {}),
     message,
     history: history.slice(-6),
     ...(depth ? { depth } : {}),

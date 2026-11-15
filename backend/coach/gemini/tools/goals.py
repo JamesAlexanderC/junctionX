@@ -9,6 +9,7 @@ Changes go through GoalSerializer, so chat and the REST form share rules.
 from ... import services
 from ...models import DismissedSuggestion, Goal, GoalRating
 from ...serializers import GoalSerializer
+from inferences import goals as goal_maths
 from ..validate import numbers_in_text
 from .context import (
     UNDO_RE,
@@ -31,6 +32,11 @@ GOAL_ACTIONS = [
     "undo",
 ]
 EDITABLE = {"name", "amount", "date", "priority", "emoji"}
+ONE_OFF_NOTE = (
+    "clash.safe_to_save_monthly = average monthly saving + the one-off amount "
+    "safe to save today, so it is not a monthly figure. Use calculate_goal for "
+    "how long a goal takes."
+)
 AMOUNT_TOLERANCE = 0.006
 CONFIRM_CHANGE = "Ask the user to confirm this change. Nothing was saved."
 
@@ -41,7 +47,63 @@ def list_goals(ctx):
         "active": g.get("active", []),
         "recommended": g.get("recommended"),
         "clash": g.get("clash"),
+        "clash_note": ONE_OFF_NOTE,
     }
+
+
+# --- calculate_goal: goal maths for numbers the user types ----------------------
+
+
+def _goal_check(ctx, amount, date=None, monthly=None, saved=0.0):
+    """#26, #49, #65, #66 for a typed amount (and date / monthly amount).
+
+    The rate is the user's average monthly saving, or the monthly amount they
+    gave. The one-off amount safe to save today is reported separately and
+    never added to the monthly rate (live test: it was called 'monthly')."""
+    if amount <= 0:
+        raise ToolError("amount must be greater than 0")
+    if monthly is not None and monthly <= 0:
+        raise ToolError("monthly must be greater than 0")
+    today = ctx.today
+    if date:
+        from datetime import date as date_cls
+
+        try:
+            if date_cls.fromisoformat(date) <= today:
+                raise ToolError("date must be in the future")
+        except ValueError as exc:
+            raise ToolError("date must be YYYY-MM-DD") from exc
+    profile = ctx.profile
+    given = monthly is not None
+    rate = float(
+        monthly if given else profile.get("baskets", {}).get("monthly_saving") or 0
+    )
+    diff = goal_maths.difficulty(amount, saved, rate)
+    months = diff["months_needed"]
+    out = {
+        "amount": amount,
+        "saved": saved,
+        "monthly_rate": rate,
+        "rate_source": (
+            "the monthly amount given" if given else "average monthly saving"
+        ),
+        "months_needed": months,
+        "reach_date": (
+            goal_maths._add_months(today, months) if months is not None else None
+        ),
+        "difficulty": diff["difficulty"],
+        "available_today": profile.get("forecast", {}).get("safe_to_save_today"),
+    }
+    if date:
+        need = goal_maths.monthly_needed(amount, saved, today, date)
+        out.update(target_date=date, monthly_needed=need)
+        out.update(goal_maths.realism(need, amount, saved, today, rate))
+    return out
+
+
+def calculate_goal(ctx, amount, date=None, monthly=None, saved=None):
+    """How long a typed amount takes, or what a date needs (no saving)."""
+    return _goal_check(ctx, amount, date, monthly, saved or 0.0)
 
 
 def create_goal(ctx, name, amount, date, emoji="", priority="medium"):
@@ -63,16 +125,20 @@ def create_goal(ctx, name, amount, date, emoji="", priority="medium"):
         "emoji": emoji,
         "priority": priority,
     }
+    stored = ctx.previous_pending.get("create_goal")
     if not is_confirmed(ctx, "create_goal"):
-        return propose(
+        result = propose(
             ctx,
             "create_goal",
             proposal,
             "Ask the user to confirm this goal. Nothing was saved. When they "
-            "say yes, call create_goal again.",
+            "say yes, call create_goal again. Say the monthly amount needed and "
+            "the difficulty from check; if not realistic, offer its suggestion.",
         )
+        # #49/#65/#66 on the proposal, not only after saving (live test #50).
+        return {**result, "check": _goal_check(ctx, amount, date)}
     # F1: the yes confirms what the user saw, so save the stored proposal.
-    proposal = {**proposal, **ctx.previous_pending["create_goal"]}
+    proposal = {**proposal, **stored}
     goal = Goal.objects.create(
         customer_id=ctx.customer_id,
         name=proposal["name"],

@@ -245,3 +245,22 @@ def test_everything_json_serialisable(df_today, inc, bsk):
         "levels": levels.compute_levels(df_today, TODAY, inc, bsk),
     }
     json.dumps(out)
+
+
+def _no_bills(inc, partial_view):
+    return {**inc, "bills": [], "partial_view": partial_view}
+
+
+def test_level_1_reached_without_bills_on_a_partial_view(df_today, inc, bsk):
+    # #28: bills paid from another bank are not visible on a partial view.
+    lv = levels.compute_levels(df_today, TODAY, _no_bills(inc, True), bsk)
+    ladder = {step["level"]: step for step in lv["ladder"]}
+    assert ladder[1]["reached"] is True
+    assert lv["current"] == 2
+
+
+def test_level_1_without_bills_says_the_bill_is_missing(df_today, inc, bsk):
+    lv = levels.compute_levels(df_today, TODAY, _no_bills(inc, False), bsk)
+    assert lv["current"] == 0
+    checks = {c["text"]: c["met"] for c in lv["next_requirement"]["checks"]}
+    assert checks == {"Payday found": True, "A regular bill found": False}

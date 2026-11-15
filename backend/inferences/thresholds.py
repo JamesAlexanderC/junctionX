@@ -30,6 +30,21 @@ OWN_TRANSFER_TYPES = NEUTRAL_TRANSFER_TYPES | SAVER_TYPES
 # payday (#1) and bill detection (#4) can group them (salary, rent and
 # utilities have no merchant_id in the data).
 PSEUDO_MERCHANT_PREFIX = "type:"
+# Real merchant ids look like "MRC-GRO-0016"; the middle code is the category
+# (checked on all 3.6M rows: one category per code). Users never see the id.
+MERCHANT_ID_RE = r"\bMRC-([A-Z]{3})-\d+\b"
+MERCHANT_CODE_NAMES = {
+    "ENT": "an entertainment merchant",
+    "GRO": "a grocery shop",
+    "HEA": "a health provider",
+    "HMT": "a home and tech shop",
+    "LIF": "a lifestyle shop",
+    "RES": "a restaurant",
+    "TRN": "a transport provider",
+    "TRV": "a travel company",
+}
+UNKNOWN_MERCHANT_NAME = "a shop"
+
 PSEUDO_MERCHANT_NAMES = {
     "salary": "Salary",
     "other_income": "Other income",
@@ -179,6 +194,9 @@ BAND_Z = 1.28  # 80% band
 DANGER_BALANCE_EUR = 50.0  # #20
 UPCOMING_BILLS_DAYS = 30  # #21
 NO_PAYDAY_HORIZON_DAYS = 30  # horizon when no payday was found
+# #19 (FC-1): with fewer days than this left in the month, "end of month"
+# means next month's last day, so the forecast always looks ahead.
+MONTH_END_ROLLOVER_DAYS = 3
 SEASONAL_WARN_RATIO = 1.25  # #23
 DEFAULT_CYCLE_DAYS = 30
 
