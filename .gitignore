@@ -11,3 +11,6 @@ backend/profiles/*.json
 .env
 .DS_Store
 spam.txt
+
+# Playwright MCP screenshots and logs from local UI checks
+.playwright-mcp/

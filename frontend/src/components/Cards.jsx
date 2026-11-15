@@ -295,6 +295,10 @@ function BeforeAfterCard({ card }) {
     ['Safe to spend', 'safe_to_spend', eur],
     ['Buffer', 'buffer_months', (v) => (v == null ? '–' : `${v} months`)],
     ['Goal date', 'goal_date', longDate],
+    // Multibank before/after (S-Bank only vs all connected banks).
+    ['DSTI', 'dsti', (v) => (v == null ? '–' : `${Math.round(v * 100)}%`)],
+    ['Level', 'level', (v) => (v == null ? '–' : `Level ${v}`)],
+    ['Monthly income', 'monthly_income', eur],
   ].filter(([, k]) => card.before?.[k] != null || card.after?.[k] != null)
   return (
     <table className="card">
@@ -318,6 +322,27 @@ function BeforeAfterCard({ card }) {
   )
 }
 
+// Every account with its bank; other banks carry a "simulated" badge.
+function AccountsCard({ card }) {
+  return (
+    <ul className="card accounts-card">
+      {(card.accounts ?? []).map((a, i) => (
+        <li key={i}>
+          <span>
+            {a.name}{' '}
+            {a.simulated ? (
+              <span className="source-badge">{a.bank} · simulated</span>
+            ) : (
+              <span className="bank-name">{a.bank}</span>
+            )}
+          </span>
+          <strong>{a.balance == null ? '–' : eur(a.balance)}</strong>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 const RENDERERS = {
   number: NumberCard,
   chart: ChartCard,
@@ -329,6 +354,7 @@ const RENDERERS = {
   alert: AlertCard,
   plan: PlanCard,
   before_after: BeforeAfterCard,
+  accounts: AccountsCard,
 }
 
 export function ReplyCard({ card, onSend }) {

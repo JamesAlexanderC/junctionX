@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     # Local
     "coach",
+    "multibank",
 ]
 
 MIDDLEWARE = [

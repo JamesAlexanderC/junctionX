@@ -31,7 +31,12 @@ from .habits import compute_habits
 from .income import compute_income
 from .levels import compute_levels
 from .mortgage import compute_mortgage
-from .multibank import compute_multibank
+from .multibank import (
+    compute_multibank,
+    external_liquid,
+    external_loan_payments,
+    merged_transactions,
+)
 from .whatif import compute_whatif
 
 
@@ -58,7 +63,19 @@ def _readiness_score(mortgage: dict):
     return ((mortgage or {}).get("readiness") or {}).get("score")
 
 
-def _goals_and_levels(df, today, profile, goals, ratings, dismissed, loans):
+def _with_external_loans(loans: dict | None, bills: list[dict]) -> dict | None:
+    """#42 -> #77: loans at linked banks join the stress test's other
+    payments (only when the user gave loan details; nothing is assumed)."""
+    extra = external_loan_payments(bills)
+    if not loans or not extra:
+        return loans
+    other = float(loans.get("other_payments") or 0.0)
+    return {**loans, "other_payments": round(other + extra, 2)}
+
+
+def _goals_and_levels(
+    df, today, profile, goals, ratings, dismissed, loans, extra_liquid=0.0
+):
     """#28 to #33 and #44 to #74 from the profile's other sections."""
     income, baskets, forecast = (
         profile["income"],
@@ -73,6 +90,7 @@ def _goals_and_levels(df, today, profile, goals, ratings, dismissed, loans):
         baskets,
         goals=active,
         readiness=_readiness_score(profile.get("mortgage")),
+        extra_liquid=extra_liquid,
     )
     section = goals_mod.compute_goals(
         df,
@@ -103,6 +121,7 @@ def build_profile(
     peer_table: dict | None = None,
     mortgage_model: dict | None = None,
     snoozed: dict | None = None,
+    linked: dict | None = None,
 ) -> dict:
     """Full profile for one customer as of `today` (JSON-serialisable).
 
@@ -111,9 +130,14 @@ def build_profile(
     ratings: {goal_type: {up, down}} (#54). dismissed: detected-goal ids.
     peer_table: benchmarks.compute_peer_table output. mortgage_model:
     mortgage.fit_readiness_model output. snoozed: {alert_id: until date}.
+    linked: other banks under an active consent (multibank/ledger.py):
+    {transactions: DataFrame, accounts: [...], consents: [...]}. Without it
+    the profile is exactly the S-Bank-only one.
     """
     today = to_date(today)
     df = _empty_df() if df is None or not len(df) else df
+    if linked:
+        df = merged_transactions(df, linked.get("transactions"))
     prepared = prepare(df, today)
     cust = _customer(customer)
     customer_id = (customer or {}).get("customer_id")
@@ -126,7 +150,13 @@ def build_profile(
     forecast = compute_forecast(prepared, today, income, baskets)
     whatif = compute_whatif(prepared, today, income, baskets)
     mortgage = compute_mortgage(
-        prepared, today, income, baskets, forecast, model=mortgage_model, loans=loans
+        prepared,
+        today,
+        income,
+        baskets,
+        forecast,
+        model=mortgage_model,
+        loans=_with_external_loans(loans, income["bills"]) if linked else loans,
     )
     profile = {
         "customer_id": customer_id,
@@ -143,12 +173,19 @@ def build_profile(
         "mortgage": mortgage,
     }
     levels, goals_section = _goals_and_levels(
-        prepared, today, profile, goals, ratings, dismissed, loans
+        prepared,
+        today,
+        profile,
+        goals,
+        ratings,
+        dismissed,
+        loans,
+        extra_liquid=external_liquid(linked),
     )
     profile["levels"] = levels
     profile["goals"] = goals_section
     profile["benchmarks"] = compute_benchmarks(prepared, cust, peer_table, today)
-    profile["multibank"] = compute_multibank(prepared, today)
+    profile["multibank"] = compute_multibank(prepared, today, linked)
     # No transactions -> nothing to alert about (not "balance EUR 0").
     profile["alerts"] = (
         alerts_mod.run_all_alerts(
@@ -181,7 +218,14 @@ def recompute_goals_and_levels(
     out = copy.deepcopy(profile)
     out["today"] = iso(today)
     levels, section = _goals_and_levels(
-        prepared, today, out, goals, ratings, dismissed, loans
+        prepared,
+        today,
+        out,
+        goals,
+        ratings,
+        dismissed,
+        loans,
+        extra_liquid=(out.get("multibank") or {}).get("external_liquid") or 0.0,
     )
     out["levels"] = levels
     out["goals"] = section

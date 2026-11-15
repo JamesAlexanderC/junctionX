@@ -141,8 +141,25 @@ def profile_summary(profile):
                 c["category"]
                 for c in profile.get("baskets", {}).get("leaky_categories", [])
             ],
+            **_multibank_summary(profile),
         }
     )
+
+
+def _multibank_summary(profile):
+    """Other banks (simulated PSD2) and coverage (#112), only when they matter,
+    so every answer can name the bank or say it sees part of the money."""
+    mb = profile.get("multibank") or {}
+    banks = mb.get("connected_banks") or []
+    if not banks and mb.get("coverage") != "partial":
+        return {}
+    return {"other_banks": banks, "coverage": mb.get("coverage")}
+
+
+def wants_multibank_hint(message, profile):
+    """The hint for bank words, and for any question once a bank is linked."""
+    linked = bool((profile.get("multibank") or {}).get("connected_banks"))
+    return linked or router.wants_multibank(message)
 
 
 def _available_count(profile):
@@ -357,6 +374,11 @@ def chat_stream(
             f"Profile summary: {profile_summary(profile)}\n"
             f"Answer at depth {depth}.\n"
             + (f"{router.LEVELS_HINT}\n" if router.wants_levels(message) else "")
+            + (
+                f"{router.MULTIBANK_HINT}\n"
+                if wants_multibank_hint(message, profile)
+                else ""
+            )
             + (f"{CONVERSATION_NOTE}\n" if ctx.conversational else "")
             + f"User: {message}",
         )

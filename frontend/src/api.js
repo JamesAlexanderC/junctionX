@@ -218,3 +218,43 @@ export async function logout() {
     setToken(null)
   }
 }
+
+// --- Simulated PSD2 multi-bank (MULTIBANK_PLAN.md) ---------------------------
+// Only the customer and the bank are ever sent: no credentials exist anywhere.
+
+export async function getBanks({ signal } = {}) {
+  const body = await request('/api/banks/', { signal })
+  return Array.isArray(body) ? body : []
+}
+
+// Backend shape: {customer_id, accounts: [...], coverage, connected_banks, delta}.
+export async function getAccounts(customerId, { signal } = {}) {
+  const body = await request(`/api/accounts/${encodeURIComponent(customerId)}/`, {
+    signal,
+  })
+  return {
+    accounts: Array.isArray(body?.accounts) ? body.accounts : [],
+    coverage: body?.coverage ?? 'sbank_only',
+    connected_banks: Array.isArray(body?.connected_banks) ? body.connected_banks : [],
+    delta: body?.delta ?? null,
+  }
+}
+
+// Consent, then the single "Allow" step. Returns the authorise result.
+export async function connectBank(customerId, bankCode) {
+  const consent = await request('/api/consents/', {
+    method: 'POST',
+    body: { customer_id: customerId, bank_code: bankCode },
+  })
+  return request(`/api/consents/${consent.consent_id}/authorise/`, { method: 'POST' })
+}
+
+export function disconnectBank(consentId) {
+  return request(`/api/consents/${consentId}/`, { method: 'DELETE' })
+}
+
+// Customers with synthetic other-bank data: [{customer_id, banks, story}].
+export async function getMultibankCustomers({ signal } = {}) {
+  const body = await request('/api/multibank/customers/', { signal })
+  return Array.isArray(body) ? body : []
+}
