@@ -245,7 +245,7 @@ Buffer months = lowest balance in the last 30 days / monthly essentials. Reached
 31
 Level 4: Goal setter
 goals, #52
-Reached when the user has an active goal that is on track (#52) and has money saved towards it. On its first day every goal is on track (0% of 0% expected), so a goal with nothing saved does not count yet.
+Reached when the user has an active goal that is on track (#52).
 32
 Level 5: Mortgage ready
 #35
@@ -561,7 +561,7 @@ Safety net
 Lowest balance covers 1 month of essentials
 4
 Goal setter
-An active goal that is on track, with money saved
+An active goal that is on track
 5
 Mortgage ready
 Readiness score ≥ 0.75
@@ -696,7 +696,7 @@ Warn when the sum of all #65 amounts > average monthly safe-to-save; show both n
 71
 Goal counts towards a level
 goal type
-Map goal types to levels (safety-net goal → Level 3, any on-track goal with money saved → Level 4). Completing it recomputes #28 to #33.
+Map goal types to levels (safety-net goal → Level 3, any on-track goal → Level 4). Completing it recomputes #28 to #33.
 72
 Edit, pause, delete
 user input
