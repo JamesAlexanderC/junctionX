@@ -7,6 +7,7 @@ import re
 import time
 from contextlib import contextmanager
 
+import httpx2
 from django.conf import settings
 from google.genai import errors as genai_errors
 from google.genai import types
@@ -50,7 +51,13 @@ def get_client():
         return None
     from google import genai
 
-    return genai.Client(api_key=settings.GEMINI_API_KEY)
+    # Without a timeout a stalled call hung the chat ("Looking deeper into
+    # your data..." forever); now it is retried, then ends in the fallback.
+    options = types.HttpOptions(
+        timeout=int(settings.GEMINI_TIMEOUT_S * 1000),  # milliseconds
+        retry_options=types.HttpRetryOptions(attempts=settings.GEMINI_RETRY_ATTEMPTS),
+    )
+    return genai.Client(api_key=settings.GEMINI_API_KEY, http_options=options)
 
 
 # Speed #2: thinking by depth. Each Gemini call took 6.5-8 s, mostly the
@@ -359,6 +366,10 @@ def chat_stream(
     except genai_errors.APIError as exc:
         log.exception("Gemini call failed for %s", customer_id)
         reply, rounds, reason, detail = None, 0, "gemini_error", str(exc)
+    except httpx2.TransportError as exc:
+        # Timed out after the retries, or Gemini could not be reached.
+        log.exception("Gemini unreachable for %s", customer_id)
+        reply, rounds, reason, detail = None, 0, "gemini_unreachable", str(exc)
     if reason:
         reply = copy.deepcopy(FALLBACK_REPLY)
     reply = reference_dates(reply, ctx.today)

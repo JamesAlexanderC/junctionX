@@ -234,6 +234,10 @@ GEMINI_ROUTER_MODEL = os.environ.get("GEMINI_ROUTER_MODEL", "gemini-3.5-flash-li
 # Thinking for depth 3-4 (what-ifs, plans): "low" or "high"; empty = the
 # model's default (dynamic, slower). Depth 1 never thinks, depth 2 thinks low.
 GEMINI_THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "")
+# Each Gemini call gives up after this many seconds, tried this many times
+# in all; then the turn ends with the fallback reply instead of hanging.
+GEMINI_TIMEOUT_S = float(os.environ.get("GEMINI_TIMEOUT_S", "30"))
+GEMINI_RETRY_ATTEMPTS = int(os.environ.get("GEMINI_RETRY_ATTEMPTS", "2"))
 # Ask Gemini for thought summaries; the chat shows their headings while it
 # waits (coach/gemini/progress.py). "0" turns them off.
 GEMINI_SHOW_THOUGHTS = os.environ.get("GEMINI_SHOW_THOUGHTS", "1") == "1"
