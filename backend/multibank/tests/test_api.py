@@ -81,9 +81,12 @@ def test_a_bank_without_data_links_nothing_and_says_so(
     assert LinkedAccount.objects.count() == 0
 
 
-def test_accounts_lists_sbank_and_linked_accounts(client, aino, synthetic, rebuilt):
+def test_accounts_lists_sbank_and_linked_accounts(client, aino, synthetic):
     _connect(client)
-    accounts = client.get(f"/api/accounts/{AINO}/").json()["accounts"]
+    body = client.get(f"/api/accounts/{AINO}/").json()
+    accounts = body["accounts"]
+    assert body["connected_banks"] == ["Nordea"] and body["coverage"] == "full"
+    assert body["delta"]["safe_to_spend"].keys() == {"before", "after"}
     banks = {a["bank"] for a in accounts}
     assert banks == {"S-Bank", "Nordea"}
     linked = next(a for a in accounts if a["bank"] == "Nordea")

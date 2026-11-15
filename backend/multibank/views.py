@@ -128,7 +128,17 @@ def accounts(request, customer_id):
         }
         for a in linked
     ]
-    return Response({"customer_id": customer_id, "accounts": rows})
+    mb = (services.get_profile(customer_id) or {}).get("multibank") or {}
+    return Response(
+        {
+            "customer_id": customer_id,
+            "accounts": rows,
+            # #112 for the Overview banner; delta for the "Connected" screen.
+            "coverage": mb.get("coverage", "sbank_only"),
+            "connected_banks": mb.get("connected_banks", []),
+            "delta": mb.get("delta"),
+        }
+    )
 
 
 # --- mock ASPSP (internal; Berlin Group NextGenPSD2 AIS shape) ---------------

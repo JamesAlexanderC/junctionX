@@ -1470,3 +1470,176 @@ button {
 .goal-status.on-track .icon {
   color: var(--brand-green);
 }
+
+/* --- Simulated PSD2 multi-bank (MULTIBANK_PLAN.md MB-8) ------------------- */
+
+.btn-dark {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  background: var(--action-dark);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-dark:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.btn-plain {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.source-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--warn-soft);
+  white-space: nowrap;
+}
+
+.bank-name {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.banner.partial-view {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 10px;
+  align-items: start;
+  background: var(--accent-soft);
+}
+
+.banner.partial-view p {
+  margin: 0;
+}
+
+.banner.partial-view .btn-dark {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.accounts .iban {
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.accounts .row-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.consent-line,
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
+.confirm {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--warn-soft);
+}
+
+.confirm p {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.connect-more {
+  margin-top: 12px;
+}
+
+.accounts-card {
+  list-style: none;
+  padding: 8px 12px;
+}
+
+.accounts-card li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.4);
+}
+
+.sheet {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 20px 16px 24px;
+  border-radius: 16px 16px 0 0;
+  background: var(--surface);
+}
+
+.sheet h2 {
+  margin: 0 32px 8px 0;
+  font-size: 20px;
+}
+
+.sheet-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.bank-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.bank-list .row {
+  width: 100%;
+  min-height: 48px;
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .sheet-backdrop {
+    align-items: center;
+  }
+
+  .sheet {
+    border-radius: 16px;
+  }
+}
