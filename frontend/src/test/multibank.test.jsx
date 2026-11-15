@@ -145,3 +145,27 @@ describe('chat', () => {
     expect(onSend).toHaveBeenCalled()
   })
 })
+
+describe('landing', () => {
+  it('lists the other-bank demo customers in a dropdown and opens one', async () => {
+    const { default: Landing } = await import('../components/Landing.jsx')
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (url.startsWith('/api/multibank/customers/')) {
+        return json([
+          { customer_id: 'CUST03369', banks: ['Nordea'], story: 'Hidden car loan' },
+          { customer_id: 'CUST00019', banks: ['Danske Bank', 'Aktia'],
+            story: 'Two music services' },
+        ])
+      }
+      return json({ built: true, demos: [], customers: [] })
+    }))
+    const onEnter = vi.fn()
+    render(<Landing onEnter={onEnter} />)
+    const select = await screen.findByLabelText('Customers with other-bank data')
+    expect(screen.getByRole('option', {
+      name: 'CUST03369 · Nordea · Hidden car loan',
+    })).toBeTruthy()
+    fireEvent.change(select, { target: { value: 'CUST00019' } })
+    expect(onEnter).toHaveBeenCalledWith('CUST00019')
+  })
+})

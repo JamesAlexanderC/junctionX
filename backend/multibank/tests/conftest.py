@@ -21,4 +21,5 @@ def synthetic(monkeypatch):
     generated = generate(seed=42)
     generated["customers"] = {AINO: generated["customers"][sc.HERO]}
     monkeypatch.setattr(mb_data, "external_data", lambda: generated)
+    monkeypatch.setitem(sc.STORIES, AINO, sc.STORIES[sc.HERO])
     return generated

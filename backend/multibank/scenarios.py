@@ -16,3 +16,12 @@ BANKS = {
     "HELSFIHH": "Aktia",
     "AABAFI22": "Ålandsbanken",
 }
+
+# One line per scenario for the landing page's other-bank dropdown.
+STORIES = {
+    HERO: "Hidden car loan",
+    SALARY_ELSEWHERE: "Salary swept to another bank",
+    DUPLICATE_SUBS: "Two music services",
+    CREDIT_CARD: "Credit card at another bank",
+    SAVINGS_ELSEWHERE: "Savings at another bank",
+}

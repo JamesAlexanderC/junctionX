@@ -4,6 +4,7 @@ from . import views
 
 api_urlpatterns = [
     path("banks/", views.banks),
+    path("multibank/customers/", views.demo_customers),
     path("consents/", views.consents),
     path("consents/<int:consent_id>/authorise/", views.authorise),
     path("consents/<int:consent_id>/", views.consent_detail),

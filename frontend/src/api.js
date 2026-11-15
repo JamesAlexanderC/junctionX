@@ -252,3 +252,9 @@ export async function connectBank(customerId, bankCode) {
 export function disconnectBank(consentId) {
   return request(`/api/consents/${consentId}/`, { method: 'DELETE' })
 }
+
+// Customers with synthetic other-bank data: [{customer_id, banks, story}].
+export async function getMultibankCustomers({ signal } = {}) {
+  const body = await request('/api/multibank/customers/', { signal })
+  return Array.isArray(body) ? body : []
+}

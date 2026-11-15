@@ -139,3 +139,19 @@ def test_mock_aspsp_needs_an_active_consent(client, aino, synthetic):
 )
 def test_unauthenticated_calls_are_rejected(anon_client, method, url):
     assert getattr(anon_client, method)(url).status_code == 401
+
+
+def test_demo_customers_list_who_has_other_bank_data(client, synthetic):
+    rows = client.get("/api/multibank/customers/").json()
+    assert rows == [
+        {
+            "customer_id": AINO,
+            "banks": ["Nordea"],
+            "bank_codes": ["NDEAFIHH"],
+            "story": "Hidden car loan",
+        }
+    ]
+
+
+def test_demo_customers_need_a_login(anon_client):
+    assert anon_client.get("/api/multibank/customers/").status_code == 401

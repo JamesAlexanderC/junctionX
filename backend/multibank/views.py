@@ -12,9 +12,9 @@ from rest_framework.response import Response
 from coach import services
 from coach.models import Account, Transaction
 
-from . import aspsp, ledger
+from . import aspsp, data, ledger
 from .models import BankConsent, LinkedAccount
-from .scenarios import BANKS
+from .scenarios import BANKS, STORIES
 
 CONSENT_FIELDS = {"customer_id", "bank_code"}
 NO_CREDENTIALS = (
@@ -40,6 +40,24 @@ def _consent_json(consent, **extra):
 def banks(request):
     """Connectable banks: plain text names only."""
     return Response([{"code": c, "name": n} for c, n in BANKS.items()])
+
+
+@api_view(["GET"])
+def demo_customers(request):
+    """Customers with synthetic other-bank data, for the landing dropdown.
+    Only customers present in the generated file (none if not generated)."""
+    rows = []
+    for customer_id, banks in sorted(data.external_data()["customers"].items()):
+        codes = sorted(banks)
+        rows.append(
+            {
+                "customer_id": customer_id,
+                "banks": [BANKS.get(c, c) for c in codes],
+                "bank_codes": codes,
+                "story": STORIES.get(customer_id, ""),
+            }
+        )
+    return Response(rows)
 
 
 @api_view(["POST"])
