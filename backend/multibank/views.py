@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from coach import services
 from coach.models import Account, Transaction
 
-from . import aspsp
+from . import aspsp, ledger
 from .models import BankConsent, LinkedAccount
 from .scenarios import BANKS
 
@@ -65,6 +65,9 @@ def authorise(request, consent_id):
     """The user tapped Allow: link the bank's accounts, rebuild the profile."""
     consent = get_object_or_404(BankConsent, pk=consent_id)
     found = aspsp.authorise(consent)
+    ledger.mark_own_transfers(
+        consent.customer_id, services.transactions_df(consent.customer_id)
+    )
     services.refresh_profile(consent.customer_id)
     extra = {"accounts_found": found}
     if not found:

@@ -31,7 +31,7 @@ from .habits import compute_habits
 from .income import compute_income
 from .levels import compute_levels
 from .mortgage import compute_mortgage
-from .multibank import compute_multibank
+from .multibank import compute_multibank, merged_transactions
 from .whatif import compute_whatif
 
 
@@ -103,6 +103,7 @@ def build_profile(
     peer_table: dict | None = None,
     mortgage_model: dict | None = None,
     snoozed: dict | None = None,
+    linked: dict | None = None,
 ) -> dict:
     """Full profile for one customer as of `today` (JSON-serialisable).
 
@@ -111,9 +112,14 @@ def build_profile(
     ratings: {goal_type: {up, down}} (#54). dismissed: detected-goal ids.
     peer_table: benchmarks.compute_peer_table output. mortgage_model:
     mortgage.fit_readiness_model output. snoozed: {alert_id: until date}.
+    linked: other banks under an active consent (multibank/ledger.py):
+    {transactions: DataFrame, accounts: [...], consents: [...]}. Without it
+    the profile is exactly the S-Bank-only one.
     """
     today = to_date(today)
     df = _empty_df() if df is None or not len(df) else df
+    if linked:
+        df = merged_transactions(df, linked.get("transactions"))
     prepared = prepare(df, today)
     cust = _customer(customer)
     customer_id = (customer or {}).get("customer_id")
@@ -148,7 +154,7 @@ def build_profile(
     profile["levels"] = levels
     profile["goals"] = goals_section
     profile["benchmarks"] = compute_benchmarks(prepared, cust, peer_table, today)
-    profile["multibank"] = compute_multibank(prepared, today)
+    profile["multibank"] = compute_multibank(prepared, today, linked)
     # No transactions -> nothing to alert about (not "balance EUR 0").
     profile["alerts"] = (
         alerts_mod.run_all_alerts(
