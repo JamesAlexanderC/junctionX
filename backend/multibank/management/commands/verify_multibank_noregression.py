@@ -18,8 +18,28 @@ SNAPSHOT = SYNTHETIC_DIR / "noregression_snapshot.json"
 IGNORED = {"generated_at", "multibank"}
 
 
+NEW_ALERTS = {112}  # #112 partial-view nudge: planned for unlinked customers
+
+
 def _sections(profile):
-    return {k: v for k, v in profile.items() if k not in IGNORED}
+    """Profile minus what the plan adds on purpose for unlinked customers:
+    the multibank section, the #112 nudge and the partial_view caveat."""
+    out = {k: v for k, v in profile.items() if k not in IGNORED}
+    out["alerts"] = [
+        a for a in out.get("alerts", []) if a.get("inference") not in NEW_ALERTS
+    ]
+    # availability["alerts"] only says whether any alert exists; the alert
+    # list itself is compared above (without #112).
+    out["availability"] = {
+        item: {k: v for k, v in rule.items() if k != "caveat"}
+        for item, rule in (out.get("availability") or {}).items()
+        if item != "alerts"
+    }
+    return out
+
+
+def _nudged(profile):
+    return any(a.get("inference") in NEW_ALERTS for a in profile.get("alerts", []))
 
 
 def _diff(old, new):
@@ -39,18 +59,22 @@ class Command(BaseCommand):
                 "customer_id", flat=True
             )
         )
-        checked, failed = 0, []
+        checked, failed, nudged = 0, [], []
         for customer_id in snap["customers"]:
             if customer_id in linked:
                 self.stdout.write(f"skip {customer_id}: has a linked bank")
                 continue
-            new = _sections(services.build(customer_id))
-            changed = _diff(snap["profiles"][customer_id], new)
+            profile = services.build(customer_id)
+            if _nudged(profile):
+                nudged.append(customer_id)
+            new = _sections(profile)
+            changed = _diff(_sections(snap["profiles"][customer_id]), new)
             checked += 1
             if changed:
                 failed.append((customer_id, changed))
         for customer_id, changed in failed:
             self.stdout.write(f"CHANGED {customer_id}: {', '.join(changed)}")
         self.stdout.write(f"{checked - len(failed)}/{checked} identical")
+        self.stdout.write(f"partial-view nudge (#112): {', '.join(nudged) or 'none'}")
         if failed:
             raise CommandError("Unlinked profiles changed")

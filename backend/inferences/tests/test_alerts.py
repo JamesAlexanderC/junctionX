@@ -224,6 +224,7 @@ def test_priority():
 
 def test_registry_covers_every_alert():
     expected = {6, 20, 23, 38, 39, 40, 42, 43, 50, 52, 62, 70} | set(range(76, 103))
+    expected |= {112}  # multibank bonus (MULTIBANK_PLAN.md)
     assert set(alerts.ALERT_RULES) == expected
 
 

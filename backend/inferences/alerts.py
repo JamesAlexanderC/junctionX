@@ -434,6 +434,24 @@ def rule_43_cross_bank_subscriptions(df, profile, today, **ctx):
     return found
 
 
+def rule_112_partial_view(df, profile, today, **ctx):
+    """#112: most of the salary leaves S-Bank for an unlinked bank. Blue, at
+    most once a month (the id carries the month)."""
+    if _get(profile, "multibank.coverage") != "partial":
+        return None
+    return _alert(
+        112,
+        "blue",
+        "I only see part of your money",
+        "Most of your salary moves to another bank, so I only see your S-Bank "
+        "account. Want to connect your other bank?",
+        today,
+        today + timedelta(days=30),
+        {"unmatched_share": _get(profile, "multibank.unmatched_share")},
+        key=today.strftime("%Y-%m"),
+    )
+
+
 def _goals(profile):
     return [g for g in _get(profile, "goals.active", []) or [] if not g.get("paused")]
 
@@ -1448,6 +1466,7 @@ ALERT_RULES = {
     100: rule_100_payday_missed,
     101: rule_101_bill_went_up,
     102: rule_102_big_bill,
+    112: rule_112_partial_view,
 }
 
 

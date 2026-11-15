@@ -12,7 +12,14 @@ from __future__ import annotations
 import pandas as pd
 
 from . import thresholds as th
-from .common import matched_own_transfers, prepare, r2
+from .common import (
+    full_months,
+    matched_own_transfers,
+    monthly_totals,
+    neutral_mask,
+    prepare,
+    r2,
+)
 from .income import monthly_income, regular_bills, subscriptions
 
 HOME_BANK = "S-Bank"
@@ -81,6 +88,29 @@ def own_transfer_ids(df: pd.DataFrame) -> set:
     return matched_own_transfers(df)
 
 
+def coverage(prepared: pd.DataFrame, today, linked: dict | None = None) -> dict:
+    """#112: how much of the money we see, from S-Bank data alone.
+
+    The share of salary that leaves as a salary sweep and is not matched (#41)
+    to a linked account. Above COVERAGE_PARTIAL_SHARE the view is "partial";
+    with linked banks and little unmatched it is "full"; else "sbank_only".
+    """
+    months = full_months(today, th.INCOME_MEDIAN_MONTHS, prepared)
+    matched = own_transfer_ids(prepared) if linked else set()
+    sweeps = prepared[neutral_mask(prepared) & ~prepared["tx_id"].isin(matched)]
+    sweeps = sweeps.assign(amount=-sweeps["tx_amount_eur"])
+    ttype = prepared["transaction_type"].str.lower()
+    salary = prepared[ttype.isin(th.SALARY_TYPES)]
+    salary_total = sum(monthly_totals(salary, months, "tx_amount_eur").values())
+    swept = sum(monthly_totals(sweeps, months).values()) if months else 0.0
+    share = swept / salary_total if salary_total > 0 else 0.0
+    if share > th.COVERAGE_PARTIAL_SHARE:
+        level = "partial"
+    else:
+        level = "full" if (linked or {}).get("accounts") else "sbank_only"
+    return {"coverage": level, "unmatched_share": r2(share)}
+
+
 def _linked_summary(prepared: pd.DataFrame, linked: dict | None) -> dict:
     """What the consents added: banks, accounts, consents, #41 matches."""
     linked = linked or {}
@@ -91,6 +121,15 @@ def _linked_summary(prepared: pd.DataFrame, linked: dict | None) -> dict:
         "consents": linked.get("consents", []),
         "own_transfers_found": len(own_transfer_ids(prepared) & external),
         "simulated": bool(linked.get("accounts")),
+    }
+
+
+def _summary(prepared: pd.DataFrame, today, linked: dict | None) -> dict:
+    cov = coverage(prepared, today, linked)
+    return {
+        **_linked_summary(prepared, linked),
+        "coverage": cov["coverage"],
+        "unmatched_share": cov["unmatched_share"],
     }
 
 
@@ -114,7 +153,7 @@ def compute_multibank(df: pd.DataFrame, today, linked: dict | None = None) -> di
             "home_bank_income": 0.0,
             "hidden_loans": [],
             "duplicate_subscriptions": [],
-            **_linked_summary(prepared, linked),
+            **_summary(prepared, today, linked),
         }
     accounts = []
     for acc, g in prepared.groupby("bank_account_id"):
@@ -176,7 +215,7 @@ def compute_multibank(df: pd.DataFrame, today, linked: dict | None = None) -> di
         "hidden_loans": hidden,
         "hidden_loans_monthly": r2(sum(h["amount"] for h in hidden)),
         "duplicate_subscriptions": dups,
-        **_linked_summary(prepared, linked),
+        **_summary(prepared, today, linked),
     }
 
 
