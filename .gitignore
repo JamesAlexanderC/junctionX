@@ -2,7 +2,12 @@
 venv/
 __pycache__/
 *.pyc
-data/
+# Real S-Bank data stays out of git. Only the generated other-bank demo
+# data is shared (manage.py generate_external_banks --seed 42).
+data/*
+!data/synthetic/
+data/synthetic/*
+!data/synthetic/external_banks.json
 node_modules/
 dist/
 .pytest_cache/

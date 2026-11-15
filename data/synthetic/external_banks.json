@@ -1,0 +1,2241 @@
+{
+ "banks": {
+  "AABAFI22": "\u00c5landsbanken",
+  "DABAFIHH": "Danske Bank",
+  "HELSFIHH": "Aktia",
+  "NDEAFIHH": "Nordea",
+  "OKOYFIHH": "OP"
+ },
+ "customers": {
+  "CUST00018": {
+   "AABAFI22": {
+    "accounts": [
+     {
+      "balance": 2843.96,
+      "balanceDate": "2026-09-30",
+      "cashAccountType": "SVGS",
+      "currency": "EUR",
+      "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2638",
+      "isSynthetic": true,
+      "name": "Savings account",
+      "resourceId": "AABA-E-SAV",
+      "transactions": []
+     }
+    ]
+   }
+  },
+  "CUST00019": {
+   "DABAFIHH": {
+    "accounts": [
+     {
+      "balance": 456.12,
+      "balanceDate": "2026-09-30",
+      "cashAccountType": "CACC",
+      "currency": "EUR",
+      "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 3536",
+      "isSynthetic": true,
+      "name": "Everyday account",
+      "resourceId": "DABA-C-CUR",
+      "transactions": [
+       {
+        "bookingDate": "2025-10-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4111"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0001",
+        "valueDate": "2025-10-07"
+       },
+       {
+        "bookingDate": "2025-11-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5861"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0002",
+        "valueDate": "2025-11-07"
+       },
+       {
+        "bookingDate": "2025-12-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4566"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0003",
+        "valueDate": "2025-12-07"
+       },
+       {
+        "bookingDate": "2026-01-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1958"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0004",
+        "valueDate": "2026-01-07"
+       },
+       {
+        "bookingDate": "2026-02-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9883"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0005",
+        "valueDate": "2026-02-07"
+       },
+       {
+        "bookingDate": "2026-03-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1998"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0006",
+        "valueDate": "2026-03-07"
+       },
+       {
+        "bookingDate": "2026-04-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6138"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0007",
+        "valueDate": "2026-04-07"
+       },
+       {
+        "bookingDate": "2026-05-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1936"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0008",
+        "valueDate": "2026-05-07"
+       },
+       {
+        "bookingDate": "2026-06-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1821"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0009",
+        "valueDate": "2026-06-07"
+       },
+       {
+        "bookingDate": "2026-07-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 8811"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0010",
+        "valueDate": "2026-07-07"
+       },
+       {
+        "bookingDate": "2026-08-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9238"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0011",
+        "valueDate": "2026-08-07"
+       },
+       {
+        "bookingDate": "2026-09-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9701"
+        },
+        "creditorName": "StreamTone Music",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "StreamTone Music",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-C-CUR-0012",
+        "valueDate": "2026-09-07"
+       }
+      ]
+     }
+    ]
+   },
+   "HELSFIHH": {
+    "accounts": [
+     {
+      "balance": 456.12,
+      "balanceDate": "2026-09-30",
+      "cashAccountType": "CACC",
+      "currency": "EUR",
+      "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 3579",
+      "isSynthetic": true,
+      "name": "Everyday account",
+      "resourceId": "HELS-C-CUR",
+      "transactions": [
+       {
+        "bookingDate": "2025-10-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1931"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0001",
+        "valueDate": "2025-10-21"
+       },
+       {
+        "bookingDate": "2025-11-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9320"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0002",
+        "valueDate": "2025-11-21"
+       },
+       {
+        "bookingDate": "2025-12-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2312"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0003",
+        "valueDate": "2025-12-21"
+       },
+       {
+        "bookingDate": "2026-01-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4044"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0004",
+        "valueDate": "2026-01-21"
+       },
+       {
+        "bookingDate": "2026-02-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2122"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0005",
+        "valueDate": "2026-02-21"
+       },
+       {
+        "bookingDate": "2026-03-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2113"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0006",
+        "valueDate": "2026-03-21"
+       },
+       {
+        "bookingDate": "2026-04-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4853"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0007",
+        "valueDate": "2026-04-21"
+       },
+       {
+        "bookingDate": "2026-05-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7615"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0008",
+        "valueDate": "2026-05-21"
+       },
+       {
+        "bookingDate": "2026-06-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2964"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0009",
+        "valueDate": "2026-06-21"
+       },
+       {
+        "bookingDate": "2026-07-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5033"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0010",
+        "valueDate": "2026-07-21"
+       },
+       {
+        "bookingDate": "2026-08-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1651"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0011",
+        "valueDate": "2026-08-21"
+       },
+       {
+        "bookingDate": "2026-09-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2343"
+        },
+        "creditorName": "Melodia Plus",
+        "merchantCategoryCode": "5815",
+        "proprietaryBankTransactionCode": "SUBSCRIPTION",
+        "remittanceInformationUnstructured": "Melodia Plus",
+        "transactionAmount": {
+         "amount": "-11.99",
+         "currency": "EUR"
+        },
+        "transactionId": "HELS-C-CUR-0012",
+        "valueDate": "2026-09-21"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "CUST01819": {
+   "DABAFIHH": {
+    "accounts": [
+     {
+      "balance": 56.0,
+      "balanceDate": "2026-09-30",
+      "cashAccountType": "CACC",
+      "currency": "EUR",
+      "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7868",
+      "isSynthetic": true,
+      "name": "Everyday account",
+      "resourceId": "DABA-D-CUR",
+      "transactions": [
+       {
+        "bookingDate": "2025-10-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9565"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0001",
+        "valueDate": "2025-10-20"
+       },
+       {
+        "bookingDate": "2025-11-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6183"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0002",
+        "valueDate": "2025-11-20"
+       },
+       {
+        "bookingDate": "2025-12-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5272"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0003",
+        "valueDate": "2025-12-20"
+       },
+       {
+        "bookingDate": "2026-01-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4346"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0004",
+        "valueDate": "2026-01-20"
+       },
+       {
+        "bookingDate": "2026-02-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6147"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0005",
+        "valueDate": "2026-02-20"
+       },
+       {
+        "bookingDate": "2026-03-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4910"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0006",
+        "valueDate": "2026-03-20"
+       },
+       {
+        "bookingDate": "2026-04-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5351"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0007",
+        "valueDate": "2026-04-20"
+       },
+       {
+        "bookingDate": "2026-05-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7484"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0008",
+        "valueDate": "2026-05-20"
+       },
+       {
+        "bookingDate": "2026-06-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 3144"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0009",
+        "valueDate": "2026-06-20"
+       },
+       {
+        "bookingDate": "2026-07-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5915"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0010",
+        "valueDate": "2026-07-20"
+       },
+       {
+        "bookingDate": "2026-08-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 8491"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0011",
+        "valueDate": "2026-08-20"
+       },
+       {
+        "bookingDate": "2026-09-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6180"
+        },
+        "creditorName": "Card repayment",
+        "merchantCategoryCode": "6012",
+        "proprietaryBankTransactionCode": "CARD_REPAYMENT",
+        "remittanceInformationUnstructured": "Card repayment",
+        "transactionAmount": {
+         "amount": "-162.00",
+         "currency": "EUR"
+        },
+        "transactionId": "DABA-D-CUR-0012",
+        "valueDate": "2026-09-20"
+       }
+      ]
+     },
+     {
+      "balance": -906.52,
+      "balanceDate": "2026-09-30",
+      "cashAccountType": "CARD",
+      "currency": "EUR",
+      "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2188",
+      "isSynthetic": true,
+      "name": "Credit card",
+      "resourceId": "DABA-D-CARD",
+      "transactions": []
+     }
+    ]
+   }
+  },
+  "CUST03369": {
+   "NDEAFIHH": {
+    "accounts": [
+     {
+      "balance": 57.79,
+      "balanceDate": "2026-09-30",
+      "cashAccountType": "CACC",
+      "currency": "EUR",
+      "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5506",
+      "isSynthetic": true,
+      "name": "Car loan account",
+      "resourceId": "NDEA-A-CUR",
+      "transactions": [
+       {
+        "bookingDate": "2025-10-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5012"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0001",
+        "valueDate": "2025-10-03"
+       },
+       {
+        "bookingDate": "2025-11-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4657"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0002",
+        "valueDate": "2025-11-03"
+       },
+       {
+        "bookingDate": "2025-12-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 3286"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0003",
+        "valueDate": "2025-12-03"
+       },
+       {
+        "bookingDate": "2026-01-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2679"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0004",
+        "valueDate": "2026-01-03"
+       },
+       {
+        "bookingDate": "2026-02-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9935"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0005",
+        "valueDate": "2026-02-03"
+       },
+       {
+        "bookingDate": "2026-03-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2424"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0006",
+        "valueDate": "2026-03-03"
+       },
+       {
+        "bookingDate": "2026-04-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7912"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0007",
+        "valueDate": "2026-04-03"
+       },
+       {
+        "bookingDate": "2026-05-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1520"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0008",
+        "valueDate": "2026-05-03"
+       },
+       {
+        "bookingDate": "2026-06-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1488"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0009",
+        "valueDate": "2026-06-03"
+       },
+       {
+        "bookingDate": "2026-07-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2535"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0010",
+        "valueDate": "2026-07-03"
+       },
+       {
+        "bookingDate": "2026-08-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4582"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0011",
+        "valueDate": "2026-08-03"
+       },
+       {
+        "bookingDate": "2026-09-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4811"
+        },
+        "creditorName": "Autorahoitus Oy",
+        "merchantCategoryCode": "6141",
+        "proprietaryBankTransactionCode": "LOAN",
+        "remittanceInformationUnstructured": "Car loan instalment",
+        "transactionAmount": {
+         "amount": "-331.00",
+         "currency": "EUR"
+        },
+        "transactionId": "NDEA-A-CUR-0012",
+        "valueDate": "2026-09-03"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "CUST03600": {
+   "OKOYFIHH": {
+    "accounts": [
+     {
+      "balance": 50224.76,
+      "balanceDate": "2026-09-30",
+      "cashAccountType": "CACC",
+      "currency": "EUR",
+      "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9279",
+      "isSynthetic": true,
+      "name": "Everyday account",
+      "resourceId": "OKOY-B-CUR",
+      "transactions": [
+       {
+        "bookingDate": "2025-10-02",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5741"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-74.68",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0016",
+        "valueDate": "2025-10-02"
+       },
+       {
+        "bookingDate": "2025-10-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6925"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-68.12",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0014",
+        "valueDate": "2025-10-03"
+       },
+       {
+        "bookingDate": "2025-10-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2654"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-35.95",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0017",
+        "valueDate": "2025-10-03"
+       },
+       {
+        "bookingDate": "2025-10-04",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7201"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-93.39",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0013",
+        "valueDate": "2025-10-04"
+       },
+       {
+        "bookingDate": "2025-10-13",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6977"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-19.78",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0018",
+        "valueDate": "2025-10-13"
+       },
+       {
+        "bookingDate": "2025-10-16",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4257"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "3741.38",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0001",
+        "valueDate": "2025-10-16"
+       },
+       {
+        "bookingDate": "2025-10-19",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2139"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-46.54",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0015",
+        "valueDate": "2025-10-19"
+       },
+       {
+        "bookingDate": "2025-11-06",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4432"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-57.21",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0019",
+        "valueDate": "2025-11-06"
+       },
+       {
+        "bookingDate": "2025-11-13",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4598"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-19.56",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0023",
+        "valueDate": "2025-11-13"
+       },
+       {
+        "bookingDate": "2025-11-17",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4611"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "3918.78",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0002",
+        "valueDate": "2025-11-17"
+       },
+       {
+        "bookingDate": "2025-11-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9751"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-73.10",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0021",
+        "valueDate": "2025-11-20"
+       },
+       {
+        "bookingDate": "2025-11-22",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2169"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-51.02",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0020",
+        "valueDate": "2025-11-22"
+       },
+       {
+        "bookingDate": "2025-11-22",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1916"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-21.08",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0024",
+        "valueDate": "2025-11-22"
+       },
+       {
+        "bookingDate": "2025-11-24",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 8573"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-49.69",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0022",
+        "valueDate": "2025-11-24"
+       },
+       {
+        "bookingDate": "2025-12-05",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9830"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-18.91",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0030",
+        "valueDate": "2025-12-05"
+       },
+       {
+        "bookingDate": "2025-12-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7482"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-74.33",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0028",
+        "valueDate": "2025-12-07"
+       },
+       {
+        "bookingDate": "2025-12-08",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6168"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-84.31",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0025",
+        "valueDate": "2025-12-08"
+       },
+       {
+        "bookingDate": "2025-12-13",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4456"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-51.06",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0026",
+        "valueDate": "2025-12-13"
+       },
+       {
+        "bookingDate": "2025-12-17",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5557"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "4700.69",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0003",
+        "valueDate": "2025-12-17"
+       },
+       {
+        "bookingDate": "2025-12-19",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6155"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-87.58",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0027",
+        "valueDate": "2025-12-19"
+       },
+       {
+        "bookingDate": "2025-12-21",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5339"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-24.85",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0029",
+        "valueDate": "2025-12-21"
+       },
+       {
+        "bookingDate": "2026-01-05",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2489"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-65.57",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0033",
+        "valueDate": "2026-01-05"
+       },
+       {
+        "bookingDate": "2026-01-05",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7916"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-29.57",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0035",
+        "valueDate": "2026-01-05"
+       },
+       {
+        "bookingDate": "2026-01-09",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 8019"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-79.82",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0031",
+        "valueDate": "2026-01-09"
+       },
+       {
+        "bookingDate": "2026-01-16",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 3615"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "4625.19",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0004",
+        "valueDate": "2026-01-16"
+       },
+       {
+        "bookingDate": "2026-01-19",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4593"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-58.96",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0032",
+        "valueDate": "2026-01-19"
+       },
+       {
+        "bookingDate": "2026-01-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7252"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-13.78",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0036",
+        "valueDate": "2026-01-20"
+       },
+       {
+        "bookingDate": "2026-01-25",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2796"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-37.83",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0034",
+        "valueDate": "2026-01-25"
+       },
+       {
+        "bookingDate": "2026-02-04",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 3591"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-20.22",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0041",
+        "valueDate": "2026-02-04"
+       },
+       {
+        "bookingDate": "2026-02-09",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1188"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-93.26",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0038",
+        "valueDate": "2026-02-09"
+       },
+       {
+        "bookingDate": "2026-02-15",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5315"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-12.09",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0042",
+        "valueDate": "2026-02-15"
+       },
+       {
+        "bookingDate": "2026-02-20",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9669"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-94.77",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0037",
+        "valueDate": "2026-02-20"
+       },
+       {
+        "bookingDate": "2026-02-22",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9797"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-78.24",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0039",
+        "valueDate": "2026-02-22"
+       },
+       {
+        "bookingDate": "2026-02-25",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6573"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-51.01",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0040",
+        "valueDate": "2026-02-25"
+       },
+       {
+        "bookingDate": "2026-03-01",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6574"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "4563.01",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0005",
+        "valueDate": "2026-03-01"
+       },
+       {
+        "bookingDate": "2026-03-01",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9005"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-28.77",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0048",
+        "valueDate": "2026-03-01"
+       },
+       {
+        "bookingDate": "2026-03-04",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5889"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-87.23",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0044",
+        "valueDate": "2026-03-04"
+       },
+       {
+        "bookingDate": "2026-03-05",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 3646"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-57.43",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0046",
+        "valueDate": "2026-03-05"
+       },
+       {
+        "bookingDate": "2026-03-17",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9317"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-80.72",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0043",
+        "valueDate": "2026-03-17"
+       },
+       {
+        "bookingDate": "2026-03-18",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9689"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-38.70",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0047",
+        "valueDate": "2026-03-18"
+       },
+       {
+        "bookingDate": "2026-03-27",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4258"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-73.34",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0045",
+        "valueDate": "2026-03-27"
+       },
+       {
+        "bookingDate": "2026-04-01",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 3547"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "4158.00",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0006",
+        "valueDate": "2026-04-01"
+       },
+       {
+        "bookingDate": "2026-04-01",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6947"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-41.71",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0049",
+        "valueDate": "2026-04-01"
+       },
+       {
+        "bookingDate": "2026-04-02",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2290"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-49.45",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0051",
+        "valueDate": "2026-04-02"
+       },
+       {
+        "bookingDate": "2026-04-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2133"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-78.91",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0052",
+        "valueDate": "2026-04-03"
+       },
+       {
+        "bookingDate": "2026-04-05",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 3705"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-30.47",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0054",
+        "valueDate": "2026-04-05"
+       },
+       {
+        "bookingDate": "2026-04-16",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6514"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "4375.95",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0007",
+        "valueDate": "2026-04-16"
+       },
+       {
+        "bookingDate": "2026-04-25",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 3060"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-26.92",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0053",
+        "valueDate": "2026-04-25"
+       },
+       {
+        "bookingDate": "2026-04-27",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4923"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-83.41",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0050",
+        "valueDate": "2026-04-27"
+       },
+       {
+        "bookingDate": "2026-05-04",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2049"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-18.94",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0059",
+        "valueDate": "2026-05-04"
+       },
+       {
+        "bookingDate": "2026-05-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4295"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-90.73",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0056",
+        "valueDate": "2026-05-07"
+       },
+       {
+        "bookingDate": "2026-05-09",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7932"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-66.66",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0055",
+        "valueDate": "2026-05-09"
+       },
+       {
+        "bookingDate": "2026-05-11",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4770"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-12.59",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0060",
+        "valueDate": "2026-05-11"
+       },
+       {
+        "bookingDate": "2026-05-15",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 8397"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-88.98",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0058",
+        "valueDate": "2026-05-15"
+       },
+       {
+        "bookingDate": "2026-05-23",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7118"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-53.70",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0057",
+        "valueDate": "2026-05-23"
+       },
+       {
+        "bookingDate": "2026-05-31",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2519"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "3991.61",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0008",
+        "valueDate": "2026-05-31"
+       },
+       {
+        "bookingDate": "2026-06-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6413"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-89.33",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0063",
+        "valueDate": "2026-06-03"
+       },
+       {
+        "bookingDate": "2026-06-03",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5562"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-65.85",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0064",
+        "valueDate": "2026-06-03"
+       },
+       {
+        "bookingDate": "2026-06-05",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 8744"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-32.25",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0066",
+        "valueDate": "2026-06-05"
+       },
+       {
+        "bookingDate": "2026-06-17",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2584"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "4454.57",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0009",
+        "valueDate": "2026-06-17"
+       },
+       {
+        "bookingDate": "2026-06-19",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2163"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-48.21",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0061",
+        "valueDate": "2026-06-19"
+       },
+       {
+        "bookingDate": "2026-06-22",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9834"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-25.59",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0065",
+        "valueDate": "2026-06-22"
+       },
+       {
+        "bookingDate": "2026-06-23",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4750"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-72.87",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0062",
+        "valueDate": "2026-06-23"
+       },
+       {
+        "bookingDate": "2026-07-02",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6559"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-23.27",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0071",
+        "valueDate": "2026-07-02"
+       },
+       {
+        "bookingDate": "2026-07-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 8062"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-40.66",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0068",
+        "valueDate": "2026-07-07"
+       },
+       {
+        "bookingDate": "2026-07-08",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7669"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-82.08",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0067",
+        "valueDate": "2026-07-08"
+       },
+       {
+        "bookingDate": "2026-07-12",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 8651"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-60.41",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0069",
+        "valueDate": "2026-07-12"
+       },
+       {
+        "bookingDate": "2026-07-17",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 6635"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "4969.61",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0010",
+        "valueDate": "2026-07-17"
+       },
+       {
+        "bookingDate": "2026-07-26",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5073"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-36.13",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0072",
+        "valueDate": "2026-07-26"
+       },
+       {
+        "bookingDate": "2026-07-28",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2612"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-78.74",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0070",
+        "valueDate": "2026-07-28"
+       },
+       {
+        "bookingDate": "2026-08-02",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9856"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-30.26",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0077",
+        "valueDate": "2026-08-02"
+       },
+       {
+        "bookingDate": "2026-08-05",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 5563"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-60.31",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0074",
+        "valueDate": "2026-08-05"
+       },
+       {
+        "bookingDate": "2026-08-07",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 8350"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-46.41",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0073",
+        "valueDate": "2026-08-07"
+       },
+       {
+        "bookingDate": "2026-08-15",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2235"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-49.99",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0075",
+        "valueDate": "2026-08-15"
+       },
+       {
+        "bookingDate": "2026-08-15",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2604"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-83.48",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0076",
+        "valueDate": "2026-08-15"
+       },
+       {
+        "bookingDate": "2026-08-17",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1711"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "4624.87",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0011",
+        "valueDate": "2026-08-17"
+       },
+       {
+        "bookingDate": "2026-08-27",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 2528"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-12.41",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0078",
+        "valueDate": "2026-08-27"
+       },
+       {
+        "bookingDate": "2026-09-06",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 7396"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-57.74",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0082",
+        "valueDate": "2026-09-06"
+       },
+       {
+        "bookingDate": "2026-09-09",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 8454"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-37.94",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0083",
+        "valueDate": "2026-09-09"
+       },
+       {
+        "bookingDate": "2026-09-10",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 8973"
+        },
+        "creditorName": "Lounasravintola",
+        "merchantCategoryCode": "5812",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "Lounasravintola",
+        "transactionAmount": {
+         "amount": "-23.84",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0084",
+        "valueDate": "2026-09-10"
+       },
+       {
+        "bookingDate": "2026-09-14",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 4502"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-64.14",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0080",
+        "valueDate": "2026-09-14"
+       },
+       {
+        "bookingDate": "2026-09-25",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 3724"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-85.92",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0079",
+        "valueDate": "2026-09-25"
+       },
+       {
+        "bookingDate": "2026-09-28",
+        "creditorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 1960"
+        },
+        "creditorName": "L\u00e4hikauppa",
+        "merchantCategoryCode": "5411",
+        "proprietaryBankTransactionCode": "PURCHASE",
+        "remittanceInformationUnstructured": "L\u00e4hikauppa",
+        "transactionAmount": {
+         "amount": "-59.06",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0081",
+        "valueDate": "2026-09-28"
+       },
+       {
+        "bookingDate": "2026-09-30",
+        "debtorAccount": {
+         "iban": "FI\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 9785"
+        },
+        "debtorName": "Own account at S-Bank",
+        "merchantCategoryCode": null,
+        "proprietaryBankTransactionCode": "TRANSFER",
+        "remittanceInformationUnstructured": "Transfer from own account",
+        "transactionAmount": {
+         "amount": "4462.93",
+         "currency": "EUR"
+        },
+        "transactionId": "OKOY-B-CUR-0012",
+        "valueDate": "2026-09-30"
+       }
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "is_synthetic": true,
+ "seed": 42
+}
