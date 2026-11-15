@@ -258,6 +258,17 @@ def on_track(actual: float, expected: float) -> bool:
     return actual >= th.ON_TRACK_FACTOR * expected
 
 
+def counts_for_level_4(goal: dict) -> bool:
+    """#31: an active goal counts once it is on track AND has money saved. On
+    its first day every goal is on track (0% of 0% expected), so without the
+    saved part a just-accepted plan reached Level 4 at once."""
+    return (
+        bool(goal.get("on_track"))
+        and not goal.get("paused")
+        and (goal.get("progress_pct") or 0.0) > 0
+    )
+
+
 def goal_difficulty(months: int | None) -> str:
     """#49: <= 2 Easy, 3 to 6 Stretch, > 6 Hard (None = not reachable = Hard)."""
     if months is None:

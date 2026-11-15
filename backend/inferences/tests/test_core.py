@@ -188,7 +188,7 @@ def test_every_level_has_a_requirement(lv):
         "low": 445.0,
         "l3": False,
         "goals_active": 1,
-        "goals_on_track": 0,
+        "goals_counting": 0,
         "readiness": 0.5,
         "l5": False,
         "buffer_months": 0.5,
@@ -200,7 +200,7 @@ def test_every_level_has_a_requirement(lv):
 
 
 def test_level_4_with_goal_on_track(df_today, inc, bsk):
-    goals = [{"on_track": True, "paused": False}]
+    goals = [{"on_track": True, "paused": False, "progress_pct": 10.0}]
     lv = levels.compute_levels(df_today, TODAY, inc, bsk, goals=goals)
     ladder = {step["level"]: step for step in lv["ladder"]}
     assert ladder[4]["reached"] is True
@@ -264,3 +264,20 @@ def test_level_1_without_bills_says_the_bill_is_missing(df_today, inc, bsk):
     assert lv["current"] == 0
     checks = {c["text"]: c["met"] for c in lv["next_requirement"]["checks"]}
     assert checks == {"Payday found": True, "A regular bill found": False}
+
+
+def test_a_new_goal_with_nothing_saved_does_not_reach_level_4(df_today, inc, bsk):
+    # A goal is "on track" on its first day (0% saved of 0% expected); live, an
+    # accepted plan jumped CUST00124 from level 3 to 5 at once.
+    goals = [{"on_track": True, "paused": False, "progress_pct": 0.0}]
+    lv = levels.compute_levels(df_today, TODAY, inc, bsk, goals=goals)
+    ladder = {step["level"]: step for step in lv["ladder"]}
+    assert ladder[4]["reached"] is False
+
+
+def test_level_4_check_says_nothing_is_saved_yet():
+    facts = {"goals_active": 1, "goals_counting": 0}
+    req = levels._requirement(4, facts)
+    assert req["checks"] == [
+        {"text": "1 active goal, 0 on track with money saved", "met": False}
+    ]
