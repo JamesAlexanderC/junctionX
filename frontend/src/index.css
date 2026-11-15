@@ -14,8 +14,6 @@
   --border: #dcdcdc;
   --accent: var(--brand-green);
   --accent-soft: #e6f6ec;
-  /* New buttons: white on #00aa46 fails WCAG AA; this passes (5.4:1). */
-  --action-dark: #007a33;
   --on-brand: #ffffff;
   --error: #b3261e;
   --error-soft: #fde7ec;

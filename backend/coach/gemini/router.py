@@ -42,29 +42,6 @@ LEVELS_HINT = (
 )
 
 
-# Accounts at other banks (MULTIBANK_PLAN.md MB-7), in en / fi / sv.
-MULTIBANK_RE = re.compile(
-    r"\b(other bank|another bank|second bank|other accounts?|all my accounts|"
-    r"all accounts|nordea|op|danske|aktia|ålandsbanken|alandsbanken|"
-    r"toinen pankki|toisen pankin|toiseen pankkiin|kaikki tilit|annan pankin|"
-    r"annan bank|andra banken?|alla mina konton|connect\w*|yhdistä\w*|psd2)\b",
-    re.I,
-)
-MULTIBANK_HINT = (
-    "Other banks may matter here (simulated PSD2). If other_banks is set, "
-    "also call get_multibank_insights for income, safe to spend, bills, loans "
-    "or buffer questions, and name the bank each number comes from (loans: "
-    "bank, day_of_month and amount; take a loan's date from "
-    "get_multibank_insights, not from upcoming bills). Use "
-    "get_accounts_overview for accounts "
-    "and compare_linked_view for what changed."
-)
-
-
-def wants_multibank(message):
-    return bool(MULTIBANK_RE.search(message or ""))
-
-
 def wants_levels(message):
     return bool(LEVELS_RE.search(message or ""))
 

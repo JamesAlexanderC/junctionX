@@ -411,36 +411,22 @@ def save_artifact(key, data=None, blob=None):
 
 
 def build(customer_id):
-    """Run every inference for one customer (no caching).
-
-    With an active bank consent (multibank) the profile is built from the
-    merged ledger, plus the S-Bank-only numbers for the before/after card.
-    Without one it is exactly the S-Bank-only profile.
-    """
-    from inferences.multibank import with_delta
+    """Run every inference for one customer (no caching)."""
     from inferences.profile import build_profile
-    from multibank.ledger import linked_context
 
-    def run(linked=None):
-        return build_profile(
-            transactions_df(customer_id),
-            customer_dict(customer_id),
-            as_of_date(),
-            goals=goal_dicts(customer_id),
-            loans=latest_loan(customer_id),
-            ratings=ratings(customer_id),
-            dismissed=dismissed_ids(customer_id),
-            peer_table=peer_table(),
-            mortgage_model=mortgage_model(),
-            linked=linked,
-            # Snoozes are applied when reading (active_alerts), not baked into
-            # the cached profile, so an alert comes back when its snooze ends.
-        )
-
-    linked = linked_context(customer_id)
-    if not linked:
-        return run()
-    return with_delta(run(linked), run())
+    return build_profile(
+        transactions_df(customer_id),
+        customer_dict(customer_id),
+        as_of_date(),
+        goals=goal_dicts(customer_id),
+        loans=latest_loan(customer_id),
+        ratings=ratings(customer_id),
+        dismissed=dismissed_ids(customer_id),
+        peer_table=peer_table(),
+        mortgage_model=mortgage_model(),
+        # Snoozes are applied when reading (active_alerts), not baked into the
+        # cached profile, so an alert comes back when its snooze ends.
+    )
 
 
 def get_profile(customer_id):

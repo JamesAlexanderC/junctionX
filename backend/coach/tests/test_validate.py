@@ -256,7 +256,6 @@ def test_card_declaration_lists_every_nested_field():
         "after": cards._Snapshot,
         "goal": cards._SliderGoal,
         "data": cards._Row,
-        "accounts": cards._AccountRow,
     }
     for field, model in nested.items():
         schema = props[field]

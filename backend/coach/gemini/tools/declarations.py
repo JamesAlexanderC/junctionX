@@ -36,25 +36,7 @@ ACTION_SCHEMA = {
 
 SNAPSHOT = {
     "type": "object",
-    "properties": {
-        "safe_to_spend": NUM,
-        "buffer_months": NUM,
-        "goal_date": STR,
-        "dsti": NUM,
-        "level": INT,
-        "monthly_income": NUM,
-    },
-}
-ACCOUNT_ROW = {
-    "type": "object",
-    "properties": {
-        "bank": STR,
-        "name": STR,
-        "type": STR,
-        "balance": NUM,
-        "iban_masked": STR,
-        "simulated": {"type": "boolean"},
-    },
+    "properties": {"safe_to_spend": NUM, "buffer_months": NUM, "goal_date": STR},
 }
 
 CARD_SCHEMA = {
@@ -72,8 +54,7 @@ CARD_SCHEMA = {
         "question {question, options, quick_answer?}; "
         "alert {id, severity, title, text}; "
         "plan {steps: [{text, monthly_impact, clears}]}; "
-        "before_after {before, after}: compare_linked_view's card unchanged; "
-        "accounts: get_accounts_overview's card unchanged."
+        "before_after {before, after}."
     ),
     "properties": {
         "type": {
@@ -89,7 +70,6 @@ CARD_SCHEMA = {
                 "alert",
                 "plan",
                 "before_after",
-                "accounts",
             ],
         },
         "label": STR,
@@ -166,8 +146,6 @@ CARD_SCHEMA = {
         },
         "before": SNAPSHOT,
         "after": SNAPSHOT,
-        "accounts": {"type": "array", "items": ACCOUNT_ROW},
-        "coverage": STR,
     },
     "required": ["type"],
 }
@@ -215,22 +193,6 @@ DECLARATIONS = [
         "End-of-month balance range (#19), danger days (#20), upcoming bills (#21).",
     ),
     _decl("get_spender_type", "Spender type and habit traits (#11-#16)."),
-    _decl(
-        "get_accounts_overview",
-        "Accounts at S-Bank and connected other banks (simulated PSD2): bank, "
-        "type, balance, coverage (#112), consent expiry, and an accounts card.",
-    ),
-    _decl(
-        "get_multibank_insights",
-        "With other banks connected: own transfers (#41), hidden loans with "
-        "bank, day and amount (#42), duplicate subscriptions (#43), real "
-        "income (#111), total buffer (#113). Simulated data.",
-    ),
-    _decl(
-        "compare_linked_view",
-        "Before (S-Bank only) vs after (all connected banks): safe to spend, "
-        "DSTI, buffer months, level, income, as a before_after card.",
-    ),
     _decl("list_goals", "Active goals with progress, plus the recommended goal."),
     _decl(
         "create_goal",

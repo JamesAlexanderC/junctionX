@@ -8,11 +8,10 @@ const insight = (title) => ({
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status })
 const EMPTY_GOALS = { active: [], completed: [], clash: null }
 const EMPTY_SPENDING = { month: null, total: 0, categories: [], savings: [] }
-// Goals, spending and accounts load beside insights; only insights reads count.
+// Goals and spending load beside insights; only insights reads are counted.
 const otherPanel = (url) => {
   if (url.startsWith('/api/goals/')) return json(EMPTY_GOALS)
   if (url.startsWith('/api/spending/')) return json(EMPTY_SPENDING)
-  if (url.startsWith('/api/accounts/')) return json({ accounts: [], coverage: 'sbank_only' })
   return null
 }
 afterEach(() => vi.unstubAllGlobals())

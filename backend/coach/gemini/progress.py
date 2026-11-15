@@ -41,9 +41,6 @@ STEP_LABELS = {
     "manage_goal": "Updating your goal",
     "dismiss_suggestion": "Dismissing that suggestion",
     "save_loan_details": "Saving your loan details",
-    "get_accounts_overview": "Looking at all your accounts",
-    "get_multibank_insights": "Checking your other banks",
-    "compare_linked_view": "Comparing before and after",
     "send_reply": "Checking the answer",
 }
 DEFAULT_STEP = "Looking at your data"

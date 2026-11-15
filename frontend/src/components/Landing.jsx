@@ -3,39 +3,8 @@
 // their level, income level and spender type. Tap one to open their view.
 
 import { useEffect, useState } from 'react'
-import { getDemoDirectory, getMultibankCustomers, logout } from '../api.js'
+import { getDemoDirectory, logout } from '../api.js'
 import Icon from './Icon.jsx'
-
-// Customers with simulated other-bank data (MULTIBANK_PLAN.md). The level
-// demos above stay as they are; this only adds a way in.
-function MultibankPicker({ customers, onEnter }) {
-  if (!customers.length) return null
-  return (
-    <div className="section multibank-picker">
-      <h2 className="section-title">
-        <Icon name="multibank" size={16} />
-        Other-bank demo (simulated)
-      </h2>
-      <select
-        aria-label="Customers with other-bank data"
-        defaultValue=""
-        onChange={(e) => e.target.value && onEnter(e.target.value)}
-      >
-        <option value="" disabled>
-          Choose a customer…
-        </option>
-        {customers.map((c) => (
-          <option key={c.customer_id} value={c.customer_id}>
-            {[c.customer_id, c.banks.join(' + '), c.story].filter(Boolean).join(' · ')}
-          </option>
-        ))}
-      </select>
-      <p className="muted">
-        Open one, then Accounts → Connect another bank → pick the bank shown here.
-      </p>
-    </div>
-  )
-}
 
 function CustomerRow({ c, onEnter }) {
   const tags = [c.level_name, c.income_label, c.spender_type].filter(Boolean)
@@ -53,7 +22,6 @@ function CustomerRow({ c, onEnter }) {
 export default function Landing({ onEnter }) {
   const [dir, setDir] = useState(null)
   const [error, setError] = useState(null)
-  const [multibank, setMultibank] = useState([])
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -62,10 +30,6 @@ export default function Landing({ onEnter }) {
       .catch((e) => {
         if (e?.name !== 'AbortError') setError(e.message)
       })
-    // Optional: without generated other-bank data the dropdown just hides.
-    getMultibankCustomers({ signal: ctrl.signal })
-      .then(setMultibank)
-      .catch(() => {})
     return () => ctrl.abort()
   }, [])
 
@@ -99,8 +63,6 @@ export default function Landing({ onEnter }) {
             No customer index yet. Run <code>manage.py build_customer_index</code>.
           </p>
         )}
-
-        <MultibankPicker customers={multibank} onEnter={onEnter} />
 
         {dir?.demos.length > 0 && (
           <div className="section">

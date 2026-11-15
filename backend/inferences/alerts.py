@@ -74,7 +74,7 @@ import numpy as np
 import pandas as pd
 
 from inferences import alert_thresholds as thresholds
-from inferences.thresholds import CONSENT_EXPIRY_WARN_DAYS, NO_PAYDAY_HORIZON_DAYS
+from inferences.thresholds import NO_PAYDAY_HORIZON_DAYS
 from inferences import models
 from inferences.common import (
     buffer_amount,
@@ -419,19 +419,12 @@ def rule_43_cross_bank_subscriptions(df, profile, today, **ctx):
     found = []
     for dup in dups:
         name = dup.get("name") or dup.get("merchant_id")
-        banks = sorted({x.get("bank") for x in dup.get("services") or []} - {None})
-        text = f"{name} is a subscription on two of your accounts."
-        if len(banks) >= 2 and dup.get("yearly_cost"):
-            text = (
-                f"You pay for {name}, one at each of {' and '.join(banks)}: "
-                f"about {_eur(dup['yearly_cost'])} a year for the extra one."
-            )
         found.append(
             _alert(
                 43,
                 "blue",
                 "Paying twice?",
-                text,
+                f"{name} is a subscription on two of your accounts.",
                 today,
                 today + timedelta(days=30),
                 dict(dup),
@@ -439,51 +432,6 @@ def rule_43_cross_bank_subscriptions(df, profile, today, **ctx):
             )
         )
     return found
-
-
-def rule_114_consent_expiring(df, profile, today, **ctx):
-    """#114: a bank connection (PSD2 consent) ends within 14 days. Blue."""
-    found = []
-    for consent in _get(profile, "multibank.consents", []) or []:
-        ends = _to_date(consent.get("expires_at"))
-        if ends is None:
-            continue
-        days = (ends - today).days
-        if not 0 <= days <= CONSENT_EXPIRY_WARN_DAYS:
-            continue
-        bank = consent.get("bank") or "other bank"
-        found.append(
-            _alert(
-                114,
-                "blue",
-                "Bank connection ending",
-                f"Your {bank} connection ends in {days} days. Renew it to keep "
-                "seeing those accounts.",
-                today,
-                ends,
-                {"bank": bank, "expires_at": ends.isoformat(), "days_left": days},
-                key=consent.get("consent_id"),
-            )
-        )
-    return found
-
-
-def rule_112_partial_view(df, profile, today, **ctx):
-    """#112: most of the salary leaves S-Bank for an unlinked bank. Blue, at
-    most once a month (the id carries the month)."""
-    if _get(profile, "multibank.coverage") != "partial":
-        return None
-    return _alert(
-        112,
-        "blue",
-        "I only see part of your money",
-        "Most of your salary moves to another bank, so I only see your S-Bank "
-        "account. Want to connect your other bank?",
-        today,
-        today + timedelta(days=30),
-        {"unmatched_share": _get(profile, "multibank.unmatched_share")},
-        key=today.strftime("%Y-%m"),
-    )
 
 
 def _goals(profile):
@@ -972,8 +920,6 @@ def rule_81_buffer_thin(df, profile, today, **ctx):
     if payments <= 0:
         return None
     lowest = _lowest_balance(df, today)
-    if lowest is not None:  # #113: savings at linked banks count too
-        lowest += float(_get(profile, "multibank.external_liquid", 0.0) or 0.0)
     if lowest is None:
         lowest = _get(profile, "balance")
     if lowest is None or float(lowest) / payments >= 1:
@@ -1502,8 +1448,6 @@ ALERT_RULES = {
     100: rule_100_payday_missed,
     101: rule_101_bill_went_up,
     102: rule_102_big_bill,
-    112: rule_112_partial_view,
-    114: rule_114_consent_expiring,
 }
 
 

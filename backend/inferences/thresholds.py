@@ -305,13 +305,3 @@ PEER_BELOW = 0.8
 DEMO_LEVELS = 5
 # Shorter histories give noisy monthly averages.
 DEMO_MIN_HISTORY_MONTHS = 6
-
-# --- Multi-bank bonus items (#111 to #114, MULTIBANK_PLAN.md; simulated PSD2) ---
-
-# #112: above this share of salary leaving S-Bank unmatched by a linked
-# account, we only see part of the money (same cut as PARTIAL_VIEW_COVERAGE).
-COVERAGE_PARTIAL_SHARE = PARTIAL_VIEW_COVERAGE
-# #114: warn this many days before a consent's 180-day access ends.
-CONSENT_EXPIRY_WARN_DAYS = 14
-# #113: linked account types that count as liquid for buffer months.
-LIQUID_ACCOUNT_TYPES = frozenset({"current", "savings"})

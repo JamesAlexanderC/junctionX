@@ -35,10 +35,7 @@ function Progress({ step, thought }) {
   )
 }
 
-// This chip opens the connect flow instead of asking the coach (MB-8).
-export const CONNECT_CHIP = 'Connect another bank'
-
-function CoachMessage({ reply, onSend, onConnect, isLast }) {
+function CoachMessage({ reply, onSend, isLast }) {
   return (
     <div className="msg coach">
       <div className="msg-head">
@@ -56,13 +53,7 @@ function CoachMessage({ reply, onSend, onConnect, isLast }) {
       {isLast && reply.chips?.length > 0 && (
         <div className="chips">
           {reply.chips.slice(0, 3).map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() =>
-                c === CONNECT_CHIP && onConnect ? onConnect() : onSend(c, nextDepth(reply.depth))
-              }
-            >
+            <button key={c} type="button" onClick={() => onSend(c, nextDepth(reply.depth))}>
               {c}
             </button>
           ))}
@@ -72,14 +63,7 @@ function CoachMessage({ reply, onSend, onConnect, isLast }) {
   )
 }
 
-export default function Chat({
-  messages,
-  busy,
-  progress = {},
-  onSend,
-  onConnect,
-  disabled,
-}) {
+export default function Chat({ messages, busy, progress = {}, onSend, disabled }) {
   const [draft, setDraft] = useState('')
   const endRef = useRef(null)
 
@@ -129,7 +113,6 @@ export default function Chat({
               key={i}
               reply={m.reply}
               onSend={onSend}
-              onConnect={onConnect}
               isLast={i === messages.length - 1}
             />
           ),
