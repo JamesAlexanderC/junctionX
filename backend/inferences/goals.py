@@ -160,11 +160,12 @@ def funding_cuts(needed_monthly: float, leaky: dict) -> list[dict]:
 
 
 def counts_towards_level(goal: dict) -> int | None:
-    """#71: safety-net goal -> Level 3, any on-track goal -> Level 4."""
+    """#71: safety-net goal -> Level 3, an on-track goal with money saved ->
+    Level 4 (models.counts_for_level_4)."""
     lv = th.GOAL_LEVEL.get(goal.get("type"))
     if lv:
         return lv
-    return 4 if goal.get("on_track") else None
+    return 4 if models.counts_for_level_4(goal) else None
 
 
 def evaluate_goal(goal: dict, today, baskets: dict, forecast: dict) -> dict:
