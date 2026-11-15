@@ -16,7 +16,12 @@ def unusual_charge(amount: float, merchant_history, category_history=None) -> di
     z = 0.6745 (x - merchant median) / MAD; flag when z > 3.5 and the merchant
     has >= 3 past payments; otherwise flag when x > 3 x the category median.
     """
+    # Lists, not Series: `category_history or hist` below needs a plain
+    # truth value (a pandas Series raised "truth value is ambiguous").
     hist = [float(x) for x in merchant_history]
+    category_history = (
+        None if category_history is None else [float(x) for x in category_history]
+    )
     med = float(np.median(hist)) if hist else None
     m = models.mad(hist) if hist else None
     z = models.robust_z(amount, hist) if hist else None

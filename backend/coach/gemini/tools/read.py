@@ -3,16 +3,20 @@
 import math
 import re
 
+from inferences.common import last_complete_month
+from inferences.thresholds import OWN_TRANSFER_TYPES
+
 from ...models import Transaction
 from ... import services
-from inferences.common import last_complete_month
-
 from .context import ToolError, _missing, _norm, unavailable
 
 # --- tool implementations --------------------------------------------------
 
 
 def get_category_spend(ctx, category, month=None):
+    """Spend in one category: outflows minus own-account and Saver transfers
+    (common.spend), so "salary" or "invest" never count the salary_sweep or
+    investment deposits as spending."""
     month = month or last_complete_month(ctx.today)  # F8
     if not re.fullmatch(r"\d{4}-\d{2}", month):
         raise ToolError("month must be YYYY-MM")
@@ -23,7 +27,12 @@ def get_category_spend(ctx, category, month=None):
         tx_date__year=year,
         tx_date__month=mon,
     )
-    rows = [t for t in qs if _norm(category) in _norm(t.category)]
+    rows = [
+        t
+        for t in qs
+        if _norm(category) in _norm(t.category)
+        and (t.transaction_type or "").lower() not in OWN_TRANSFER_TYPES
+    ]
     if not rows:
         return {
             **unavailable(f"No spending in '{category}' in {month}."),

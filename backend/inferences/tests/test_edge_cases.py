@@ -56,6 +56,18 @@ def test_unusual_charge_in_frame():
     assert len(flagged) == 1 and flagged[0]["amount"] == 89.0
 
 
+def test_unusual_charge_short_merchant_history_uses_category():
+    # Fewer than 3 merchant payments: falls back to the category history,
+    # which arrives as a pandas Series (this used to raise ValueError).
+    rows = [
+        dict(ts=f"2026-{m:02d}-10", amount=-20, merchant=f"M_{m}", category="sport")
+        for m in (5, 6, 7, 8, 9)
+    ] + [dict(ts="2026-10-10", amount=-90, merchant="M_NEW", category="sport")]
+    flagged = anomalies.unusual_charges(make_df(rows), date(2026, 10, 18))
+    assert [f["rule"] for f in flagged] == ["category_median"]
+    assert flagged[0]["amount"] == 90.0
+
+
 def test_category_spike():
     # #40: taxis 20, 22, 21, then 47.80 -> flagged (47.80 > 31.50, +26.80 > 20).
     rows = [

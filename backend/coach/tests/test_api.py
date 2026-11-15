@@ -4,13 +4,15 @@ The customer is Test Aino loaded into the test DB; every profile is built by
 the real inference engine, so expected numbers are read from the tools.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from coach import services
 from coach.gemini import loop, router
 from coach.gemini.system_prompt import FALLBACK_REPLY
 from coach.gemini.tools import ToolContext, call_tool
-from coach.models import Goal, Profile
+from coach.models import Account, Goal, Profile, Transaction
 
 from .conftest import AINO, response
 
@@ -130,6 +132,32 @@ def test_chat_tool_then_send_reply(client, aino, fake_gemini):
 def test_unsupported_category_is_unavailable(aino):
     out = call_tool(ToolContext(AINO), "get_category_spend", {"category": "casino"})
     assert out["available"] is False and out["reason"]
+
+
+def test_category_spend_leaves_out_own_transfers(aino):
+    """Sweeps and Saver deposits are not spending (common.spend)."""
+    ctx = ToolContext(AINO)
+    month = ctx.today.replace(day=1) - timedelta(days=1)
+    acc = Account.objects.filter(customer_id=AINO).first()
+    for i, (cat, ttype) in enumerate(
+        (("Salary Sweep", "salary_sweep"), ("Invest Deposit", "investment_deposit"))
+    ):
+        Transaction.objects.create(
+            tx_id=f"own-{i}",
+            customer_id=AINO,
+            account=acc,
+            tx_date=month,
+            tx_timestamp=datetime(
+                month.year, month.month, month.day, 12, tzinfo=timezone.utc
+            ),
+            category=cat,
+            tx_amount_eur=-500.0,
+            balance_after_eur=0.0,
+            transaction_type=ttype,
+        )
+    for word in ("salary", "invest"):
+        out = call_tool(ToolContext(AINO), "get_category_spend", {"category": word})
+        assert out["available"] is False, word
 
 
 def test_no_send_reply_stops_after_max_rounds(client, aino, fake_gemini):
