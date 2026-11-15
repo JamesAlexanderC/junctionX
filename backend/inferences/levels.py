@@ -120,14 +120,16 @@ def _requirement(lv, f):
             ],
         }
     if lv == 4:  # #31
-        n, ok = f["goals_active"], f["goals_on_track"]
+        n, ok = f["goals_active"], f["goals_counting"]
         text = (
             "No active goal yet"
             if not n
-            else f"{n} active goal{'s' if n != 1 else ''}, {ok} on track"
+            else f"{n} active goal{'s' if n != 1 else ''}, {ok} on track with "
+            "money saved"
         )
         return {
-            "text": "Have an active goal that is on track.",
+            "text": "Have an active goal that is on track, with money saved "
+            "towards it.",
             "checks": [{"text": text, "met": ok > 0}],
         }
     if lv == 5:  # #32
@@ -188,9 +190,10 @@ def compute_levels(
     # #30 Level 3: buffer months = lowest balance (30 days) / monthly essentials.
     buffer_months = safe_div(low, essentials, default=0.0)
     l3 = buffer_months >= th.SAFETY_NET_MONTHS
-    # #31 Level 4: an active goal that is on track.
+    # #31 Level 4: an active goal that is on track, with money saved.
     live = [g for g in goals or [] if not g.get("paused")]
-    l4 = any(g.get("on_track") for g in live)
+    counting = sum(1 for g in live if models.counts_for_level_4(g))
+    l4 = counting > 0
     # #32 Level 5: readiness >= 0.75.
     l5 = readiness is not None and readiness >= th.MORTGAGE_READY_SCORE
     # Level 6: buffer >= 3 months and Saver >= 10% of income 3 months running.
@@ -246,7 +249,7 @@ def compute_levels(
         "low": low,
         "l3": l3,
         "goals_active": len(live),
-        "goals_on_track": sum(1 for g in live if g.get("on_track")),
+        "goals_counting": counting,
         "readiness": readiness,
         "l5": l5,
         "buffer_months": buffer_months,
