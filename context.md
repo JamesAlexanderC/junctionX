@@ -313,7 +313,29 @@ Run #4 on the other bank's outflows and keep bills with a loan or credit categor
 43
 Cross-bank duplicate subscriptions
 #5 on each bank
-The same merchant appears as a subscription (#5) in two or more accounts.
+The same merchant appears as a subscription (#5) in two or more accounts, or subscriptions with the same MCC appear at two or more banks. Yearly cost = what the extra services cost (all but the dearest), x 12.
+Bonus: simulated PSD2 multi-bank view (#111 to #114, MULTIBANK_PLAN.md)
+Linked banks come only from synthetic data (generate_external_banks --seed 42) through a consent screen with no credentials. With no active consent the profile is exactly the S-Bank-only one (verify_multibank_noregression). Constants in thresholds.py.
+#
+Inference
+Data
+How it's calculated
+111
+Real income
+merged ledger
+Recompute #1 to #3 on S-Bank plus linked rows after #41, so a transfer between own accounts at two banks is never counted as income.
+112
+Partial view (coverage)
+S-Bank data alone
+Share of salary leaving as a salary sweep not matched (#41) to a linked account. Above COVERAGE_PARTIAL_SHARE (0.5): "partial" (blue alert at most once a month; income, safe-to-spend and level items carry caveat "partial_view"). Linked and below: "full". Else "sbank_only".
+113
+Total buffer
+linked balances
+Buffer months (#30, #81) add the balances of linked current and savings accounts. Safe to spend (#17) stays the S-Bank balance but subtracts bills due at any bank before payday.
+114
+Consent expiring
+consents
+Blue alert from CONSENT_EXPIRY_WARN_DAYS (14) days before a consent's 180-day access ends.
 More alerts (#76 to #102)
 These extend the alerts above with mortgage and loan risk, debt stress, spending pace, subscriptions and savings. Mortgage checks follow Finland's rule from the FIN-FSA: loan payments should stay at or below 60% of net income if interest rates rose to 6%, over at most 25 years (FIN-FSA, 2024). Most Finnish mortgages have variable rates, so payments move when rates move.
 The data shows loan payments but no loan balances or rates: #77 and #82 need the user to enter the balance once ("Add loan details"), otherwise they fall back to #76.

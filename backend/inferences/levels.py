@@ -165,17 +165,19 @@ def compute_levels(
     baskets: dict,
     goals: list[dict] | None = None,
     readiness: float | None = None,
+    extra_liquid: float = 0.0,
 ) -> dict:
     """profile["levels"] (#28 to #33).
 
     goals: active goal dicts with `on_track` and `paused` (#31, from #52).
     readiness: mortgage readiness score 0..1 (#32, from #35).
+    extra_liquid: current and savings balances at linked banks (#113).
     """
     df = prepare(df, today)
     income_monthly = income.get("monthly_income") or 0.0
     essentials = baskets.get("monthly_essentials") or 0.0
     low = lowest_balance(df, today) if len(df) else 0.0
-    low = low or 0.0
+    low = (low or 0.0) + extra_liquid  # #113: buffer across all banks
 
     # #28 Level 1: payday and at least one regular bill detected. On a partial
     # view the bills are paid from another bank, so a payday alone counts.

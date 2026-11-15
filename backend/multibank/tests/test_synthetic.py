@@ -103,3 +103,9 @@ def test_data_ends_with_the_sbank_data(data):
                 dates = [t["bookingDate"] for t in account["transactions"]]
                 assert all("2025-10-01" <= d <= "2026-09-30" for d in dates)
                 assert account["balanceDate"] == "2026-09-30"
+
+
+def test_a_hero_loan_account_holds_only_a_small_balance(data):
+    # Otherwise #113 counts it as buffer and the level goes up, not down.
+    account = _account(data, sc.HERO, "NDEAFIHH", "CACC")
+    assert 0 < account["balance"] < 150

@@ -71,8 +71,11 @@ class _Account:
 
 def _hero(rng):
     """A: a car loan paid on the 3rd, before the 15th payday."""
-    acc = _Account(rng, "NDEA-A-CUR", "Everyday account", "CACC", opening=4200.0)
     payment = -float(rng.randint(250, 350))
+    # Kept just topped up for the instalments: only a small balance is left.
+    leftover = round(rng.uniform(50, 120), 2)
+    opening = -payment * len(_month_starts()) + leftover
+    acc = _Account(rng, "NDEA-A-CUR", "Car loan account", "CACC", opening=opening)
     for start in _month_starts():
         acc.add(
             start.replace(day=3),

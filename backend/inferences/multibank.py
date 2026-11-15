@@ -14,6 +14,7 @@ import pandas as pd
 from . import thresholds as th
 from .common import (
     full_months,
+    latest_balance,
     matched_own_transfers,
     monthly_totals,
     neutral_mask,
@@ -155,68 +156,152 @@ def compute_multibank(df: pd.DataFrame, today, linked: dict | None = None) -> di
             "duplicate_subscriptions": [],
             **_summary(prepared, today, linked),
         }
-    accounts = []
-    for acc, g in prepared.groupby("bank_account_id"):
-        accounts.append(
-            {
-                "bank_account_id": str(acc),
-                "bank": str(g["bank"].iloc[0]),
-                "synthetic": (
-                    bool(g["synthetic"].any()) if "synthetic" in g.columns else False
-                ),
-            }
-        )
     home = prepared[prepared["bank"] == HOME_BANK]
     other = prepared[prepared["bank"] != HOME_BANK]
-
-    # #42 hidden loans: #4 on the other bank's outflows, loan category / MCC.
-    hidden = []
-    if len(other):
-        for b in regular_bills(other, today):
-            if _is_loan(b):
-                hidden.append(
-                    {
-                        "merchant_id": b["merchant_id"],
-                        "name": b["name"],
-                        "bank": str(
-                            other.loc[
-                                other["merchant_id"] == b["merchant_id"], "bank"
-                            ].iloc[0]
-                        ),
-                        "amount": b["amount"],
-                        "next_date": b["next_date"],
-                    }
-                )
-
-    # #43 same merchant as a subscription (#5) in two or more accounts.
-    seen: dict[str, dict] = {}
-    for acc, g in prepared.groupby("bank_account_id"):
-        for s in subscriptions(regular_bills(g, today)):
-            entry = seen.setdefault(
-                s["merchant_id"], {"name": s["name"], "accounts": [], "amount": 0.0}
-            )
-            entry["accounts"].append(str(acc))
-            entry["amount"] += s["amount"]
-    dups = [
-        {
-            "merchant_id": m,
-            "name": e["name"],
-            "accounts": e["accounts"],
-            "monthly_total": r2(e["amount"]),
-        }
-        for m, e in seen.items()
-        if len(e["accounts"]) >= 2
-    ]
+    hidden = _hidden_loans(other, today)
     return {
-        "accounts": accounts,
+        "accounts": _accounts(prepared),
         # #41: union of all accounts, own-account transfers removed by matching.
         "true_income": r2(monthly_income(prepared, today)),
         "home_bank_income": r2(monthly_income(home, today)) if len(home) else 0.0,
         "hidden_loans": hidden,
         "hidden_loans_monthly": r2(sum(h["amount"] for h in hidden)),
-        "duplicate_subscriptions": dups,
+        "duplicate_subscriptions": _duplicate_subscriptions(prepared, today),
         **_summary(prepared, today, linked),
+        **_liquid(home, linked),
     }
+
+
+def _accounts(prepared: pd.DataFrame) -> list[dict]:
+    return [
+        {
+            "bank_account_id": str(acc),
+            "bank": str(g["bank"].iloc[0]),
+            "synthetic": bool(g["synthetic"].any()) if "synthetic" in g else False,
+        }
+        for acc, g in prepared.groupby("bank_account_id")
+    ]
+
+
+def _evidence(rows: pd.DataFrame, n: int = 3) -> list[dict]:
+    """Latest rows as {date, amount, bank, name}: never raw IDs (#42)."""
+    out = []
+    for _, r in rows.sort_values("tx_date").tail(n).iterrows():
+        name = r.get("merchant_name")
+        out.append(
+            {
+                "date": r["tx_date"].date().isoformat(),
+                "amount": r2(r["tx_amount_eur"]),
+                "bank": str(r["bank"]),
+                "name": str(name) if isinstance(name, str) and name else "Unknown",
+            }
+        )
+    return out
+
+
+def _hidden_loans(other: pd.DataFrame, today) -> list[dict]:
+    """#42: #4 on the other banks' outflows, kept when loan category / MCC."""
+    hidden = []
+    if not len(other):
+        return hidden
+    for b in regular_bills(other, today):
+        if not _is_loan(b):
+            continue
+        rows = other[other["merchant_id"] == b["merchant_id"]]
+        hidden.append(
+            {
+                "merchant_id": b["merchant_id"],
+                "name": b["name"],
+                "bank": str(rows["bank"].iloc[0]),
+                "amount": b["amount"],
+                "day_of_month": int(rows["tx_date"].dt.day.mode().iloc[0]),
+                "next_date": b["next_date"],
+                "evidence": _evidence(rows),
+            }
+        )
+    return hidden
+
+
+def _subscriptions_by_account(prepared: pd.DataFrame, today) -> list[dict]:
+    """#5 per account, with the account's bank."""
+    found = []
+    for acc, g in prepared.groupby("bank_account_id"):
+        bank = str(g["bank"].iloc[0])
+        for sub in subscriptions(regular_bills(g, today)):
+            found.append({**sub, "account": str(acc), "bank": bank})
+    return found
+
+
+def _dup_entry(key: str, subs: list[dict]) -> dict:
+    monthly = [float(x["amount"]) for x in subs]
+    return {
+        "merchant_id": key,
+        "name": " and ".join(dict.fromkeys(x["name"] for x in subs)),
+        "accounts": [x["account"] for x in subs],
+        "mcc": subs[0].get("mcc_code") or None,
+        "services": [
+            {"name": x["name"], "bank": x["bank"], "monthly": r2(x["amount"])}
+            for x in subs
+        ],
+        "monthly_total": r2(sum(monthly)),
+        # What paying twice costs: everything but the dearest one, a year.
+        "yearly_cost": r2((sum(monthly) - max(monthly)) * 12),
+    }
+
+
+def _duplicate_subscriptions(prepared: pd.DataFrame, today) -> list[dict]:
+    """#43: the same merchant as a subscription in two or more accounts, or
+    subscriptions with the same MCC at two or more banks (#92)."""
+    subs = _subscriptions_by_account(prepared, today)
+    dups, used = [], set()
+    by_merchant: dict[str, list] = {}
+    for x in subs:
+        by_merchant.setdefault(x["merchant_id"], []).append(x)
+    for merchant, group in by_merchant.items():
+        if len({x["account"] for x in group}) >= 2:
+            dups.append(_dup_entry(merchant, group))
+            used.update(id(x) for x in group)
+    by_mcc: dict[str, list] = {}
+    for x in subs:
+        if id(x) not in used and x.get("mcc_code"):
+            by_mcc.setdefault(x["mcc_code"], []).append(x)
+    for mcc, group in by_mcc.items():
+        if len({x["bank"] for x in group}) >= 2:
+            dups.append(_dup_entry(f"mcc-{mcc}", group))
+    return dups
+
+
+def external_liquid(linked: dict | None) -> float:
+    """#113: linked current and savings balances (cards and loans excluded)."""
+    accounts = (linked or {}).get("accounts") or []
+    return r2(
+        sum(
+            float(a.get("balance_eur") or 0.0)
+            for a in accounts
+            if a.get("type") in th.LIQUID_ACCOUNT_TYPES
+        )
+    )
+
+
+def _liquid(home: pd.DataFrame, linked: dict | None) -> dict:
+    """#113: what is liquid across S-Bank and linked accounts."""
+    sbank = latest_balance(home) if len(home) else None
+    extra = external_liquid(linked)
+    return {
+        "external_liquid": extra,
+        "total_liquid_balance": r2((sbank or 0.0) + extra),
+    }
+
+
+def external_loan_payments(bills: list[dict]) -> float:
+    """#42: monthly loan bills paid at other banks (ledger ids start EXT:)."""
+    return r2(
+        sum(
+            float(b["amount"])
+            for b in bills
+            if str(b["merchant_id"]).startswith("EXT:") and _is_loan(b)
+        )
+    )
 
 
 # Numbers the before/after card compares (MULTIBANK_PLAN.md §5 delta).
